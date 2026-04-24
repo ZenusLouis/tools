@@ -131,3 +131,15 @@ model McpProfile {
   servers     String[]
   useWhen     String
 }
+
+model ApiKey {
+  id             String   @id @default(cuid())
+  name           String
+  service        String
+  encryptedValue String
+  iv             String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([service])
+}

@@ -44,6 +44,11 @@ spec:
                 configMapKeyRef:
                   name: gcs-config
                   key: CLAUDE_ROOT
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gcs-secrets
+                  key: ENCRYPTION_KEY
           readinessProbe:
             httpGet:
               path: /

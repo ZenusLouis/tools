@@ -1,11 +1,16 @@
 import { TopBar } from "@/components/layout/TopBar";
 import { PageShell } from "@/components/layout/PageShell";
 import { GlobalSettingsClient } from "@/components/settings/GlobalSettingsClient";
+import { ApiKeysPanel } from "@/components/settings/ApiKeysPanel";
 import { getMcpProfiles } from "@/lib/mcp";
+import { listApiKeys } from "@/lib/api-keys";
 import { Terminal, FolderOpen } from "lucide-react";
 
 export default async function SettingsPage() {
-  const profiles = await getMcpProfiles();
+  const [profiles, apiKeys] = await Promise.all([
+    getMcpProfiles(),
+    listApiKeys(),
+  ]);
   const claudeRoot = process.env.CLAUDE_ROOT ?? "d:\\GlobalClaudeSkills";
 
   return (
@@ -23,6 +28,11 @@ export default async function SettingsPage() {
 
           {/* 3-column bento grid */}
           <GlobalSettingsClient profiles={profiles} />
+
+          {/* API Keys section */}
+          <section className="bg-card border border-border rounded-xl p-6">
+            <ApiKeysPanel initialKeys={apiKeys} />
+          </section>
 
           {/* About card — glassmorphism */}
           <section className="relative overflow-hidden bg-linear-to-br from-card to-bg-base border border-border rounded-xl p-8 group">

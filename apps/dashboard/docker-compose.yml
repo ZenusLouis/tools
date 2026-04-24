@@ -7,6 +7,7 @@ services:
       DATABASE_URL: postgresql://gcs:gcs@postgres:5432/gcs
       CLAUDE_ROOT: /data
       NODE_ENV: production
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
     volumes:
       - gcs_data:/data
     depends_on:
