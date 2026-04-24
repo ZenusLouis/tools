@@ -2,7 +2,17 @@
 
 import { useMemo, useState, useTransition } from "react";
 
-type Skill = { id: string; name: string; slug: string; category: string; description: string; isRemote: boolean };
+type Skill = { id: string; name: string; slug: string; category: string; description: string; isRemote: boolean; sourcePath?: string | null };
+type SourceSummary = {
+  sources: Array<{ name: string; url: string; kind: string; why: string; recommendedFor?: string[] }>;
+  marketplaceCount: number;
+  wrappedCount: number;
+  cachedSourceCount: number;
+  cachedSkillCount: number;
+  recommendedCount: number;
+  recommendedCandidates: number;
+  recommended: Array<{ name: string; sourceName: string; sourcePath: string; description: string; recommendedFor: string[]; score: number }>;
+};
 type Role = {
   id: string;
   name: string;
@@ -18,20 +28,32 @@ type Role = {
   isBuiltin: boolean;
 };
 
-export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; skills: Skill[]; profiles: string[] }) {
+export function CreateRoleClient({
+  roles,
+  skills,
+  profiles,
+  sourceSummary,
+}: {
+  roles: Role[];
+  skills: Skill[];
+  profiles: string[];
+  sourceSummary: SourceSummary;
+}) {
   const [roleList, setRoleList] = useState(roles);
+  const [skillList, setSkillList] = useState(skills);
+  const [importingSkill, setImportingSkill] = useState("");
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
   const [suggested, setSuggested] = useState<Skill[]>([]);
   const [rulesDraft, setRulesDraft] = useState("");
   const [pending, startTransition] = useTransition();
 
   const groupedSkills = useMemo(() => {
-    return skills.reduce<Record<string, Skill[]>>((acc, skill) => {
+    return skillList.reduce<Record<string, Skill[]>>((acc, skill) => {
       acc[skill.category] ??= [];
       acc[skill.category].push(skill);
       return acc;
     }, {});
-  }, [skills]);
+  }, [skillList]);
 
   function toggleSkill(id: string) {
     setSelectedSkillIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
@@ -82,12 +104,34 @@ export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; s
     });
   }
 
+  function importSkill(skill: SourceSummary["recommended"][number]) {
+    setImportingSkill(skill.name);
+    startTransition(async () => {
+      const res = await fetch("/api/skills/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sourceName: skill.sourceName, name: skill.name, sourcePath: skill.sourcePath }),
+      });
+      if (res.ok) {
+        const next = await fetch("/api/skills").then((r) => r.json());
+        if (Array.isArray(next)) setSkillList(next);
+      }
+      setImportingSkill("");
+    });
+  }
+
   return (
     <div className="grid grid-cols-1 xl:grid-cols-[320px_1fr] gap-6">
       <section className="rounded-xl border bg-card p-4">
-        <h2 className="text-sm font-bold text-text mb-3">Role Library</h2>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="text-sm font-bold text-text">Role Library</h2>
+        </div>
         <div className="flex flex-col gap-2">
-          {roleList.map((role) => (
+          {roleList.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-border bg-bg-base p-3 text-xs text-text-muted">
+              No roles found. Repo agent files sync automatically when this page loads.
+            </div>
+          ) : roleList.map((role) => (
             <div key={role.id} className="rounded-lg border border-border bg-bg-base p-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-text">{role.name}</p>
@@ -102,6 +146,65 @@ export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; s
             </div>
           ))}
         </div>
+      </section>
+
+      <div className="flex flex-col gap-6">
+      <section className="rounded-xl border bg-card p-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-bold text-text">Skill Sources</h2>
+            <p className="text-xs text-text-muted">
+              {sourceSummary.sources.length} GitHub sources, {sourceSummary.marketplaceCount} marketplace skills, {sourceSummary.wrappedCount} local wrappers
+            </p>
+            <p className="text-xs text-text-muted">
+              {sourceSummary.cachedSourceCount} cached sources, {sourceSummary.cachedSkillCount} discovered upstream skills
+            </p>
+            <p className="text-xs text-text-muted">
+              {sourceSummary.recommendedCount} recommended imports from {sourceSummary.recommendedCandidates} scored candidates
+            </p>
+          </div>
+          <a href="/api/skills/sources" className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-accent hover:bg-accent/10">JSON</a>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          {sourceSummary.sources.slice(0, 6).map((source) => (
+            <div key={source.name} className="rounded-lg border border-border bg-bg-base p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold text-text">{source.name}</p>
+                <span className="rounded bg-border px-1.5 py-0.5 text-[10px] text-text-muted">{source.kind}</span>
+              </div>
+              <p className="mt-1 text-xs text-text-muted">{source.why}</p>
+              <p className="mt-2 truncate text-[10px] text-accent">{source.url}</p>
+            </div>
+          ))}
+        </div>
+        {sourceSummary.recommended.length > 0 && (
+          <div className="mt-4">
+            <p className="mb-2 text-[10px] font-bold uppercase text-text-muted">Top import candidates</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {sourceSummary.recommended.map((skill) => (
+                <div key={`${skill.sourceName}-${skill.name}`} className="rounded-lg border border-border bg-bg-base p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-semibold text-text">{skill.name}</p>
+                    <div className="flex items-center gap-1">
+                      <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[10px] text-accent">{skill.score}</span>
+                      <button
+                        type="button"
+                        onClick={() => importSkill(skill)}
+                        disabled={pending || importingSkill === skill.name}
+                        className="rounded border border-border px-2 py-0.5 text-[10px] font-semibold text-accent hover:bg-accent/10 disabled:opacity-50"
+                      >
+                        {importingSkill === skill.name ? "Adding" : "Add"}
+                      </button>
+                    </div>
+                  </div>
+                  <p className="mt-1 text-[10px] text-text-muted">{skill.sourceName}</p>
+                  <p className="mt-1 max-h-10 overflow-hidden text-xs text-text-muted">{skill.description}</p>
+                  <p className="mt-2 text-[10px] text-text-muted">{skill.recommendedFor.slice(0, 3).join(", ")}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       <form action={createRole} className="rounded-xl border bg-card p-5">
@@ -139,7 +242,11 @@ export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; s
         <div className="mt-5">
           <h3 className="text-xs font-bold uppercase tracking-wide text-text-muted mb-3">Skills</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {Object.entries(groupedSkills).map(([category, list]) => (
+          {Object.entries(groupedSkills).length === 0 ? (
+            <div className="rounded-lg border border-dashed border-border bg-bg-base p-3 text-xs text-text-muted">
+              No skills in database yet. Repo skill files sync automatically when this page loads.
+            </div>
+          ) : Object.entries(groupedSkills).map(([category, list]) => (
               <div key={category} className="rounded-lg border border-border bg-bg-base p-3">
                 <p className="mb-2 text-[10px] font-bold uppercase text-accent">{category}</p>
                 <div className="flex flex-col gap-1.5">
@@ -163,10 +270,13 @@ export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; s
           <p className="font-semibold text-text">Generated preview</p>
           <p><code>agents/roles/&lt;slug&gt;.json</code></p>
           <p><code>.claude/roles/&lt;slug&gt;.md</code></p>
-          <p><code>.agents/skills/&lt;slug&gt;/SKILL.md</code></p>
+          <p><code>.codex/skills/&lt;slug&gt;/SKILL.md</code></p>
+          <p><code>.agents/providers/chatgpt/roles/&lt;slug&gt;.md</code></p>
+          <p><code>agents/learning/role-feedback.md</code></p>
           {suggested.length > 0 && <p className="mt-2 text-accent">{suggested.length} suggested skills selected.</p>}
         </div>
       </form>
+      </div>
     </div>
   );
 }
@@ -190,4 +300,3 @@ function Select({ name, label, options }: { name: string; label: string; options
     </label>
   );
 }
-

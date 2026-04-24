@@ -1,0 +1,8 @@
+{
+  "slug": "design-integrator",
+  "name": "Design Integrator",
+  "provider": "claude",
+  "phase": "design",
+  "defaultCommand": "prepare-brief",
+  "skills": ["figma-design", "stitch", "nextjs", "react", "accessibility-auditor", "browser-qa"]
+}

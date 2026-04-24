@@ -51,7 +51,7 @@ spec:
 
                         sh '''
                             /kaniko/executor \
-                                --context "$WORKSPACE/apps/dashboard" \
+                                --context "$WORKSPACE" \
                                 --dockerfile "$WORKSPACE/apps/dashboard/Dockerfile" \
                                 --destination "$APP_IMAGE:$BUILD_ID" \
                                 --destination "$APP_IMAGE:latest" \

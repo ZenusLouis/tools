@@ -4,6 +4,7 @@ import fs from "fs/promises";
 import { requireCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { resolvePath } from "@/lib/fs/resolve";
+import { ensureWorkspaceAgentDefaults } from "@/lib/agent-bootstrap";
 
 const RoleSchema = z.object({
   name: z.string().min(1).max(120),
@@ -22,6 +23,7 @@ const RoleSchema = z.object({
 
 export async function GET() {
   const user = await requireCurrentUser();
+  await ensureWorkspaceAgentDefaults(user.workspaceId);
   const roles = await db.agentRole.findMany({
     where: { workspaceId: user.workspaceId },
     include: { skills: true },
@@ -38,7 +40,8 @@ export async function POST(req: NextRequest) {
   const generatedPaths = {
     shared: `agents/roles/${parsed.data.slug}.json`,
     claude: `.claude/roles/${parsed.data.slug}.md`,
-    codex: `.agents/skills/${parsed.data.slug}/SKILL.md`,
+    codex: `.codex/skills/${parsed.data.slug}/SKILL.md`,
+    chatgpt: `.agents/providers/chatgpt/roles/${parsed.data.slug}.md`,
   };
 
   const role = await db.agentRole.upsert({
@@ -92,13 +95,27 @@ async function writeGeneratedRoleFiles(slug: string, data: Record<string, unknow
   const header = "# Managed by GCS Dashboard. Regenerate from /create.\n\n";
   const sharedPath = resolvePath("agents", "roles", `${slug}.json`);
   const claudePath = resolvePath(".claude", "roles", `${slug}.md`);
-  const codexPath = resolvePath(".agents", "skills", slug, "SKILL.md");
+  const codexPath = resolvePath(".codex", "skills", slug, "SKILL.md");
+  const chatgptPath = resolvePath(".agents", "providers", "chatgpt", "roles", `${slug}.md`);
+  const learningPath = resolvePath("agents", "learning", "role-feedback.md");
 
   await fs.mkdir(resolvePath("agents", "roles"), { recursive: true });
   await fs.mkdir(resolvePath(".claude", "roles"), { recursive: true });
-  await fs.mkdir(resolvePath(".agents", "skills", slug), { recursive: true });
+  await fs.mkdir(resolvePath(".codex", "skills", slug), { recursive: true });
+  await fs.mkdir(resolvePath(".agents", "providers", "chatgpt", "roles"), { recursive: true });
+  await fs.mkdir(resolvePath("agents", "learning"), { recursive: true });
 
   await fs.writeFile(sharedPath, `${JSON.stringify(data, null, 2)}\n`, "utf-8");
   await fs.writeFile(claudePath, `${header}${data.rulesMarkdown}\n\nSkills: ${(data.skillRefs as string[]).join(", ")}\n`, "utf-8");
-  await fs.writeFile(codexPath, `---\nname: ${slug}\ndescription: ${data.description}\n---\n\n${header}${data.rulesMarkdown}\n`, "utf-8");
+  await fs.writeFile(
+    codexPath,
+    `---\nname: ${slug}\ndescription: ${data.description}\n---\n\n${header}${data.rulesMarkdown}\n\n## Skills\n${(data.skillRefs as string[]).map((skill) => `- ${skill}`).join("\n")}\n`,
+    "utf-8",
+  );
+  await fs.writeFile(
+    chatgptPath,
+    `${header}# ${data.name}\n\n${data.description}\n\n## Rules\n${data.rulesMarkdown}\n\n## Skills\n${(data.skillRefs as string[]).map((skill) => `- ${skill}`).join("\n")}\n`,
+    "utf-8",
+  );
+  await fs.appendFile(learningPath, `\n## ${data.name}\n\n- Generated role artifact for ${data.provider}; review after first real task.\n`, "utf-8");
 }

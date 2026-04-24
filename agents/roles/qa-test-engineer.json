@@ -1,0 +1,8 @@
+{
+  "slug": "qa-test-engineer",
+  "name": "QA Test Engineer",
+  "provider": "codex",
+  "phase": "review",
+  "defaultCommand": "review",
+  "skills": ["project-context", "token-saver", "qodo-skills", "pr-review-toolkit", "browser-qa", "accessibility-auditor", "github-actions-debugger"]
+}

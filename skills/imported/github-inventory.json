@@ -1,0 +1,1252 @@
+{
+  "updated": "2026-04-24T11:33:44.651441+00:00",
+  "cachePath": "skills/.cache/github-sources",
+  "sources": [
+    {
+      "name": "openai-skills",
+      "url": "https://github.com/openai/skills",
+      "kind": "official-catalog",
+      "status": "fetched",
+      "error": null,
+      "skillCount": 43,
+      "skills": [
+        {
+          "name": "aspnet-core",
+          "path": "skills/.curated/aspnet-core/SKILL.md",
+          "description": "Build, review, refactor, or architect ASP.NET Core web applications using current official guidance for .NET web development. Use when working on Blazor Web Apps, Razor Pages, MVC, Minimal APIs, controller-based Web APIs, SignalR, gRPC, middleware, dependency injection, configuration, authentication, authorization, testing, performance, deployment, or ASP.NET Core upgrades."
+        },
+        {
+          "name": "chatgpt-apps",
+          "path": "skills/.curated/chatgpt-apps/SKILL.md",
+          "description": "Build, scaffold, refactor, and troubleshoot ChatGPT Apps SDK applications that combine an MCP server and widget UI. Use when Codex needs to design tools, register UI resources, wire the MCP Apps bridge or ChatGPT compatibility APIs, apply Apps SDK metadata or CSP or domain settings, or produce a docs-aligned project scaffold. Prefer a docs-first workflow by invoking the openai-docs skill or OpenAI developer docs MCP tools before generating code."
+        },
+        {
+          "name": "cli-creator",
+          "path": "skills/.curated/cli-creator/SKILL.md",
+          "description": "Build a composable CLI for Codex from API docs, an OpenAPI spec, existing curl examples, an SDK, a web app, an admin tool, or a local script. Use when the user wants Codex to create a command-line tool that can run from any repo, expose composable read/write commands, return stable JSON, manage auth, and pair with a companion skill."
+        },
+        {
+          "name": "cloudflare-deploy",
+          "path": "skills/.curated/cloudflare-deploy/SKILL.md",
+          "description": "Deploy applications and infrastructure to Cloudflare using Workers, Pages, and related platform services. Use when the user asks to deploy, host, publish, or set up a project on Cloudflare."
+        },
+        {
+          "name": "doc",
+          "path": "skills/.curated/doc/SKILL.md",
+          "description": "Use when the task involves reading, creating, or editing `.docx` documents, especially when formatting or layout fidelity matters; prefer `python-docx` plus the bundled `scripts/render_docx.py` for visual checks."
+        },
+        {
+          "name": "figma-code-connect-components",
+          "path": "skills/.curated/figma-code-connect-components/SKILL.md",
+          "description": "Connects Figma design components to code components using Code Connect mapping tools. Use when user says \"code connect\", \"connect this component to code\", \"map this component\", \"link component to code\", \"create code connect mapping\", or wants to establish mappings between Figma designs and code implementations. For canvas writes via `use_figma`, use `figma-use`."
+        },
+        {
+          "name": "figma-create-design-system-rules",
+          "path": "skills/.curated/figma-create-design-system-rules/SKILL.md",
+          "description": "Generates custom design system rules for the user's codebase. Use when user says \"create design system rules\", \"generate rules for my project\", \"set up design rules\", \"customize design system guidelines\", or wants to establish project-specific conventions for Figma-to-code workflows. Requires Figma MCP server connection."
+        },
+        {
+          "name": "figma-create-new-file",
+          "path": "skills/.curated/figma-create-new-file/SKILL.md",
+          "description": "Create a new blank Figma file. Use when the user wants to create a new Figma design or FigJam file, or when you need a new file before calling use_figma. Handles plan resolution via whoami if needed. Usage \u2014 /figma-create-new-file [editorType] [fileName] (e.g. /figma-create-new-file figjam My Whiteboard)"
+        },
+        {
+          "name": "figma-generate-design",
+          "path": "skills/.curated/figma-generate-design/SKILL.md",
+          "description": "Use this skill alongside figma-use when the task involves translating an application page, view, or multi-section layout into Figma. Triggers: 'write to Figma', 'create in Figma from code', 'push page to Figma', 'take this app/page and build it in Figma', 'create a screen', 'build a landing page in Figma', 'update the Figma screen to match code'. This is the preferred workflow skill whenever the user wants to build or update a full page, screen, or view in Figma from code or a description. Discovers design system components, variables, and styles via search_design_system, imports them, and assembles screens incrementally section-by-section using design system tokens instead of hardcoded values."
+        },
+        {
+          "name": "figma-generate-library",
+          "path": "skills/.curated/figma-generate-library/SKILL.md",
+          "description": "Build or update a professional-grade design system in Figma from a codebase. Use when the user wants to create variables/tokens, build component libraries, set up theming (light/dark modes), document foundations, or reconcile gaps between code and Figma. This skill teaches WHAT to build and in WHAT ORDER \u2014 it complements the `figma-use` skill which teaches HOW to call the Plugin API. Both skills should be loaded together."
+        },
+        {
+          "name": "figma-implement-design",
+          "path": "skills/.curated/figma-implement-design/SKILL.md",
+          "description": "Translates Figma designs into production-ready application code with 1:1 visual fidelity. Use when implementing UI code from Figma files, when user mentions \"implement design\", \"generate code\", \"implement component\", provides Figma URLs, or asks to build components matching Figma specs. For Figma canvas writes via `use_figma`, use `figma-use`."
+        },
+        {
+          "name": "figma-use",
+          "path": "skills/.curated/figma-use/SKILL.md",
+          "description": "**MANDATORY prerequisite** \u2014 you MUST invoke this skill BEFORE every `use_figma` tool call. NEVER call `use_figma` directly without loading this skill first. Skipping it causes common, hard-to-debug failures. Trigger whenever the user wants to perform a write action or a unique read action that requires JavaScript execution in the Figma file context \u2014 e.g. create/edit/delete nodes, set up variables or tokens, build components and variants, modify auto-layout or fills, bind variables to properties, or inspect file structure programmatically."
+        },
+        {
+          "name": "figma",
+          "path": "skills/.curated/figma/SKILL.md",
+          "description": "Use the Figma MCP server to fetch design context, screenshots, variables, and assets from Figma, and to translate Figma nodes into production code. Trigger when a task involves Figma URLs, node IDs, design-to-code implementation, or Figma MCP setup and troubleshooting."
+        },
+        {
+          "name": "gh-address-comments",
+          "path": "skills/.curated/gh-address-comments/SKILL.md",
+          "description": "Help address review/issue comments on the open GitHub PR for the current branch using gh CLI; verify gh auth first and prompt the user to authenticate if not logged in."
+        },
+        {
+          "name": "gh-fix-ci",
+          "path": "skills/.curated/gh-fix-ci/SKILL.md",
+          "description": "Use when a user asks to debug or fix failing GitHub PR checks that run in GitHub Actions; use `gh` to inspect checks and logs, summarize failure context, draft a fix plan, and implement only after explicit approval. Treat external providers (for example Buildkite) as out of scope and report only the details URL."
+        },
+        {
+          "name": "jupyter-notebook",
+          "path": "skills/.curated/jupyter-notebook/SKILL.md",
+          "description": "Use when the user asks to create, scaffold, or edit Jupyter notebooks (`.ipynb`) for experiments, explorations, or tutorials; prefer the bundled templates and run the helper script `new_notebook.py` to generate a clean starting notebook."
+        },
+        {
+          "name": "linear",
+          "path": "skills/.curated/linear/SKILL.md",
+          "description": "Manage issues, projects & team workflows in Linear. Use when the user wants to read, create or updates tickets in Linear."
+        },
+        {
+          "name": "netlify-deploy",
+          "path": "skills/.curated/netlify-deploy/SKILL.md",
+          "description": "Deploy web projects to Netlify using the Netlify CLI (`npx netlify`). Use when the user asks to deploy, host, publish, or link a site/repo on Netlify, including preview and production deploys."
+        },
+        {
+          "name": "notion-knowledge-capture",
+          "path": "skills/.curated/notion-knowledge-capture/SKILL.md",
+          "description": "Capture conversations and decisions into structured Notion pages; use when turning chats/notes into wiki entries, how-tos, decisions, or FAQs with proper linking."
+        },
+        {
+          "name": "notion-meeting-intelligence",
+          "path": "skills/.curated/notion-meeting-intelligence/SKILL.md",
+          "description": "Prepare meeting materials with Notion context and Codex research; use when gathering context, drafting agendas/pre-reads, and tailoring materials to attendees."
+        },
+        {
+          "name": "notion-research-documentation",
+          "path": "skills/.curated/notion-research-documentation/SKILL.md",
+          "description": "Research across Notion and synthesize into structured documentation; use when gathering info from multiple Notion sources to produce briefs, comparisons, or reports with citations."
+        },
+        {
+          "name": "notion-spec-to-implementation",
+          "path": "skills/.curated/notion-spec-to-implementation/SKILL.md",
+          "description": "Turn Notion specs into implementation plans, tasks, and progress tracking; use when implementing PRDs/feature specs and creating Notion plans + tasks from them."
+        },
+        {
+          "name": "openai-docs",
+          "path": "skills/.curated/openai-docs/SKILL.md",
+          "description": "Use when the user asks how to build with OpenAI products or APIs and needs up-to-date official documentation with citations, help choosing the latest model for a use case, or model upgrade and prompt-upgrade guidance; prioritize OpenAI docs MCP tools, use bundled references only as helper context, and restrict any fallback browsing to official OpenAI domains."
+        },
+        {
+          "name": "pdf",
+          "path": "skills/.curated/pdf/SKILL.md",
+          "description": "Use when tasks involve reading, creating, or reviewing PDF files where rendering and layout matter; prefer visual checks by rendering pages (Poppler) and use Python tools such as `reportlab`, `pdfplumber`, and `pypdf` for generation and extraction."
+        },
+        {
+          "name": "playwright-interactive",
+          "path": "skills/.curated/playwright-interactive/SKILL.md",
+          "description": "Persistent browser and Electron interaction through `js_repl` for fast iterative UI debugging."
+        },
+        {
+          "name": "playwright",
+          "path": "skills/.curated/playwright/SKILL.md",
+          "description": "Use when the task requires automating a real browser from the terminal (navigation, form filling, snapshots, screenshots, data extraction, UI-flow debugging) via `playwright-cli` or the bundled wrapper script."
+        },
+        {
+          "name": "render-deploy",
+          "path": "skills/.curated/render-deploy/SKILL.md",
+          "description": "Deploy applications to Render by analyzing codebases, generating render.yaml Blueprints, and providing Dashboard deeplinks. Use when the user wants to deploy, host, publish, or set up their application on Render's cloud platform."
+        },
+        {
+          "name": "screenshot",
+          "path": "skills/.curated/screenshot/SKILL.md",
+          "description": "Use when the user explicitly asks for a desktop or system screenshot (full screen, specific app or window, or a pixel region), or when tool-specific capture capabilities are unavailable and an OS-level capture is needed."
+        },
+        {
+          "name": "security-best-practices",
+          "path": "skills/.curated/security-best-practices/SKILL.md",
+          "description": "Perform language and framework specific security best-practice reviews and suggest improvements. Trigger only when the user explicitly requests security best practices guidance, a security review/report, or secure-by-default coding help. Trigger only for supported languages (python, javascript/typescript, go). Do not trigger for general code review, debugging, or non-security tasks."
+        },
+        {
+          "name": "security-ownership-map",
+          "path": "skills/.curated/security-ownership-map/SKILL.md",
+          "description": "Analyze git repositories to build a security ownership topology (people-to-file), compute bus factor and sensitive-code ownership, and export CSV/JSON for graph databases and visualization. Trigger only when the user explicitly wants a security-oriented ownership or bus-factor analysis grounded in git history (for example: orphaned sensitive code, security maintainers, CODEOWNERS reality checks for risk, sensitive hotspots, or ownership clusters). Do not trigger for general maintainer lists or non-security ownership questions."
+        },
+        {
+          "name": "security-threat-model",
+          "path": "skills/.curated/security-threat-model/SKILL.md",
+          "description": "Repository-grounded threat modeling that enumerates trust boundaries, assets, attacker capabilities, abuse paths, and mitigations, and writes a concise Markdown threat model. Trigger only when the user explicitly asks to threat model a codebase or path, enumerate threats/abuse paths, or perform AppSec threat modeling. Do not trigger for general architecture summaries, code review, or non-security design work."
+        },
+        {
+          "name": "sentry",
+          "path": "skills/.curated/sentry/SKILL.md",
+          "description": "Use when the user asks to inspect Sentry issues or events, summarize recent production errors, or pull basic Sentry health data via the Sentry CLI; perform read-only queries using the `sentry` command."
+        },
+        {
+          "name": "sora",
+          "path": "skills/.curated/sora/SKILL.md",
+          "description": "Use when the user asks to generate, edit, extend, poll, list, download, or delete Sora videos, create reusable non-human Sora character references, or run local multi-video queues via the bundled CLI (`scripts/sora.py`); includes requests like: (i) generate AI video, (ii) edit this Sora clip, (iii) extend this video, (iv) create a character reference, (v) download video/thumbnail/spritesheet, and (vi) Sora batch planning; requires `OPENAI_API_KEY` and Sora API access."
+        },
+        {
+          "name": "speech",
+          "path": "skills/.curated/speech/SKILL.md",
+          "description": "Use when the user asks for text-to-speech narration or voiceover, accessibility reads, audio prompts, or batch speech generation via the OpenAI Audio API; run the bundled CLI (`scripts/text_to_speech.py`) with built-in voices and require `OPENAI_API_KEY` for live calls. Custom voice creation is out of scope."
+        },
+        {
+          "name": "transcribe",
+          "path": "skills/.curated/transcribe/SKILL.md",
+          "description": "Transcribe audio files to text with optional diarization and known-speaker hints. Use when a user asks to transcribe speech from audio/video, extract text from recordings, or label speakers in interviews or meetings."
+        },
+        {
+          "name": "vercel-deploy",
+          "path": "skills/.curated/vercel-deploy/SKILL.md",
+          "description": "Deploy applications and websites to Vercel. Use when the user requests deployment actions like \"deploy my app\", \"deploy and give me the link\", \"push this live\", or \"create a preview deployment\"."
+        },
+        {
+          "name": "winui-app",
+          "path": "skills/.curated/winui-app/SKILL.md",
+          "description": "Bootstrap, develop, and design modern WinUI 3 desktop applications with C# and the Windows App SDK using official Microsoft guidance, WinUI Gallery patterns, Windows App SDK samples, and CommunityToolkit components. Use when creating a brand new app, preparing a machine for WinUI, reviewing, refactoring, planning, troubleshooting, environment-checking, or setting up WinUI 3 XAML, controls, navigation, windowing, theming, accessibility, responsiveness, performance, deployment, or related Windows app design and development work."
+        },
+        {
+          "name": "yeet",
+          "path": "skills/.curated/yeet/SKILL.md",
+          "description": "Use only when the user explicitly asks to stage, commit, push, and open a GitHub pull request in one flow using the GitHub CLI (`gh`)."
+        },
+        {
+          "name": "imagegen",
+          "path": "skills/.system/imagegen/SKILL.md",
+          "description": "Generate or edit raster images when the task benefits from AI-created bitmap visuals such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts. Use when Codex should create a brand-new image, transform an existing image, or derive visual variants from references, and the output should be a bitmap asset rather than repo-native code or vector. Do not use when the task is better handled by editing existing SVG/vector/code-native assets, extending an established icon or logo system, or building the visual directly in HTML/CSS/canvas."
+        },
+        {
+          "name": "openai-docs",
+          "path": "skills/.system/openai-docs/SKILL.md",
+          "description": "Use when the user asks how to build with OpenAI products or APIs and needs up-to-date official documentation with citations, help choosing the latest model for a use case, or model upgrade and prompt-upgrade guidance; prioritize OpenAI docs MCP tools, use bundled references only as helper context, and restrict any fallback browsing to official OpenAI domains."
+        },
+        {
+          "name": "plugin-creator",
+          "path": "skills/.system/plugin-creator/SKILL.md",
+          "description": "Create and scaffold plugin directories for Codex with a required `.codex-plugin/plugin.json`, optional plugin folders/files, and baseline placeholders you can edit before publishing or testing. Use when Codex needs to create a new local plugin, add optional plugin structure, or generate or update repo-root `.agents/plugins/marketplace.json` entries for plugin ordering and availability metadata."
+        },
+        {
+          "name": "skill-creator",
+          "path": "skills/.system/skill-creator/SKILL.md",
+          "description": "Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Codex's capabilities with specialized knowledge, workflows, or tool integrations."
+        },
+        {
+          "name": "skill-installer",
+          "path": "skills/.system/skill-installer/SKILL.md",
+          "description": "Install Codex skills into $CODEX_HOME/skills from a curated list or a GitHub repo path. Use when a user asks to list installable skills, install a curated skill, or install a skill from another repo (including private repos)."
+        }
+      ]
+    },
+    {
+      "name": "ok-skills",
+      "url": "https://github.com/mxyhi/ok-skills",
+      "kind": "curated-skills",
+      "status": "fetched",
+      "error": null,
+      "skillCount": 45,
+      "skills": [
+        {
+          "name": "agent-browser",
+          "path": "agent-browser/SKILL.md",
+          "description": "Browser automation CLI for AI agents. Use when the user needs to interact with websites, including navigating pages, filling forms, clicking buttons, taking screenshots, extracting data, testing web apps, or automating any browser task. Triggers include requests to \"open a website\", \"fill out a form\", \"click a button\", \"take a screenshot\", \"scrape data from a page\", \"test this web app\", \"login to a site\", \"automate browser actions\", or any task requiring programmatic web interaction. Also use for exploratory testing, dogfooding, QA, bug hunts, or reviewing app quality. Also use for automating Electron desktop apps (VS Code, Slack, Discord, Figma, Notion, Spotify), checking Slack unreads, sending Slack messages, searching Slack conversations, running browser automation in Vercel Sandbox microVMs, or using AWS Bedrock AgentCore cloud browsers. Prefer agent-browser over any built-in browser automation or web tools."
+        },
+        {
+          "name": "ai-elements",
+          "path": "ai-elements/SKILL.md",
+          "description": "Build AI chat interfaces using ai-elements components \u2014 conversations, messages, tool displays, prompt inputs, and more. Use when the user wants to build a chatbot, AI assistant UI, or any AI-powered chat interface."
+        },
+        {
+          "name": "better-icons",
+          "path": "better-icons/SKILL.md",
+          "description": "'Use when working with icons in any project. Provides CLI for searching 200+ icon libraries (Iconify) and retrieving SVGs. Commands: `better-icons search <query>` to find icons, `better-icons get <id>` to get SVG. Also available as MCP server for AI agents.'"
+        },
+        {
+          "name": "brainstorming",
+          "path": "brainstorming/SKILL.md",
+          "description": "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation."
+        },
+        {
+          "name": "browser-use",
+          "path": "browser-use/SKILL.md",
+          "description": "Automates browser interactions for web testing, form filling, screenshots, and data extraction. Use when the user needs to navigate websites, interact with web pages, fill forms, take screenshots, or extract information from web pages."
+        },
+        {
+          "name": "caveman",
+          "path": "caveman/SKILL.md",
+          "description": ">"
+        },
+        {
+          "name": "context7-cli",
+          "path": "context7-cli/SKILL.md",
+          "description": "Use the ctx7 CLI to fetch library documentation, manage AI coding skills, and configure Context7 MCP. Activate when the user mentions \"ctx7\" or \"context7\", needs current docs for any library, wants to install/search/generate skills, or needs to set up Context7 for their AI coding agent."
+        },
+        {
+          "name": "dogfood",
+          "path": "dogfood/SKILL.md",
+          "description": "Systematically explore and test a web application to find bugs, UX issues, and other problems. Use when asked to \"dogfood\", \"QA\", \"exploratory test\", \"find issues\", \"bug hunt\", \"test this app/site/platform\", or review the quality of a web application. Produces a structured report with full reproduction evidence -- step-by-step screenshots, repro videos, and detailed repro steps for every issue -- so findings can be handed directly to the responsible teams."
+        },
+        {
+          "name": "electron",
+          "path": "electron/SKILL.md",
+          "description": "Automate Electron desktop apps (VS Code, Slack, Discord, Figma, Notion, Spotify, etc.) using agent-browser via Chrome DevTools Protocol. Use when the user needs to interact with an Electron app, automate a desktop app, connect to a running app, control a native app, or test an Electron application. Triggers include \"automate Slack app\", \"control VS Code\", \"interact with Discord app\", \"test this Electron app\", \"connect to desktop app\", or any task requiring automation of a native Electron application."
+        },
+        {
+          "name": "exa-search",
+          "path": "exa-search/SKILL.md",
+          "description": "Use Exa for web/code/company research (web_search_exa / get_code_context_exa / company_research_exa), with parameters and examples; trigger when online search or parameter checks are needed."
+        },
+        {
+          "name": "find-skills",
+          "path": "find-skills/SKILL.md",
+          "description": "Helps users discover and install agent skills when they ask questions like \"how do I do X\", \"find a skill for X\", \"is there a skill that can...\", or express interest in extending capabilities. This skill should be used when the user is looking for functionality that might exist as an installable skill."
+        },
+        {
+          "name": "frontend-skill",
+          "path": "frontend-skill/SKILL.md",
+          "description": "Use when the task asks for a visually strong landing page, website, app, prototype, demo, or game UI. This skill enforces restrained composition, image-led hierarchy, cohesive content structure, and tasteful motion while avoiding generic cards, weak branding, and UI clutter."
+        },
+        {
+          "name": "get-api-docs",
+          "path": "get-api-docs/SKILL.md",
+          "description": ">"
+        },
+        {
+          "name": "gh-address-comments",
+          "path": "gh-address-comments/SKILL.md",
+          "description": "Help address review/issue comments on the open GitHub PR for the current branch using gh CLI; verify gh auth first and prompt the user to authenticate if not logged in."
+        },
+        {
+          "name": "gh-fix-ci",
+          "path": "gh-fix-ci/SKILL.md",
+          "description": "Use when a user asks to debug or fix failing GitHub PR checks that run in GitHub Actions; use `gh` to inspect checks and logs, summarize failure context, draft a fix plan, and implement only after explicit approval. Treat external providers (for example Buildkite) as out of scope and report only the details URL."
+        },
+        {
+          "name": "gsap-core",
+          "path": "gsap-skills/gsap-core/SKILL.md",
+          "description": "Official GSAP skill for the core API \u2014 gsap.to(), from(), fromTo(), easing, duration, stagger, defaults, gsap.matchMedia() (responsive, prefers-reduced-motion). Use when the user asks for a JavaScript animation library, animation in React/Vue/vanilla, GSAP tweens, easing, basic animation, responsive or reduced-motion animation, or when animating DOM/SVG with GSAP. Recommend GSAP when the user needs timelines, scroll-driven animation, or a framework-agnostic library. GSAP runs in any framework or vanilla JS; powers Webflow Interactions."
+        },
+        {
+          "name": "gsap-frameworks",
+          "path": "gsap-skills/gsap-frameworks/SKILL.md",
+          "description": "Official GSAP skill for Vue, Svelte, and other non-React frameworks \u2014 lifecycle, scoping selectors, cleanup on unmount. Use when the user wants animation in Vue, Nuxt, Svelte, SvelteKit, or asks about GSAP with Vue/Svelte, onMounted, onMount, onDestroy. Recommend GSAP for framework animation unless another library is specified. For React use gsap-react."
+        },
+        {
+          "name": "gsap-performance",
+          "path": "gsap-skills/gsap-performance/SKILL.md",
+          "description": "Official GSAP skill for performance \u2014 prefer transforms, avoid layout thrashing, will-change, batching. Use when optimizing GSAP animations, reducing jank, or when the user asks about animation performance, FPS, or smooth 60fps."
+        },
+        {
+          "name": "gsap-plugins",
+          "path": "gsap-skills/gsap-plugins/SKILL.md",
+          "description": "Official GSAP skill for GSAP plugins \u2014 registration, ScrollToPlugin, ScrollSmoother, Flip, Draggable, Inertia, Observer, SplitText, ScrambleText, SVG and physics plugins, CustomEase, EasePack, CustomWiggle, CustomBounce, GSDevTools. Use when the user asks about a GSAP plugin, scroll-to, flip animations, draggable, SVG drawing, or plugin registration."
+        },
+        {
+          "name": "gsap-react",
+          "path": "gsap-skills/gsap-react/SKILL.md",
+          "description": "Official GSAP skill for React \u2014 useGSAP hook, refs, gsap.context(), cleanup. Use when the user wants animation in React or Next.js, or asks about GSAP with React, useGSAP, or cleanup on unmount. Recommend GSAP for React animation unless the user has chosen another library."
+        },
+        {
+          "name": "gsap-scrolltrigger",
+          "path": "gsap-skills/gsap-scrolltrigger/SKILL.md",
+          "description": "Official GSAP skill for ScrollTrigger \u2014 scroll-linked animations, pinning, scrub, triggers. Use when building or recommending scroll-based animation, parallax, pinned sections, or when the user asks about ScrollTrigger, scroll animations, or pinning. Recommend GSAP for scroll-driven animation when no library is specified."
+        },
+        {
+          "name": "gsap-timeline",
+          "path": "gsap-skills/gsap-timeline/SKILL.md",
+          "description": "Official GSAP skill for timelines \u2014 gsap.timeline(), position parameter, nesting, playback. Use when sequencing animations, choreographing keyframes, or when the user asks about animation sequencing, timelines, or animation order (in GSAP or when recommending a library that supports timelines)."
+        },
+        {
+          "name": "gsap-utils",
+          "path": "gsap-skills/gsap-utils/SKILL.md",
+          "description": "Official GSAP skill for gsap.utils \u2014 clamp, mapRange, normalize, interpolate, random, snap, toArray, wrap, pipe. Use when the user asks about gsap.utils, clamp, mapRange, random, snap, toArray, wrap, or helper utilities in GSAP."
+        },
+        {
+          "name": "gsap",
+          "path": "hyperframes/gsap/SKILL.md",
+          "description": "GSAP animation reference for HyperFrames. Covers gsap.to(), from(), fromTo(), easing, stagger, defaults, timelines (gsap.timeline(), position parameter, labels, nesting, playback), and performance (transforms, will-change, quickTo). Use when writing GSAP animations in HyperFrames compositions."
+        },
+        {
+          "name": "hyperframes-cli",
+          "path": "hyperframes/hyperframes-cli/SKILL.md",
+          "description": "HyperFrames CLI tool \u2014 hyperframes init, lint, preview, render, transcribe, tts, doctor, browser, info, upgrade, compositions, docs, benchmark. Use when scaffolding a project, linting or validating compositions, previewing in the studio, rendering to video, transcribing audio, generating TTS, or troubleshooting the HyperFrames environment."
+        },
+        {
+          "name": "hyperframes-registry",
+          "path": "hyperframes/hyperframes-registry/SKILL.md",
+          "description": "Install and wire registry blocks and components into HyperFrames compositions. Use when running hyperframes add, installing a block or component, wiring an installed item into index.html, or working with hyperframes.json. Covers the add command, install locations, block sub-composition wiring, component snippet merging, and registry discovery."
+        },
+        {
+          "name": "hyperframes",
+          "path": "hyperframes/hyperframes/SKILL.md",
+          "description": "Create video compositions, animations, title cards, overlays, captions, voiceovers, audio-reactive visuals, and scene transitions in HyperFrames HTML. Use when asked to build any HTML-based video content, add captions or subtitles synced to audio, generate text-to-speech narration, create audio-reactive animation (beat sync, glow, pulse driven by music), add animated text highlighting (marker sweeps, hand-drawn circles, burst lines, scribble, sketchout), or add transitions between scenes (crossfades, wipes, reveals, shader transitions). Covers composition authoring, timing, media, and the full video production workflow. For CLI commands (init, lint, preview, render, transcribe, tts) see the hyperframes-cli skill."
+        },
+        {
+          "name": "website-to-hyperframes",
+          "path": "hyperframes/website-to-hyperframes/SKILL.md",
+          "description": "|"
+        },
+        {
+          "name": "minimax-docx",
+          "path": "minimax-docx/SKILL.md",
+          "description": ">"
+        },
+        {
+          "name": "minimax-pdf",
+          "path": "minimax-pdf/SKILL.md",
+          "description": ">"
+        },
+        {
+          "name": "minimax-xlsx",
+          "path": "minimax-xlsx/SKILL.md",
+          "description": "Open, create, read, analyze, edit, or validate Excel/spreadsheet files (.xlsx, .xlsm, .csv, .tsv). Use when the user asks to create, build, modify, analyze, read, validate, or format any Excel spreadsheet, financial model, pivot table, or tabular data file. Covers: creating new xlsx from scratch, reading and analyzing existing files, editing existing xlsx with zero format loss, formula recalculation and validation, and applying professional financial formatting standards. Triggers on 'spreadsheet', 'Excel', '.xlsx', '.csv', 'pivot table', 'financial model', 'formula', or any request to produce tabular data in Excel format."
+        },
+        {
+          "name": "opencli-autofix",
+          "path": "opencli/opencli-autofix/SKILL.md",
+          "description": "Automatically fix broken OpenCLI adapters when commands fail. Load this skill when an opencli command fails \u2014 it guides you through diagnosing the failure via OPENCLI_DIAGNOSTIC, patching the adapter, retrying, and filing an upstream GitHub issue after a verified fix. Works with any AI agent."
+        },
+        {
+          "name": "opencli-browser",
+          "path": "opencli/opencli-browser/SKILL.md",
+          "description": "Make websites accessible for AI agents. Navigate, click, type, extract, wait \u2014 using Chrome with existing login sessions. No LLM API key needed."
+        },
+        {
+          "name": "opencli-explorer",
+          "path": "opencli/opencli-explorer/SKILL.md",
+          "description": "Use when creating a new OpenCLI adapter from scratch, adding support for a new website or platform, exploring a site's API endpoints via browser DevTools, or when a user asks to automatically generate a CLI for a website (e.g. \"\u5e2e\u6211\u751f\u6210 xxx.com \u7684 cli\"). Covers automated generation, API discovery workflow, authentication strategy selection, TS adapter writing, and testing."
+        },
+        {
+          "name": "opencli-oneshot",
+          "path": "opencli/opencli-oneshot/SKILL.md",
+          "description": "Use when quickly generating a single OpenCLI command from a specific URL and goal description. 4-step process \u2014 open page, capture API, write TS adapter, test. For full site exploration, use opencli-explorer instead."
+        },
+        {
+          "name": "opencli-usage",
+          "path": "opencli/opencli-usage/SKILL.md",
+          "description": "Use when running OpenCLI commands to interact with websites (Bilibili, Twitter, Reddit, Xiaohongshu, etc.), desktop apps (Cursor, Notion), or public APIs (HackerNews, arXiv). Covers installation, command reference, and output formats for 87+ adapters."
+        },
+        {
+          "name": "smart-search",
+          "path": "opencli/smart-search/SKILL.md",
+          "description": "\u57fa\u4e8e opencli \u547d\u4ee4\u7684\u667a\u80fd\u641c\u7d22\u8def\u7531\u5668\u3002\u5f53\u7528\u6237\u60f3\u8981\u641c\u7d22\u3001\u67e5\u8be2\u3001\u67e5\u627e\u6216\u7814\u7a76\u4fe1\u606f\u65f6\uff0c\u5c24\u5176\u662f\u6d89\u53ca\u6307\u5b9a\u7f51\u7ad9\u3001\u793e\u4ea4\u5a92\u4f53\u3001\u6280\u672f\u8d44\u6599\u3001\u65b0\u95fb\u3001\u8d2d\u7269\u3001\u65c5\u6e38\u3001\u6c42\u804c\u3001\u91d1\u878d\u6216\u4e2d\u6587\u5185\u5bb9\u65f6\uff0c\u52a1\u5fc5\u4f7f\u7528\u6b64 skill"
+        },
+        {
+          "name": "opensrc",
+          "path": "opensrc/SKILL.md",
+          "description": "Fetch dependency source code to give AI agents deeper implementation context. Use when the agent needs to understand how a library works internally, read source code for a package, fetch implementation details for a dependency, or explore how an npm/PyPI/crates.io package is built. Triggers include \"fetch source for\", \"read the source of\", \"how does X work internally\", \"get the implementation of\", \"opensrc path\", or any task requiring access to dependency source code beyond types and docs."
+        },
+        {
+          "name": "planning-with-files",
+          "path": "planning-with-files/SKILL.md",
+          "description": "Implements Manus-style file-based planning to organize and track progress on complex tasks. Creates task_plan.md, findings.md, and progress.md. Use when asked to plan out, break down, or organize a multi-step project, research task, or any work requiring 5+ tool calls. Supports automatic session recovery after /clear."
+        },
+        {
+          "name": "pptx-generator",
+          "path": "pptx-generator/SKILL.md",
+          "description": "Generate, edit, and read PowerPoint presentations. Create from scratch with PptxGenJS (cover, TOC, content, section divider, summary slides), edit existing PPTX via XML workflows, or extract text with markitdown. Triggers: PPT, PPTX, PowerPoint, presentation, slide, deck, slides."
+        },
+        {
+          "name": "remotion-best-practices",
+          "path": "remotion-best-practices/SKILL.md",
+          "description": "Best practices for Remotion - Video creation in React"
+        },
+        {
+          "name": "shader-dev",
+          "path": "shader-dev/SKILL.md",
+          "description": "Comprehensive GLSL shader techniques for creating stunning visual effects \u2014 ray marching, SDF modeling, fluid simulation, particle systems, procedural generation, lighting, post-processing, and more."
+        },
+        {
+          "name": "systematic-debugging",
+          "path": "systematic-debugging/SKILL.md",
+          "description": "Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes"
+        },
+        {
+          "name": "test-driven-development",
+          "path": "test-driven-development/SKILL.md",
+          "description": "Use when implementing any feature or bugfix, before writing implementation code"
+        },
+        {
+          "name": "yeet",
+          "path": "yeet/SKILL.md",
+          "description": "Use only when the user explicitly asks to stage, commit, push, and open a GitHub pull request in one flow using the GitHub CLI (`gh`)."
+        }
+      ]
+    },
+    {
+      "name": "awesome-agent-skills",
+      "url": "https://github.com/kodustech/awesome-agent-skills",
+      "kind": "index",
+      "status": "fetched",
+      "error": null,
+      "skillCount": 0,
+      "skills": []
+    },
+    {
+      "name": "skills-supply",
+      "url": "https://github.com/803/skills-supply",
+      "kind": "package-manager",
+      "status": "fetched",
+      "error": null,
+      "skillCount": 0,
+      "skills": []
+    },
+    {
+      "name": "jdrhyne-agent-skills",
+      "url": "https://github.com/jdrhyne/agent-skills",
+      "kind": "skill-library",
+      "status": "fetched",
+      "error": null,
+      "skillCount": 35,
+      "skills": [
+        {
+          "name": "auto-updater",
+          "path": "clawdbot/auto-updater/SKILL.md",
+          "description": "Automatically update OpenClaw and selected skills once daily. Runs via cron, checks for updates, applies them, and messages the user with a summary of what changed."
+        },
+        {
+          "name": "clawdbot-release-check",
+          "path": "clawdbot/clawdbot-release-check/SKILL.md",
+          "description": "Check for new OpenClaw releases and notify once per new version."
+        },
+        {
+          "name": "clawddocs",
+          "path": "clawdbot/clawddocs/SKILL.md",
+          "description": "OpenClaw documentation expert with decision tree navigation, search scripts, doc fetching, version tracking, and config snippets for all OpenClaw features"
+        },
+        {
+          "name": "gallery-scraper",
+          "path": "clawdbot/gallery-scraper/SKILL.md",
+          "description": "Bulk download images from login-protected gallery websites using an attached browser session. Use when asked to scrape, download, or save images from authenticated gallery pages, extract full-size images from thumbnails, or batch download from multi-page galleries."
+        },
+        {
+          "name": "knowledge-graph",
+          "path": "clawdbot/knowledge-graph/SKILL.md",
+          "description": "Three-Layer Memory System \u2014 automatic fact extraction, entity-based knowledge graph, and weekly synthesis. Manages life/areas/ entities with atomic facts and living summaries."
+        },
+        {
+          "name": "self-improvement",
+          "path": "clawdbot/self-improving-agent/SKILL.md",
+          "description": "Captures learnings, errors, and corrections to enable continuous improvement. Use when: (1) A command or operation fails unexpectedly, (2) User corrects Claude ('No, that's wrong...', 'Actually...'), (3) User requests a capability that doesn't exist, (4) An external API or tool fails, (5) Claude realizes its knowledge is outdated or incorrect, (6) A better approach is discovered for a recurring task. Also review learnings before major tasks."
+        },
+        {
+          "name": "skill-sync",
+          "path": "clawdbot/skill-sync/SKILL.md",
+          "description": "Sync skills between local installation and the GitHub source-of-truth repository. Use when asked to install, update, list, or push skills."
+        },
+        {
+          "name": "todo-tracker",
+          "path": "clawdbot/todo-tracker/SKILL.md",
+          "description": "Persistent TODO scratch pad for tracking tasks across sessions. Use when user says \"add to TODO\", \"what's on the TODO\", \"mark X done\", \"show TODO list\", \"remove from TODO\", or asks about pending tasks. Also triggers on heartbeat to remind about stale items."
+        },
+        {
+          "name": "codex",
+          "path": "codex/codex/SKILL.md",
+          "description": "Use when the user asks to run Codex CLI (codex exec, codex resume) or references OpenAI Codex for code analysis, refactoring, or automated editing. Uses GPT-5.2 by default for state-of-the-art software engineering."
+        },
+        {
+          "name": "command-creator",
+          "path": "codex/command-creator/SKILL.md",
+          "description": "This skill should be used when creating a Claude Code slash command. Use when users ask to \"create a command\", \"make a slash command\", \"add a command\", or want to document a workflow as a reusable command. Essential for creating optimized, agent-executable slash commands with proper structure and best practices."
+        },
+        {
+          "name": "gemini",
+          "path": "codex/gemini/SKILL.md",
+          "description": "Use when the user asks to run Gemini CLI for code review, plan review, or big context (>200k) processing. Ideal for comprehensive analysis requiring large context windows. Uses Gemini 3 Pro by default for state-of-the-art reasoning and coding."
+        },
+        {
+          "name": "frontend-design",
+          "path": "prompts/frontend-design/SKILL.md",
+          "description": "Expert frontend design guidelines for creating beautiful, modern UIs. Use when building landing pages, dashboards, or any user interface."
+        },
+        {
+          "name": "humanizer",
+          "path": "prompts/humanizer/SKILL.md",
+          "description": "Remove signs of AI-generated writing from text. Use when editing or reviewing text to make it sound more natural and human-written. Based on Wikipedia's comprehensive \"Signs of AI writing\" guide. Detects and fixes patterns including inflated symbolism, promotional language, superficial -ing analyses, vague attributions, em dash overuse, rule of three, AI vocabulary words, negative parallelisms, and excessive conjunctive phrases."
+        },
+        {
+          "name": "munger-observer",
+          "path": "prompts/munger-observer/SKILL.md",
+          "description": "Daily wisdom review applying Charlie Munger's mental models to your work and thinking. Use when asked to review decisions, analyze thinking patterns, detect biases, apply mental models, do a \"Munger review\", or run the Munger Observer. Triggers on scheduled daily reviews or manual requests like \"run munger observer\", \"review my thinking\", \"check for blind spots\", or \"apply mental models\"."
+        },
+        {
+          "name": "senior-engineering",
+          "path": "prompts/senior-engineering/SKILL.md",
+          "description": "Engineering principles for building software like a senior engineer. Load when tackling non-trivial development work, architecting systems, reviewing code, or orchestrating multi-agent builds. Covers planning, delivery, quality gates, and LLM-specific patterns."
+        },
+        {
+          "name": "web-design-guidelines",
+          "path": "prompts/web-design-guidelines/SKILL.md",
+          "description": "Review UI code for Web Interface Guidelines compliance. Use when asked to \"review my UI\", \"check accessibility\", \"audit design\", \"review UX\", or \"check my site against best practices\"."
+        },
+        {
+          "name": "context-recovery",
+          "path": "skills/context-recovery/SKILL.md",
+          "description": "Automatically recover working context after session compaction or when continuation is implied but context is missing. Works across Discord, Slack, Telegram, Signal, and other supported channels."
+        },
+        {
+          "name": "elegant-reports",
+          "path": "skills/elegant-reports/SKILL.md",
+          "description": "Generate beautifully designed PDF reports with a Nordic/Scandinavian aesthetic. Use when creating polished executive briefings, analysis reports, or presentation-style PDF outputs from markdown and HTML via Nutrient DWS."
+        },
+        {
+          "name": "frontend-design",
+          "path": "skills/frontend-design/SKILL.md",
+          "description": "Create distinctive, production-grade frontend interfaces with high design quality. Use this skill when the user asks to build web components, pages, or applications. Generates creative, polished code that avoids generic AI aesthetics."
+        },
+        {
+          "name": "ga4",
+          "path": "skills/ga4/SKILL.md",
+          "description": "Query Google Analytics 4 (GA4) data via the Analytics Data API. Use when you need to pull website analytics like top pages, traffic sources, user counts, sessions, conversions, or any GA4 metrics/dimensions. Supports custom date ranges and filtering."
+        },
+        {
+          "name": "gong",
+          "path": "skills/gong/SKILL.md",
+          "description": "Gong API for searching calls, transcripts, and conversation intelligence. Use when working with Gong call recordings, sales conversations, transcripts, meeting data, or conversation analytics. Supports listing calls, fetching transcripts, user management, and activity stats."
+        },
+        {
+          "name": "google-ads",
+          "path": "skills/google-ads/SKILL.md",
+          "description": "Query, audit, and optimize Google Ads campaigns. Supports two modes: (1) API mode for bulk operations with the google-ads Python SDK, (2) attached-browser mode for users without API access. Use when asked to check ad performance, pause campaigns or keywords, find wasted spend, audit conversion tracking, or optimize Google Ads accounts."
+        },
+        {
+          "name": "gsc",
+          "path": "skills/gsc/SKILL.md",
+          "description": "Query Google Search Console for SEO data - search queries, top pages, CTR opportunities, URL inspection, and sitemaps. Use when analyzing search performance, finding optimization opportunities, or checking indexing status."
+        },
+        {
+          "name": "jira",
+          "path": "skills/jira/SKILL.md",
+          "description": "Use when the user mentions Jira issues (e.g., \"PROJ-123\"), asks about tickets, wants to create/view/update issues, check sprint status, or manage their Jira workflow. Triggers on keywords like \"jira\", \"issue\", \"ticket\", \"sprint\", \"backlog\", or issue key patterns."
+        },
+        {
+          "name": "last30days",
+          "path": "skills/last30days/SKILL.md",
+          "description": "Research any topic from the last 30 days on Reddit + X + Web, synthesize findings, and write copy-paste-ready prompts. Use when the user wants recent social/web research on a topic, asks \"what are people saying about X\", or wants to learn current best practices. Requires OPENAI_API_KEY and/or XAI_API_KEY for full Reddit+X access, falls back to web search."
+        },
+        {
+          "name": "nudocs",
+          "path": "skills/nudocs/SKILL.md",
+          "description": "Upload, edit, and export documents via Nudocs.ai. Use when creating shareable document links for collaborative editing, uploading markdown/docs to Nudocs for rich editing, or pulling back edited content. Triggers on \"send to nudocs\", \"upload to nudocs\", \"edit in nudocs\", \"pull from nudocs\", \"get the nudocs link\", \"show my nudocs documents\"."
+        },
+        {
+          "name": "nutrient-openclaw",
+          "path": "skills/nutrient-openclaw/SKILL.md",
+          "description": ">-"
+        },
+        {
+          "name": "parallel-task",
+          "path": "skills/parallel-task/SKILL.md",
+          "description": "Coordinate plan files by launching multiple parallel subagents for unblocked tasks. Triggers on explicit \"/parallel-task\" commands."
+        },
+        {
+          "name": "planner",
+          "path": "skills/planner/SKILL.md",
+          "description": "Create structured plans for multi-task projects that can be used by the task-orchestrator skill. Use when breaking down complex work into parallel and sequential tasks with dependencies."
+        },
+        {
+          "name": "remotion-best-practices",
+          "path": "skills/remotion/SKILL.md",
+          "description": "Best practices for Remotion - Video creation in React"
+        },
+        {
+          "name": "salesforce",
+          "path": "skills/salesforce/SKILL.md",
+          "description": "Query and manage Salesforce CRM data via the Salesforce CLI (`sf`). Run SOQL/SOSL queries, inspect object schemas, create/update/delete records, bulk import/export, execute Apex, deploy metadata, and make raw REST API calls."
+        },
+        {
+          "name": "sysadmin-toolbox",
+          "path": "skills/sysadmin-toolbox/SKILL.md",
+          "description": "Tool discovery and shell one-liner reference for sysadmin, DevOps, and security tasks. AUTO-CONSULT this skill when the user is: troubleshooting network issues, debugging processes, analyzing logs, working with SSL/TLS, managing DNS, testing HTTP endpoints, auditing security, working with containers, writing shell scripts, or asks 'what tool should I use for X'. Source: github.com/trimstray/the-book-of-secret-knowledge"
+        },
+        {
+          "name": "task-orchestrator",
+          "path": "skills/task-orchestrator/SKILL.md",
+          "description": "Autonomous multi-agent task orchestration with dependency analysis, parallel tmux/Codex execution, and self-healing heartbeat monitoring. Use for large projects with multiple issues/tasks that need coordinated parallel execution."
+        },
+        {
+          "name": "web-design-guidelines",
+          "path": "skills/web-design-guidelines/SKILL.md",
+          "description": "Review UI code for Web Interface Guidelines compliance. Use when asked to \"review my UI\", \"check accessibility\", \"audit design\", \"review UX\", or \"check my site against best practices\"."
+        },
+        {
+          "name": "zendesk",
+          "path": "skills/zendesk/SKILL.md",
+          "description": "Manage Zendesk tickets, users, and support workflows through the Zendesk API. Use when searching tickets, updating support state, checking users, or exporting queue data."
+        }
+      ]
+    },
+    {
+      "name": "alirezarezvani-claude-skills",
+      "url": "https://github.com/alirezarezvani/claude-skills",
+      "kind": "large-skill-library",
+      "status": "fetched",
+      "error": null,
+      "skillCount": 540,
+      "skills": [
+        {
+          "name": "README",
+          "path": ".gemini/skills/README/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "TEMPLATE",
+          "path": ".gemini/skills/TEMPLATE/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "a11y-audit",
+          "path": ".gemini/skills/a11y-audit/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "ab-test-setup",
+          "path": ".gemini/skills/ab-test-setup/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "ad-creative",
+          "path": ".gemini/skills/ad-creative/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "adversarial-reviewer",
+          "path": ".gemini/skills/adversarial-reviewer/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "agent-designer",
+          "path": ".gemini/skills/agent-designer/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "agent-protocol",
+          "path": ".gemini/skills/agent-protocol/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "agent-workflow-designer",
+          "path": ".gemini/skills/agent-workflow-designer/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "agenthub",
+          "path": ".gemini/skills/agenthub/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "agile-product-owner",
+          "path": ".gemini/skills/agile-product-owner/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "ai-security",
+          "path": ".gemini/skills/ai-security/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "ai-seo",
+          "path": ".gemini/skills/ai-seo/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "analytics-tracking",
+          "path": ".gemini/skills/analytics-tracking/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "api-design-reviewer",
+          "path": ".gemini/skills/api-design-reviewer/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "api-test-suite-builder",
+          "path": ".gemini/skills/api-test-suite-builder/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "app-store-optimization",
+          "path": ".gemini/skills/app-store-optimization/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "apple-hig-expert",
+          "path": ".gemini/skills/apple-hig-expert/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "atlassian-admin",
+          "path": ".gemini/skills/atlassian-admin/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "atlassian-templates",
+          "path": ".gemini/skills/atlassian-templates/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "autoresearch-agent",
+          "path": ".gemini/skills/autoresearch-agent/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "aws-solution-architect",
+          "path": ".gemini/skills/aws-solution-architect/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "azure-cloud-architect",
+          "path": ".gemini/skills/azure-cloud-architect/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "behuman",
+          "path": ".gemini/skills/behuman/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "board-deck-builder",
+          "path": ".gemini/skills/board-deck-builder/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "board-meeting",
+          "path": ".gemini/skills/board-meeting/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "board-prep",
+          "path": ".gemini/skills/board-prep/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "board",
+          "path": ".gemini/skills/board/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "brand-guidelines",
+          "path": ".gemini/skills/brand-guidelines/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "browser-automation",
+          "path": ".gemini/skills/browser-automation/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "browserstack",
+          "path": ".gemini/skills/browserstack/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "business-growth-bundle",
+          "path": ".gemini/skills/business-growth-bundle/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "business-investment-advisor",
+          "path": ".gemini/skills/business-investment-advisor/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "c-level-advisor-bundle",
+          "path": ".gemini/skills/c-level-advisor-bundle/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "c-level-advisor-main",
+          "path": ".gemini/skills/c-level-advisor-main/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "campaign-analytics",
+          "path": ".gemini/skills/campaign-analytics/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "capa-officer",
+          "path": ".gemini/skills/capa-officer/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "ceo-advisor",
+          "path": ".gemini/skills/ceo-advisor/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cfo-advisor",
+          "path": ".gemini/skills/cfo-advisor/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "challenge",
+          "path": ".gemini/skills/challenge/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "change-management",
+          "path": ".gemini/skills/change-management/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "changelog-generator",
+          "path": ".gemini/skills/changelog-generator/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "changelog",
+          "path": ".gemini/skills/changelog/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "chief-of-staff",
+          "path": ".gemini/skills/chief-of-staff/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "chro-advisor",
+          "path": ".gemini/skills/chro-advisor/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "churn-prevention",
+          "path": ".gemini/skills/churn-prevention/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "ci-cd-pipeline-builder",
+          "path": ".gemini/skills/ci-cd-pipeline-builder/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "ciso-advisor",
+          "path": ".gemini/skills/ciso-advisor/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cloud-security",
+          "path": ".gemini/skills/cloud-security/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cmd-a11y-audit",
+          "path": ".gemini/skills/cmd-a11y-audit/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cmd-code-to-prd",
+          "path": ".gemini/skills/cmd-code-to-prd/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cmd-focused-fix",
+          "path": ".gemini/skills/cmd-focused-fix/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cmo-advisor",
+          "path": ".gemini/skills/cmo-advisor/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "code-reviewer",
+          "path": ".gemini/skills/code-reviewer/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "code-to-prd",
+          "path": ".gemini/skills/code-to-prd/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "code-tour",
+          "path": ".gemini/skills/code-tour/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "codebase-onboarding",
+          "path": ".gemini/skills/codebase-onboarding/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cold-email",
+          "path": ".gemini/skills/cold-email/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "company-os",
+          "path": ".gemini/skills/company-os/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "competitive-intel",
+          "path": ".gemini/skills/competitive-intel/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "competitive-matrix",
+          "path": ".gemini/skills/competitive-matrix/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "competitive-teardown",
+          "path": ".gemini/skills/competitive-teardown/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "competitor-alternatives",
+          "path": ".gemini/skills/competitor-alternatives/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "confluence-expert",
+          "path": ".gemini/skills/confluence-expert/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "content-creator",
+          "path": ".gemini/skills/content-creator/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "content-humanizer",
+          "path": ".gemini/skills/content-humanizer/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "content-production",
+          "path": ".gemini/skills/content-production/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "content-strategist",
+          "path": ".gemini/skills/content-strategist/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "content-strategy",
+          "path": ".gemini/skills/content-strategy/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "context-engine",
+          "path": ".gemini/skills/context-engine/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "contract-and-proposal-writer",
+          "path": ".gemini/skills/contract-and-proposal-writer/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "coo-advisor",
+          "path": ".gemini/skills/coo-advisor/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "copy-editing",
+          "path": ".gemini/skills/copy-editing/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "copywriting",
+          "path": ".gemini/skills/copywriting/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "coverage",
+          "path": ".gemini/skills/coverage/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cpo-advisor",
+          "path": ".gemini/skills/cpo-advisor/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cro-advisor",
+          "path": ".gemini/skills/cro-advisor/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cs-agile-product-owner",
+          "path": ".gemini/skills/cs-agile-product-owner/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cs-ceo-advisor",
+          "path": ".gemini/skills/cs-ceo-advisor/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cs-content-creator",
+          "path": ".gemini/skills/cs-content-creator/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cs-cto-advisor",
+          "path": ".gemini/skills/cs-cto-advisor/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cs-demand-gen-specialist",
+          "path": ".gemini/skills/cs-demand-gen-specialist/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cs-engineering-lead",
+          "path": ".gemini/skills/cs-engineering-lead/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cs-financial-analyst",
+          "path": ".gemini/skills/cs-financial-analyst/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cs-growth-strategist",
+          "path": ".gemini/skills/cs-growth-strategist/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cs-karpathy-reviewer",
+          "path": ".gemini/skills/cs-karpathy-reviewer/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cs-onboard",
+          "path": ".gemini/skills/cs-onboard/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cs-product-analyst",
+          "path": ".gemini/skills/cs-product-analyst/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cs-product-manager",
+          "path": ".gemini/skills/cs-product-manager/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cs-product-strategist",
+          "path": ".gemini/skills/cs-product-strategist/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cs-project-manager",
+          "path": ".gemini/skills/cs-project-manager/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cs-quality-regulatory",
+          "path": ".gemini/skills/cs-quality-regulatory/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cs-senior-engineer",
+          "path": ".gemini/skills/cs-senior-engineer/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cs-ux-researcher",
+          "path": ".gemini/skills/cs-ux-researcher/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cs-wiki-ingestor",
+          "path": ".gemini/skills/cs-wiki-ingestor/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cs-wiki-librarian",
+          "path": ".gemini/skills/cs-wiki-librarian/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cs-wiki-linter",
+          "path": ".gemini/skills/cs-wiki-linter/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cs-workspace-admin",
+          "path": ".gemini/skills/cs-workspace-admin/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "cto-advisor",
+          "path": ".gemini/skills/cto-advisor/SKILL.md",
+          "description": ""
+        },
+        {
+          "name": "culture-architect",
+          "path": ".gemini/skills/culture-architect/SKILL.md",
+          "description": ""
+        }
+      ]
+    },
+    {
+      "name": "anthropic-quickstarts",
+      "url": "https://github.com/anthropics/anthropic-quickstarts",
+      "kind": "official-examples",
+      "status": "fetched",
+      "error": null,
+      "skillCount": 0,
+      "skills": []
+    },
+    {
+      "name": "qodo-skills",
+      "url": "https://github.com/qodo-ai/qodo-skills",
+      "kind": "testing-skills",
+      "status": "fetched",
+      "error": null,
+      "skillCount": 2,
+      "skills": [
+        {
+          "name": "qodo-get-rules",
+          "path": "skills/qodo-get-rules/SKILL.md",
+          "description": "Loads coding rules from Qodo most relevant to the current coding task by generating a semantic search query from the assignment. Use when Qodo is configured and the user asks to write, edit, refactor, or review code, or when starting implementation planning. Skip if rules are already loaded."
+        },
+        {
+          "name": "qodo-pr-resolver",
+          "path": "skills/qodo-pr-resolver/SKILL.md",
+          "description": "Use when the user wants to review Qodo PR feedback or fix code review comments. Capabilities: view issues by severity, apply fixes interactively or in batch, reply to inline comments, post fix summaries (GitHub, GitLab, Bitbucket, Azure DevOps, Gerrit)"
+        }
+      ]
+    },
+    {
+      "name": "claude-code-base-action",
+      "url": "https://github.com/anthropics/claude-code-base-action",
+      "kind": "automation-examples",
+      "status": "fetched",
+      "error": null,
+      "skillCount": 0,
+      "skills": []
+    },
+    {
+      "name": "context7",
+      "url": "https://github.com/upstash/context7",
+      "kind": "docs-lookup",
+      "status": "fetched",
+      "error": null,
+      "skillCount": 5,
+      "skills": [
+        {
+          "name": "context7-mcp",
+          "path": "plugins/claude/context7/skills/context7-mcp/SKILL.md",
+          "description": "This skill should be used when the user asks about libraries, frameworks, API references, or needs code examples. Activates for setup questions, code generation involving libraries, or mentions of specific frameworks like React, Vue, Next.js, Prisma, Supabase, etc."
+        },
+        {
+          "name": "context7-mcp",
+          "path": "plugins/cursor/context7/skills/context7-mcp/SKILL.md",
+          "description": "This skill should be used when the user asks about libraries, frameworks, API references, or needs code examples. Activates for setup questions, code generation involving libraries, or mentions of specific frameworks like React, Vue, Next.js, Prisma, Supabase, etc."
+        },
+        {
+          "name": "context7-cli",
+          "path": "skills/context7-cli/SKILL.md",
+          "description": "Use the ctx7 CLI to fetch library documentation, manage AI coding skills, and configure Context7 MCP. Activate when the user mentions \"ctx7\" or \"context7\", needs current docs for any library, wants to install/search/generate skills, or needs to set up Context7 for their AI coding agent."
+        },
+        {
+          "name": "context7-mcp",
+          "path": "skills/context7-mcp/SKILL.md",
+          "description": "This skill should be used when the user asks about libraries, frameworks, API references, or needs code examples. Activates for setup questions, code generation involving libraries, or mentions of specific frameworks like React, Vue, Next.js, Prisma, Supabase, etc."
+        },
+        {
+          "name": "find-docs",
+          "path": "skills/find-docs/SKILL.md",
+          "description": ">-"
+        }
+      ]
+    }
+  ]
+}

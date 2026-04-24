@@ -1,0 +1,8 @@
+{
+  "slug": "dev-implementer",
+  "name": "Dev Implementer",
+  "provider": "codex",
+  "phase": "implementation",
+  "defaultCommand": "implement",
+  "skills": ["project-context", "token-saver", "nextjs", "react", "nestjs", "spring-boot", "fastapi", "django", "dotnet", "qodo-skills", "github-actions-debugger", "gitops-workflow"]
+}

@@ -21,6 +21,9 @@ apps/dashboard/.env.*.local
 # Logs
 logs/*.jsonl
 
+# External skill source cache
+skills/.cache/
+
 # OS
 .DS_Store
 Thumbs.db

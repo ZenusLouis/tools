@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "routes": [
+    {
+      "phase": "analysis",
+      "role": "ba-analyst",
+      "provider": "claude",
+      "executionMode": "local",
+      "command": "prepare-brief"
+    },
+    {
+      "phase": "implementation",
+      "role": "dev-implementer",
+      "provider": "codex",
+      "executionMode": "local",
+      "command": "implement"
+    },
+    {
+      "phase": "review",
+      "role": "research-reviewer",
+      "provider": "chatgpt",
+      "executionMode": "dashboard",
+      "command": "review"
+    },
+    {
+      "phase": "review",
+      "role": "qa-test-engineer",
+      "provider": "codex",
+      "executionMode": "local",
+      "command": "review"
+    },
+    {
+      "phase": "design",
+      "role": "design-integrator",
+      "provider": "claude",
+      "executionMode": "local",
+      "command": "prepare-brief"
+    },
+    {
+      "phase": "research",
+      "role": "knowledge-curator",
+      "provider": "claude",
+      "executionMode": "local",
+      "command": "learn"
+    }
+  ]
+}

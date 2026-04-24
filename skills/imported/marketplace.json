@@ -1,40 +1,103 @@
 {
-  "_comment": "Local cache of known Claude Code skills/plugins. Updated by /skill-install.",
+  "_comment": "Local cache of known agent skills/plugins. Keep real skill code in source repos unless explicitly vendored.",
+  "updated": "2026-04-24",
+  "sources": [
+    "https://github.com/openai/skills",
+    "https://github.com/mxyhi/ok-skills",
+    "https://github.com/kodustech/awesome-agent-skills",
+    "https://github.com/803/skills-supply",
+    "https://github.com/jdrhyne/agent-skills",
+    "https://github.com/alirezarezvani/claude-skills"
+  ],
   "skills": [
     {
       "name": "commit-commands",
-      "description": "Official Anthropic git workflow commands — commit, PR, branch",
+      "description": "Official Anthropic git workflow commands: commit, PR, branch.",
       "stars": 1200,
       "source": "https://github.com/anthropics/anthropic-quickstarts",
-      "tags": ["git", "workflow"]
+      "tags": ["git", "workflow", "claude"]
     },
     {
       "name": "qodo-skills",
-      "description": "AI-assisted test generation for unit and integration tests",
+      "description": "AI-assisted test generation for unit and integration tests.",
       "stars": 234,
       "source": "https://github.com/qodo-ai/qodo-skills",
-      "tags": ["testing", "unit-test"]
+      "tags": ["testing", "unit-test", "qa"]
     },
     {
       "name": "pr-review-toolkit",
-      "description": "Code review checklist + test coverage check for PRs",
+      "description": "Code review checklist and test coverage checks for PRs.",
       "stars": 89,
       "source": "https://github.com/anthropics/claude-code-base-action",
       "tags": ["review", "pr", "testing"]
     },
     {
       "name": "context7",
-      "description": "Version-aware docs lookup — replaces pasting documentation into chat",
+      "description": "Version-aware docs lookup to avoid pasting documentation into chat.",
       "stars": 560,
       "source": "https://github.com/upstash/context7",
       "tags": ["docs", "research", "token-saver"]
     },
     {
       "name": "session-report",
-      "description": "HTML token analytics report — which commands/skills cost most",
+      "description": "HTML token analytics report showing which commands and skills cost most.",
       "stars": 45,
       "source": "https://github.com/anthropics/claude-code-base-action",
       "tags": ["analytics", "token", "reporting"]
+    },
+    {
+      "name": "codex-official-catalog",
+      "description": "Official OpenAI Codex skills catalog reference for creating and importing Agent Skills.",
+      "source": "https://github.com/openai/skills",
+      "tags": ["codex", "official", "skill-source"]
+    },
+    {
+      "name": "planning-with-files",
+      "description": "File-based planning for BA briefs, research notes, long-running tasks, and multi-agent handoff.",
+      "source": "https://github.com/mxyhi/ok-skills",
+      "tags": ["planning", "ba", "research", "handoff"]
+    },
+    {
+      "name": "browser-qa",
+      "description": "Browser automation, screenshots, form checks, and visual smoke testing for dashboard/web UI.",
+      "source": "https://github.com/mxyhi/ok-skills",
+      "tags": ["qa", "browser", "frontend", "screenshots"]
+    },
+    {
+      "name": "github-actions-debugger",
+      "description": "CI/CD log triage for GitHub Actions, Jenkins, build failures, test failures, and deployment pipelines.",
+      "source": "https://github.com/mxyhi/ok-skills",
+      "tags": ["ci", "github-actions", "jenkins", "debugging"]
+    },
+    {
+      "name": "gitops-workflow",
+      "description": "ArgoCD, Flux, Kustomize, Kubernetes manifests, image tag bumps, and secret boundary workflow.",
+      "source": "https://github.com/kodustech/awesome-agent-skills",
+      "tags": ["gitops", "argocd", "kubernetes", "deployment"]
+    },
+    {
+      "name": "accessibility-auditor",
+      "description": "WCAG accessibility checks for keyboard navigation, contrast, focus states, labels, and semantic HTML.",
+      "source": "https://github.com/kodustech/awesome-agent-skills",
+      "tags": ["accessibility", "wcag", "frontend", "qa"]
+    },
+    {
+      "name": "skill-sync",
+      "description": "Sync, catalog, import, and update SKILL.md-compatible skills across Claude, Codex, ChatGPT, and OpenCode.",
+      "source": "https://github.com/jdrhyne/agent-skills",
+      "tags": ["skills", "sync", "codex", "claude", "chatgpt"]
+    },
+    {
+      "name": "self-improving-agent",
+      "description": "Capture mistakes, recurring patterns, review feedback, and memory updates into reusable agent rules.",
+      "source": "https://github.com/jdrhyne/agent-skills",
+      "tags": ["learning", "memory", "feedback", "agent"]
+    },
+    {
+      "name": "security-review",
+      "description": "Security review for auth, session handling, secrets, CI/CD credentials, dependencies, and Kubernetes manifests.",
+      "source": "https://github.com/alirezarezvani/claude-skills",
+      "tags": ["security", "auth", "secrets", "review"]
     }
   ]
 }

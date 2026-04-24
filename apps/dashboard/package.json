@@ -10,11 +10,12 @@
     "test": "jest",
     "test:e2e": "playwright test",
     "db:migrate": "prisma migrate dev",
+    "db:sync": "ts-node -P tsconfig.scripts.json scripts/sync-dashboard-data.ts",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio"
   },
   "prisma": {
-    "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
+    "seed": "ts-node -P tsconfig.scripts.json prisma/seed.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "latest",

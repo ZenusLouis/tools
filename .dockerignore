@@ -1,0 +1,15 @@
+.git
+.gitignore
+**/node_modules
+**/.next
+**/coverage
+**/dist
+**/build
+**/.turbo
+**/.cache
+skills/.cache
+apps/dashboard/.env
+apps/dashboard/.env.local
+apps/dashboard/.env.*.local
+hooks/.session_tokens.tmp
+deploy/

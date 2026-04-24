@@ -1,6 +1,8 @@
 services:
   migrate:
-    build: .
+    build:
+      context: ../..
+      dockerfile: apps/dashboard/Dockerfile
     command: npx prisma db push --accept-data-loss
     environment:
       DATABASE_URL: postgresql://gcs:gcs@postgres:5432/gcs
@@ -10,7 +12,9 @@ services:
     restart: "no"
 
   app:
-    build: .
+    build:
+      context: ../..
+      dockerfile: apps/dashboard/Dockerfile
     ports:
       - "3000:3000"
     environment:
@@ -18,8 +22,6 @@ services:
       CLAUDE_ROOT: /data
       NODE_ENV: production
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
-    volumes:
-      - gcs_data:/data
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -44,4 +46,3 @@ services:
 
 volumes:
   postgres_data:
-  gcs_data:

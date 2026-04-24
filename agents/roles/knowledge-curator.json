@@ -1,0 +1,8 @@
+{
+  "slug": "knowledge-curator",
+  "name": "Knowledge Curator",
+  "provider": "claude",
+  "phase": "research",
+  "defaultCommand": "learn",
+  "skills": ["learn", "auto-learner", "project-context", "skill-sync", "self-improving-agent", "codex-official-catalog"]
+}

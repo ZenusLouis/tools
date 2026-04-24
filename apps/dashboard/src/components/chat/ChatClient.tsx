@@ -5,6 +5,12 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 type Agent = { id: string; name: string; provider: string; mode: string; model?: string; roleType: string };
 type ChatMessage = { id: string; role: "user" | "assistant" | "system" | "tool"; content: string; createdAt: string };
 type ChatSession = { id: string; title: string; agentRoleId: string | null; messages: ChatMessage[] };
+type Diagnostics = {
+  roles: number;
+  apiKeys: string[];
+  local: { claude: boolean; codex: boolean };
+  onlineDevices: Array<{ name: string; claudeAvailable: boolean; codexAvailable: boolean; lastSeenAt: string | null }>;
+};
 
 export function ChatClient() {
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -12,6 +18,7 @@ export function ChatClient() {
   const [selectedAgentId, setSelectedAgentId] = useState("");
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [input, setInput] = useState("");
+  const [diagnostics, setDiagnostics] = useState<Diagnostics | null>(null);
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -27,6 +34,7 @@ export function ChatClient() {
     const sessionBody = await sessionRes.json();
     const nextAgents = agentBody.agents ?? [];
     setAgents(nextAgents);
+    setDiagnostics(agentBody.diagnostics ?? null);
     setSessions(Array.isArray(sessionBody) ? sessionBody : []);
     setSelectedAgentId((prev) => prev || nextAgents[0]?.id || "");
   }
@@ -71,10 +79,21 @@ export function ChatClient() {
             </select>
           ) : (
             <div className="rounded-lg border border-in-progress/30 bg-in-progress/10 p-3 text-xs text-in-progress">
-              Add an API key or connect a local bridge to start chatting.
+              Dashboard-run needs an API key. Local-run does not need an API key, but it must see a bridge heartbeat.
             </div>
           )}
         </div>
+
+        {agents.length === 0 && (
+          <div className="mb-4 rounded-lg border border-border bg-bg-base p-3 text-xs text-text-muted">
+            <p className="font-semibold text-text">Local bridge</p>
+            <p className="mt-1">Set `BRIDGE_TOKEN` from Settings, then run:</p>
+            <code className="mt-2 block rounded bg-card px-2 py-1 text-[10px] text-accent">python hooks/bridge-heartbeat.py</code>
+            <p className="mt-2">Claude online: {diagnostics?.local.claude ? "yes" : "no"} · Codex online: {diagnostics?.local.codex ? "yes" : "no"}</p>
+            <p>Roles: {diagnostics?.roles ?? 0} · API keys: {diagnostics?.apiKeys.length ?? 0}</p>
+            <a href="/settings" className="mt-2 inline-block text-accent">Open Settings</a>
+          </div>
+        )}
 
         <p className="text-xs font-bold uppercase tracking-wide text-text-muted mb-2">History</p>
         <div className="flex flex-col gap-1.5">
@@ -95,8 +114,17 @@ export function ChatClient() {
       <section className="rounded-xl border bg-card flex min-h-[600px] flex-col">
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {messages.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-sm text-text-muted">
-              {agents.length === 0 ? "No available agents." : "Start a conversation with the selected agent."}
+            <div className="flex h-full items-center justify-center p-6 text-sm text-text-muted">
+              {agents.length === 0 ? (
+                <div className="max-w-lg rounded-xl border border-border bg-bg-base p-5">
+                  <p className="font-semibold text-text">No available agents yet.</p>
+                  <p className="mt-2">For local Claude/Codex, add a bridge token in Settings and run the heartbeat script. For dashboard-run ChatGPT/Claude, add the provider API key in Settings.</p>
+                  <div className="mt-3 grid grid-cols-1 gap-2 text-xs">
+                    <code className="rounded bg-card px-2 py-1">python hooks/bridge-heartbeat.py</code>
+                    <code className="rounded bg-card px-2 py-1">set BRIDGE_TOKEN=&lt;token&gt;</code>
+                  </div>
+                </div>
+              ) : "Start a conversation with the selected agent."}
             </div>
           ) : messages.map((message) => (
             <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
@@ -130,4 +158,3 @@ export function ChatClient() {
     </div>
   );
 }
-

@@ -1,0 +1,58 @@
+[agents]
+claude-code = true
+codex = true
+chatgpt = true
+opencode = false
+cursor = false
+
+[paths]
+shared_roles = "agents/roles"
+shared_commands = "agents/commands"
+shared_learning = "agents/learning"
+imported_marketplace = "skills/imported/marketplace.json"
+imported_wrappers = "skills/imported/github-sources"
+
+[providers.claude]
+roles = ".claude/roles"
+commands = ".claude/commands"
+skills = "skills"
+
+[providers.codex]
+skills = ".codex/skills"
+commands = ".codex/commands"
+learning = ".codex/learning"
+
+[providers.chatgpt]
+roles = ".agents/providers/chatgpt/roles"
+commands = ".agents/providers/chatgpt/commands"
+learning = ".agents/providers/chatgpt/learning"
+
+[[dependencies]]
+name = "openai-skills"
+type = "github-catalog"
+url = "https://github.com/openai/skills"
+
+[[dependencies]]
+name = "ok-skills"
+type = "github-catalog"
+url = "https://github.com/mxyhi/ok-skills"
+
+[[dependencies]]
+name = "awesome-agent-skills"
+type = "github-index"
+url = "https://github.com/kodustech/awesome-agent-skills"
+
+[[dependencies]]
+name = "skills-supply"
+type = "skill-manager"
+url = "https://github.com/803/skills-supply"
+
+[[dependencies]]
+name = "jdrhyne-agent-skills"
+type = "github-catalog"
+url = "https://github.com/jdrhyne/agent-skills"
+
+[[dependencies]]
+name = "alirezarezvani-claude-skills"
+type = "github-catalog"
+url = "https://github.com/alirezarezvani/claude-skills"

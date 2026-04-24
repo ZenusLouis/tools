@@ -1,0 +1,8 @@
+{
+  "slug": "ba-analyst",
+  "name": "BA Analyst",
+  "provider": "claude",
+  "phase": "analysis",
+  "defaultCommand": "prepare-brief",
+  "skills": ["requirement-analyzer", "clarifier", "architecture-designer", "project-context", "token-saver", "context7", "planning-with-files"]
+}

@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "providers": {
+    "claude": {
+      "runtime": "local",
+      "rolesPath": ".claude/roles",
+      "commandsPath": ".claude/commands",
+      "skillsPath": "skills",
+      "learningPath": "agents/learning"
+    },
+    "codex": {
+      "runtime": "local",
+      "rolesPath": ".codex/skills",
+      "commandsPath": ".codex/commands",
+      "skillsPath": ".codex/skills",
+      "learningPath": ".codex/learning"
+    },
+    "chatgpt": {
+      "runtime": "dashboard",
+      "rolesPath": ".agents/providers/chatgpt/roles",
+      "commandsPath": ".agents/providers/chatgpt/commands",
+      "skillsPath": "skills",
+      "learningPath": ".agents/providers/chatgpt/learning"
+    }
+  },
+  "shared": {
+    "rolesPath": "agents/roles",
+    "commandsPath": "agents/commands",
+    "learningPath": "agents/learning",
+    "assignmentsPath": "agents/assignments"
+  }
+}

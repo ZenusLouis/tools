@@ -1,0 +1,8 @@
+{
+  "slug": "research-reviewer",
+  "name": "Research Reviewer",
+  "provider": "chatgpt",
+  "phase": "review",
+  "defaultCommand": "review",
+  "skills": ["clarifier", "architecture-designer", "project-context", "context7", "pr-review-toolkit", "security-review", "codex-official-catalog"]
+}

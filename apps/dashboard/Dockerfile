@@ -1,10 +1,21 @@
 FROM node:22-alpine AS builder
 WORKDIR /app
 
-COPY package*.json ./
+COPY apps/dashboard/package*.json ./
 RUN npm ci --ignore-scripts
 
-COPY . .
+COPY apps/dashboard/ ./
+COPY AGENTS.md /data/AGENTS.md
+COPY agents.toml /data/agents.toml
+COPY agents /data/agents
+COPY .agents /data/.agents
+COPY .claude /data/.claude
+COPY .codex /data/.codex
+COPY skills /data/skills
+COPY projects /data/projects
+COPY memory /data/memory
+COPY logs /data/logs
+COPY mcp /data/mcp
 RUN npx prisma generate
 
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -23,6 +34,7 @@ COPY --from=builder --chown=node:node /app/node_modules/.bin ./node_modules/.bin
 COPY --from=builder --chown=node:node /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder --chown=node:node /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder --chown=node:node /app/node_modules/prisma ./node_modules/prisma
+COPY --from=builder --chown=node:node /data /data
 
 USER node
 

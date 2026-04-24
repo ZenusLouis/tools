@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { ensureWorkspaceAgentDefaults } from "@/lib/agent-bootstrap";
 
 export async function GET() {
   const user = await requireCurrentUser();
+  await ensureWorkspaceAgentDefaults(user.workspaceId);
   const [roles, keys, devices] = await Promise.all([
     db.agentRole.findMany({ where: { workspaceId: user.workspaceId }, orderBy: { name: "asc" } }),
     db.apiKey.findMany({ where: { workspaceId: user.workspaceId }, select: { service: true } }),
@@ -25,6 +27,18 @@ export async function GET() {
   });
 
   return NextResponse.json({
+    diagnostics: {
+      roles: roles.length,
+      apiKeys: Array.from(services),
+      local,
+      onlineDevices: devices.map((device) => ({
+        name: device.name,
+        deviceKey: device.deviceKey,
+        claudeAvailable: device.claudeAvailable,
+        codexAvailable: device.codexAvailable,
+        lastSeenAt: device.lastSeenAt,
+      })),
+    },
     agents: available.map((role) => ({
       id: role.id,
       name: role.name,
@@ -35,4 +49,3 @@ export async function GET() {
     })),
   });
 }
-

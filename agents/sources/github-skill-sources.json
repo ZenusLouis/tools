@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "updated": "2026-04-24",
+  "sources": [
+    {
+      "name": "openai-skills",
+      "url": "https://github.com/openai/skills",
+      "kind": "official-catalog",
+      "why": "Official Codex skills catalog; useful as the baseline format and install source for Codex-compatible skills.",
+      "recommendedFor": ["codex", "chatgpt", "custom-ai"]
+    },
+    {
+      "name": "ok-skills",
+      "url": "https://github.com/mxyhi/ok-skills",
+      "kind": "curated-skills",
+      "why": "Curated SKILL.md and AGENTS.md playbooks with planning, browser automation, docs lookup, GitHub Actions debugging, and document workflows.",
+      "recommendedFor": ["ba-analyst", "dev-implementer", "qa-test-engineer"]
+    },
+    {
+      "name": "awesome-agent-skills",
+      "url": "https://github.com/kodustech/awesome-agent-skills",
+      "kind": "index",
+      "why": "Large curated index for finding targeted skills such as GitOps, accessibility audits, SAST, JavaScript testing, and agent modes.",
+      "recommendedFor": ["research-reviewer", "qa-test-engineer", "knowledge-curator"]
+    },
+    {
+      "name": "skills-supply",
+      "url": "https://github.com/803/skills-supply",
+      "kind": "package-manager",
+      "why": "Cross-agent skill dependency model using agents.toml; useful for future sync/install automation across Claude Code, Codex, and OpenCode.",
+      "recommendedFor": ["knowledge-curator", "dev-implementer"]
+    },
+    {
+      "name": "jdrhyne-agent-skills",
+      "url": "https://github.com/jdrhyne/agent-skills",
+      "kind": "skill-library",
+      "why": "Includes Codex-specific skills, self-improving-agent, knowledge graph, skill-sync, todo tracking, and universal skills.",
+      "recommendedFor": ["codex", "knowledge-curator", "qa-test-engineer"]
+    },
+    {
+      "name": "alirezarezvani-claude-skills",
+      "url": "https://github.com/alirezarezvani/claude-skills",
+      "kind": "large-skill-library",
+      "why": "Large multi-platform Claude/Codex/Gemini-compatible skill and plugin library spanning engineering, DevOps, product, PM, compliance, and executive roles.",
+      "recommendedFor": ["ba-analyst", "dev-implementer", "research-reviewer", "custom-ai"]
+    },
+    {
+      "name": "anthropic-quickstarts",
+      "url": "https://github.com/anthropics/anthropic-quickstarts",
+      "kind": "official-examples",
+      "why": "Anthropic examples and workflow commands useful for Claude-oriented git and task automation.",
+      "recommendedFor": ["claude", "dev-implementer"]
+    },
+    {
+      "name": "qodo-skills",
+      "url": "https://github.com/qodo-ai/qodo-skills",
+      "kind": "testing-skills",
+      "why": "Testing and quality-focused skill source for unit, integration, and review workflows.",
+      "recommendedFor": ["qa-test-engineer", "dev-implementer"]
+    },
+    {
+      "name": "claude-code-base-action",
+      "url": "https://github.com/anthropics/claude-code-base-action",
+      "kind": "automation-examples",
+      "why": "Claude automation examples useful for PR review, reports, and CI-style agent workflows.",
+      "recommendedFor": ["research-reviewer", "qa-test-engineer"]
+    },
+    {
+      "name": "context7",
+      "url": "https://github.com/upstash/context7",
+      "kind": "docs-lookup",
+      "why": "Version-aware documentation lookup source for research and token-saving workflows.",
+      "recommendedFor": ["ba-analyst", "research-reviewer", "knowledge-curator"]
+    }
+  ]
+}
