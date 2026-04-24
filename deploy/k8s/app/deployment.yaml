@@ -49,6 +49,11 @@ spec:
                 secretKeyRef:
                   name: gcs-secrets
                   key: ENCRYPTION_KEY
+            - name: NEXT_PUBLIC_APP_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: gcs-config
+                  key: NEXT_PUBLIC_APP_URL
           readinessProbe:
             httpGet:
               path: /

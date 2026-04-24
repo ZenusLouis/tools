@@ -8,3 +8,4 @@ data:
   CLAUDE_ROOT: "/data"
   POSTGRES_USER: "gcs"
   POSTGRES_DB: "gcs"
+  NEXT_PUBLIC_APP_URL: "https://gcs-dashboard.zenus.dev"
