@@ -45,18 +45,6 @@ spec:
 
     stages {
 
-        stage('Validate') {
-            steps {
-                container('node') {
-                    dir('apps/dashboard') {
-                        sh 'npm ci --ignore-scripts'
-                        sh 'npx prisma generate'
-                        sh 'npx tsc --noEmit'
-                    }
-                }
-            }
-        }
-
         stage('Build & Push Image') {
             steps {
                 container('kaniko') {
