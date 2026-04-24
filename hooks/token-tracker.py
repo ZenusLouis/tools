@@ -1,34 +1,37 @@
 #!/usr/bin/env python3
 """
 Token tracker hook for GlobalClaudeSkills.
-Reads PostToolUse JSON from stdin, estimates token usage, logs to JSONL.
-Run with --session-end to print daily summary.
-Run with --check-glob to warn on overly broad Glob patterns.
+Reads PostToolUse JSON from stdin, estimates token usage.
+Sends to dashboard API (primary) + local JSONL fallback.
 """
 
 import json
 import sys
 import os
+import urllib.request
 from datetime import datetime, date
 
 # Fix Windows console encoding
 if sys.stdout.encoding != 'utf-8':
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
-LOG_DIR = r"d:\GlobalClaudeSkills\logs"
-DAILY_THRESHOLD = 100_000
-COMPACT_THRESHOLD = 25_000  # suggest /compact per CONVERSATION session
+LOG_DIR      = r"d:\GlobalClaudeSkills\logs"
+DAILY_THRESHOLD   = 100_000
+COMPACT_THRESHOLD = 25_000
 SESSION_FILE = os.path.join(os.path.dirname(__file__), ".session_tokens.tmp")
 
-# Rough token estimates per tool type (input + output combined)
+# Dashboard API config (set in env or .env)
+DASHBOARD_URL = os.environ.get("DASHBOARD_URL", "https://gcs-dashboard.zenus.dev")
+HOOK_SECRET   = os.environ.get("HOOK_SECRET", "")
+
 TOOL_ESTIMATES = {
-    "Read": lambda inp: max(200, len(str(inp.get("content", ""))) // 4 + 100),
-    "Write": lambda inp: max(150, len(str(inp.get("content", ""))) // 4 + 80),
-    "Edit": lambda inp: max(100, (len(str(inp.get("old_string", ""))) + len(str(inp.get("new_string", "")))) // 4 + 80),
-    "Bash": lambda inp: 150,
-    "Grep": lambda inp: 120,
-    "Glob": lambda inp: 100,
-    "Agent": lambda inp: 2000,  # subagent calls are expensive
+    "Read":    lambda inp: max(200, len(str(inp.get("content", ""))) // 4 + 100),
+    "Write":   lambda inp: max(150, len(str(inp.get("content", ""))) // 4 + 80),
+    "Edit":    lambda inp: max(100, (len(str(inp.get("old_string", ""))) + len(str(inp.get("new_string", "")))) // 4 + 80),
+    "Bash":    lambda inp: 150,
+    "Grep":    lambda inp: 120,
+    "Glob":    lambda inp: 100,
+    "Agent":   lambda inp: 2000,
     "default": lambda inp: 100,
 }
 
@@ -41,37 +44,60 @@ def estimate_tokens(tool_name: str, tool_input: dict) -> int:
         return 100
 
 
+# ── Local fallback ─────────────────────────────────────────────────────────────
+
 def get_log_path() -> str:
     os.makedirs(LOG_DIR, exist_ok=True)
     return os.path.join(LOG_DIR, f"global-{date.today().isoformat()}.jsonl")
 
 
-def load_daily_total() -> int:
-    log_path = get_log_path()
-    if not os.path.exists(log_path):
-        return 0
+def append_log_local(entry: dict):
+    try:
+        with open(get_log_path(), "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + "\n")
+    except Exception:
+        pass
+
+
+def load_daily_total_local() -> int:
     total = 0
     try:
-        with open(log_path, "r", encoding="utf-8") as f:
+        with open(get_log_path(), "r", encoding="utf-8") as f:
             for line in f:
-                entry = json.loads(line.strip())
-                total += entry.get("tokens", 0)
+                total += json.loads(line.strip()).get("tokens", 0)
     except Exception:
         pass
     return total
 
 
-def append_log(entry: dict):
-    log_path = get_log_path()
-    with open(log_path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(entry) + "\n")
+# ── Dashboard API ──────────────────────────────────────────────────────────────
 
+def post_to_dashboard(payload: dict) -> bool:
+    """Fire-and-forget POST. Returns True on success, False on any error."""
+    try:
+        body = json.dumps(payload).encode("utf-8")
+        headers = {"Content-Type": "application/json"}
+        if HOOK_SECRET:
+            headers["x-hook-secret"] = HOOK_SECRET
+
+        req = urllib.request.Request(
+            f"{DASHBOARD_URL}/api/log",
+            data=body,
+            headers=headers,
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            return resp.status == 201
+    except Exception:
+        return False
+
+
+# ── Session token tracking ─────────────────────────────────────────────────────
 
 def _load_session_tokens() -> int:
     try:
         if os.path.exists(SESSION_FILE):
-            with open(SESSION_FILE, "r") as f:
-                return int(f.read().strip() or "0")
+            return int(open(SESSION_FILE).read().strip() or "0")
     except Exception:
         pass
     return 0
@@ -79,20 +105,20 @@ def _load_session_tokens() -> int:
 
 def _save_session_tokens(total: int):
     try:
-        with open(SESSION_FILE, "w") as f:
-            f.write(str(total))
+        open(SESSION_FILE, "w").write(str(total))
     except Exception:
         pass
 
 
+# ── Session summary (--session-end) ───────────────────────────────────────────
+
 def session_summary():
-    total = load_daily_total()
-    log_path = get_log_path()
+    total = load_daily_total_local()
     tool_counts: dict[str, int] = {}
     tool_tokens: dict[str, int] = {}
 
-    if os.path.exists(log_path):
-        with open(log_path, "r", encoding="utf-8") as f:
+    try:
+        with open(get_log_path(), "r", encoding="utf-8") as f:
             for line in f:
                 try:
                     e = json.loads(line.strip())
@@ -102,31 +128,41 @@ def session_summary():
                     tool_tokens[t] = tool_tokens.get(t, 0) + tok
                 except Exception:
                     pass
+    except Exception:
+        pass
 
     session_total = _load_session_tokens()
-    # Reset session counter on session end
     _save_session_tokens(0)
+
+    # Push session summary to dashboard
+    post_to_dashboard({
+        "type": "session",
+        "project": os.environ.get("GCS_PROJECT", "unknown"),
+        "date": datetime.now().isoformat(),
+        "tasksCompleted": [],
+        "totalTokens": session_total,
+        "totalCostUSD": round(session_total * 3.0 / 1_000_000, 6),
+        "sessionNotes": f"Auto session summary — {date.today().isoformat()}",
+        "risks": [],
+    })
 
     print(f"\n{'='*45}")
     print(f"  Session Token Summary — {date.today().isoformat()}")
     print(f"{'='*45}")
-    print(f"  This session: {session_total:,} tokens")
-    print(f"  Total today:  {total:,} tokens")
+    print(f"  This session : {session_total:,} tokens")
+    print(f"  Total today  : {total:,} tokens")
     if total > DAILY_THRESHOLD:
-        pct = total / DAILY_THRESHOLD * 100
-        print(f"  WARNING: {pct:.0f}% of {DAILY_THRESHOLD:,} daily threshold")
-
+        print(f"  WARNING: {total/DAILY_THRESHOLD*100:.0f}% of {DAILY_THRESHOLD:,} daily threshold")
     if tool_tokens:
-        top = sorted(tool_tokens.items(), key=lambda x: x[1], reverse=True)[:5]
         print(f"\n  Top token consumers:")
-        for name, tok in top:
-            count = tool_counts.get(name, 0)
-            print(f"    {name:<20} {tok:>7,} tokens  ({count}x)")
+        for name, tok in sorted(tool_tokens.items(), key=lambda x: x[1], reverse=True)[:5]:
+            print(f"    {name:<20} {tok:>7,} tokens  ({tool_counts.get(name,0)}x)")
     print(f"{'='*45}\n")
 
 
+# ── Glob pattern check (--check-glob) ─────────────────────────────────────────
+
 def check_glob_pattern():
-    """Warn on overly broad Glob patterns (PreToolUse hook)."""
     try:
         raw = sys.stdin.read().strip()
         if not raw:
@@ -134,11 +170,12 @@ def check_glob_pattern():
         data = json.loads(raw)
         pattern = data.get("tool_input", {}).get("pattern", "")
         if pattern == "**/*" or (pattern.endswith("/**/*") and "." not in pattern.split("/")[-1]):
-            print(f"! Broad Glob pattern: '{pattern}' may match thousands of files. "
-                  f"Add extension filter? e.g., '**/*.ts' or '**/*.py'")
+            print(f"! Broad Glob pattern: '{pattern}' — add extension filter? e.g. '**/*.ts'")
     except Exception:
         pass
 
+
+# ── Main (PostToolUse hook) ────────────────────────────────────────────────────
 
 def main():
     if "--session-end" in sys.argv:
@@ -157,30 +194,32 @@ def main():
     except Exception:
         return
 
-    tool_name = data.get("tool_name", data.get("tool", "unknown"))
+    tool_name  = data.get("tool_name", data.get("tool", "unknown"))
     tool_input = data.get("tool_input", data.get("input", {}))
+    tokens     = estimate_tokens(tool_name, tool_input)
+    ts         = datetime.now().isoformat()
 
-    tokens = estimate_tokens(tool_name, tool_input)
+    entry = {"ts": ts, "tool": tool_name, "tokens": tokens}
 
-    entry = {
-        "ts": datetime.now().isoformat(),
-        "tool": tool_name,
-        "tokens": tokens,
-    }
-    append_log(entry)
+    # 1. Send to dashboard API (primary)
+    sent = post_to_dashboard({"type": "tool", **entry})
 
-    # Track CONVERSATION tokens separately (reset on session-end, not daily)
+    # 2. Fallback: write local file if API unreachable
+    if not sent:
+        append_log_local(entry)
+
+    # Session tracking
     session_total = _load_session_tokens() + tokens
     _save_session_tokens(session_total)
 
-    # Suggest /compact at 25k conversation tokens
     if session_total > COMPACT_THRESHOLD and (session_total - tokens) % 5000 > (session_total % 5000):
         print(f"! Context ~{session_total:,} tokens this session. Run /compact to free up.")
 
-    # Daily budget warning
-    daily_total = load_daily_total()
-    if daily_total > DAILY_THRESHOLD:
-        print(f"! Token warning: {daily_total:,} tokens today (limit: {DAILY_THRESHOLD:,})")
+    # Daily budget warning (read from local fallback)
+    if not sent:
+        daily_total = load_daily_total_local()
+        if daily_total > DAILY_THRESHOLD:
+            print(f"! Token warning: {daily_total:,} tokens today (limit: {DAILY_THRESHOLD:,})")
 
 
 if __name__ == "__main__":

@@ -54,6 +54,11 @@ spec:
                 configMapKeyRef:
                   name: gcs-config
                   key: NEXT_PUBLIC_APP_URL
+            - name: HOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: gcs-secrets
+                  key: HOOK_SECRET
           readinessProbe:
             httpGet:
               path: /
