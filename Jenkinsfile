@@ -6,31 +6,22 @@ apiVersion: v1
 kind: Pod
 spec:
   containers:
-  - name: node
-    image: node:22-alpine
-    command: ['sleep']
-    args: ['99d']
-    resources:
-      requests: { memory: "2Gi", cpu: "1" }
-      limits:   { memory: "4Gi", cpu: "2" }
-    volumeMounts:
-    - name: npm-cache
-      mountPath: /root/.npm
   - name: kaniko
     image: gcr.io/kaniko-project/executor:debug
     command: ['sleep']
     args: ['99d']
     resources:
-      requests: { memory: "2Gi", cpu: "1" }
-      limits:   { memory: "4Gi", cpu: "2" }
+      requests:
+        memory: "2Gi"
+        cpu: "1"
+      limits:
+        memory: "4Gi"
+        cpu: "2"
+
   - name: git-tool
     image: alpine/git:latest
     command: ['sleep']
     args: ['99d']
-  volumes:
-  - name: npm-cache
-    persistentVolumeClaim:
-      claimName: npm-cache-pvc
 """
         }
     }
@@ -44,7 +35,6 @@ spec:
     }
 
     stages {
-
         stage('Build & Push Image') {
             steps {
                 container('kaniko') {
@@ -58,18 +48,16 @@ spec:
                             AUTH=$(echo -n "$REG_USER:$REG_PASS" | base64 -w 0)
                             printf '{"auths":{"ghcr.io":{"auth":"%s"}}}' "$AUTH" > /kaniko/.docker/config.json
                         '''
-                        sh """
-                            /kaniko/executor \\
-                                --context    ${WORKSPACE}/apps/dashboard \\
-                                --dockerfile ${WORKSPACE}/apps/dashboard/Dockerfile \\
-                                --destination ${APP_IMAGE}:${BUILD_ID} \\
-                                --destination ${APP_IMAGE}:latest \\
-                                --cache=true \\
-                                --cache-ttl=24h \\
-                                --snapshot-mode=redo \\
+
+                        sh '''
+                            /kaniko/executor \
+                                --context "$WORKSPACE/apps/dashboard" \
+                                --dockerfile "$WORKSPACE/apps/dashboard/Dockerfile" \
+                                --destination "$APP_IMAGE:$BUILD_ID" \
+                                --destination "$APP_IMAGE:latest" \
+                                --snapshot-mode=redo \
                                 --compressed-caching=false
-                                
-                        """
+                        '''
                     }
                 }
             }
@@ -83,30 +71,33 @@ spec:
                         usernameVariable: 'GIT_USER',
                         passwordVariable: 'GIT_PASS'
                     )]) {
-                        sh "git clone https://${GIT_USER}:${GIT_PASS}@${GITOPS_REPO} gitops-repo"
+                        sh '''
+                            git clone https://$GIT_USER:$GIT_PASS@$GITOPS_REPO gitops-repo
+                        '''
 
-                        sh """
-                            VALUES=gitops-repo/${VALUES_PATH}
-                            if [ ! -f "\$VALUES" ]; then
-                                echo "ERROR: \$VALUES not found"
+                        sh '''
+                            VALUES="gitops-repo/$VALUES_PATH"
+
+                            if [ ! -f "$VALUES" ]; then
+                                echo "ERROR: $VALUES not found"
                                 exit 1
                             fi
 
-                            sed -i "s|^  tag:.*|  tag: \\"${BUILD_ID}\\"|" "\$VALUES"
+                            sed -i "s|^  tag:.*|  tag: \\"$BUILD_ID\\"|" "$VALUES"
 
                             echo "--- values.yaml sau khi update ---"
-                            cat "\$VALUES"
-                        """
+                            cat "$VALUES"
+                        '''
 
-                        sh """
+                        sh '''
                             cd gitops-repo
                             git config user.email 'jenkins@gcs.local'
                             git config user.name  'Jenkins CI'
-                            git add ${VALUES_PATH}
+                            git add "$VALUES_PATH"
                             git diff --cached --quiet && echo "No changes" && exit 0
-                            git commit -m "ci: bump gcs-dashboard to build ${BUILD_ID}"
+                            git commit -m "ci: bump gcs-dashboard to build $BUILD_ID"
                             git push
-                        """
+                        '''
                     }
                 }
             }
