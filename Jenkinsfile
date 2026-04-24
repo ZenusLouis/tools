@@ -29,9 +29,9 @@ spec:
     environment {
         APP_IMAGE    = "ghcr.io/zenuslouis/gcs-dashboard"
         GHCR_CREDS   = "ghcr-creds"
-        GITOPS_REPO  = "github.com/ZenusLouis/my-cluster-gitops.git"
-        GITOPS_CREDS = "github-token"
-        VALUES_PATH  = "global-claude-skills/values.yaml"
+        SOURCE_REPO  = "github.com/ZenusLouis/tools.git"
+        GIT_CREDS    = "github-token"
+        KUSTOMIZATION_PATH = "deploy/k8s/kustomization.yaml"
     }
 
     stages {
@@ -63,37 +63,37 @@ spec:
             }
         }
 
-        stage('Update GitOps Manifest') {
+        stage('Update K8s Manifest') {
             steps {
                 container('git-tool') {
                     withCredentials([usernamePassword(
-                        credentialsId: "${GITOPS_CREDS}",
+                        credentialsId: "${GIT_CREDS}",
                         usernameVariable: 'GIT_USER',
                         passwordVariable: 'GIT_PASS'
                     )]) {
                         sh '''
-                            git clone https://$GIT_USER:$GIT_PASS@$GITOPS_REPO gitops-repo
+                            git clone https://$GIT_USER:$GIT_PASS@$SOURCE_REPO source-repo
                         '''
 
                         sh '''
-                            VALUES="gitops-repo/$VALUES_PATH"
+                            KUSTOMIZATION="source-repo/$KUSTOMIZATION_PATH"
 
-                            if [ ! -f "$VALUES" ]; then
-                                echo "ERROR: $VALUES not found"
+                            if [ ! -f "$KUSTOMIZATION" ]; then
+                                echo "ERROR: $KUSTOMIZATION not found"
                                 exit 1
                             fi
 
-                            sed -i "s|^  tag:.*|  tag: \\"$BUILD_ID\\"|" "$VALUES"
+                            sed -i "s|^    newTag:.*|    newTag: \\"$BUILD_ID\\"|" "$KUSTOMIZATION"
 
-                            echo "--- values.yaml sau khi update ---"
-                            cat "$VALUES"
+                            echo "--- kustomization.yaml sau khi update ---"
+                            cat "$KUSTOMIZATION"
                         '''
 
                         sh '''
-                            cd gitops-repo
+                            cd source-repo
                             git config user.email 'jenkins@gcs.local'
                             git config user.name  'Jenkins CI'
-                            git add "$VALUES_PATH"
+                            git add "$KUSTOMIZATION_PATH"
                             git diff --cached --quiet && echo "No changes" && exit 0
                             git commit -m "ci: bump gcs-dashboard to build $BUILD_ID"
                             git push
@@ -109,7 +109,7 @@ spec:
             echo "=============================================================="
             echo "Pipeline SUCCEEDED  |  Build: ${BUILD_ID}"
             echo "Image pushed: ${APP_IMAGE}:${BUILD_ID}"
-            echo "Argo CD will sync from: ${VALUES_PATH}"
+            echo "Argo CD will sync from: ${KUSTOMIZATION_PATH}"
             echo "=============================================================="
         }
         failure {
