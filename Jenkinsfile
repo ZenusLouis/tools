@@ -6,6 +6,13 @@ apiVersion: v1
 kind: Pod
 spec:
   containers:
+  - name: node
+    image: node:22-alpine
+    command: ['sleep']
+    args: ['99d']
+    resources:
+      requests: { memory: "1Gi", cpu: "500m" }
+      limits:   { memory: "2Gi", cpu: "1" }
   - name: kaniko
     image: gcr.io/kaniko-project/executor:debug
     command: ['sleep']
@@ -30,6 +37,18 @@ spec:
     }
 
     stages {
+
+        stage('Validate') {
+            steps {
+                container('node') {
+                    dir('apps/dashboard') {
+                        sh 'npm ci --ignore-scripts'
+                        sh 'npx prisma generate'
+                        sh 'npx tsc --noEmit'
+                    }
+                }
+            }
+        }
 
         stage('Build & Push Image') {
             steps {

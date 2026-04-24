@@ -16,7 +16,7 @@ spec:
       initContainers:
         - name: migrate
           image: ghcr.io/zenuslouis/gcs-dashboard:latest
-          command: ["npx", "prisma", "migrate", "deploy"]
+          command: ["npx", "prisma", "db", "push", "--accept-data-loss"]
           env:
             - name: DATABASE_URL
               valueFrom:
