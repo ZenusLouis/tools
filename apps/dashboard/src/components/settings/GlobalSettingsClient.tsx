@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Zap, Network, SlidersHorizontal } from "lucide-react";
 import { AUTO_REFRESH_KEY } from "@/components/dashboard/AutoRefresh";
 import type { McpProfile } from "@/lib/mcp";
@@ -15,29 +15,30 @@ interface Props {
 }
 
 export function GlobalSettingsClient({ profiles }: Props) {
-  const [budgetInput, setBudgetInput] = useState(DEFAULT_BUDGET.toLocaleString());
-  const [budgetSaved, setBudgetSaved] = useState(false);
-  const [currentUsage, setCurrentUsage] = useState(0);
-  const [selectedProfile, setSelectedProfile] = useState("fullstack");
-  const [autoRefresh, setAutoRefresh] = useState(true);
-  const [dateFormat, setDateFormat] = useState<"iso" | "relative">("iso");
-
-  useEffect(() => {
+  const [budgetInput, setBudgetInput] = useState(() => {
+    if (typeof window === "undefined") return DEFAULT_BUDGET.toLocaleString();
     const budget = localStorage.getItem(BUDGET_KEY);
-    if (budget) setBudgetInput(parseInt(budget).toLocaleString());
-
-    const profile = localStorage.getItem(MCP_PROFILE_KEY);
-    if (profile) setSelectedProfile(profile);
-
-    setAutoRefresh(localStorage.getItem(AUTO_REFRESH_KEY) !== "false");
-
-    const fmt = localStorage.getItem(DATE_FORMAT_KEY);
-    if (fmt === "relative") setDateFormat("relative");
-
+    return budget ? parseInt(budget, 10).toLocaleString() : DEFAULT_BUDGET.toLocaleString();
+  });
+  const [budgetSaved, setBudgetSaved] = useState(false);
+  const [currentUsage] = useState(() => {
+    if (typeof window === "undefined") return 0;
     const statsKey = `token-count-${new Date().toISOString().slice(0, 10)}`;
     const stored = localStorage.getItem(statsKey);
-    if (stored) setCurrentUsage(parseInt(stored, 10) || 0);
-  }, []);
+    return stored ? parseInt(stored, 10) || 0 : 0;
+  });
+  const [selectedProfile, setSelectedProfile] = useState(() => {
+    if (typeof window === "undefined") return "fullstack";
+    return localStorage.getItem(MCP_PROFILE_KEY) ?? "fullstack";
+  });
+  const [autoRefresh, setAutoRefresh] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem(AUTO_REFRESH_KEY) !== "false";
+  });
+  const [dateFormat, setDateFormat] = useState<"iso" | "relative">(() => {
+    if (typeof window === "undefined") return "iso";
+    return localStorage.getItem(DATE_FORMAT_KEY) === "relative" ? "relative" : "iso";
+  });
 
   function saveBudget() {
     const n = parseInt(budgetInput.replace(/[^0-9]/g, ""), 10);

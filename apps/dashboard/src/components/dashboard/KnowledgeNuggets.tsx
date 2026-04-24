@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Lightbulb, Shield, Code2, BookOpen } from "lucide-react";
 import type { Lesson } from "@/lib/lessons";
 
@@ -40,7 +39,7 @@ const FW_COLORS: Record<string, string> = {
 
 function NuggetCard({ lesson }: { lesson: Lesson }) {
   const category = detectCategory(lesson);
-  const { icon: Icon, iconClass, bgClass, borderClass, label } = CATEGORY_CONFIG[category];
+  const { iconClass, bgClass, borderClass, label } = CATEGORY_CONFIG[category];
   const fwKey = (lesson.framework ?? "general").toLowerCase();
   const fwColor = FW_COLORS[fwKey] ?? FW_COLORS.general;
 

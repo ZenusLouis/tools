@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { BudgetWarningBanner } from "./BudgetWarningBanner";
 
 const STORAGE_KEY = "token-daily-budget";
@@ -11,20 +11,17 @@ interface Props {
 }
 
 export function BudgetConfig({ totalTokens }: Props) {
-  const [budget, setBudget] = useState(DEFAULT_BUDGET);
-  const [input, setInput] = useState(String(DEFAULT_BUDGET));
-  const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
+  const getInitialBudget = () => {
+    if (typeof window === "undefined") return DEFAULT_BUDGET;
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const n = parseInt(stored, 10);
-      if (!isNaN(n) && n > 0) {
-        setBudget(n);
-        setInput(String(n));
-      }
-    }
-  }, []);
+    if (!stored) return DEFAULT_BUDGET;
+    const n = parseInt(stored, 10);
+    return !isNaN(n) && n > 0 ? n : DEFAULT_BUDGET;
+  };
+
+  const [budget, setBudget] = useState(getInitialBudget);
+  const [input, setInput] = useState(() => String(getInitialBudget()));
+  const [saved, setSaved] = useState(false);
 
   function handleSave() {
     const n = parseInt(input.replace(/[^0-9]/g, ""), 10);

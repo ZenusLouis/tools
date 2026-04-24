@@ -2,8 +2,9 @@
 
 import path from "path";
 import fs from "fs/promises";
+import type { Dirent } from "fs";
 import { readJSON, writeJSON } from "@/lib/fs/json";
-import { resolvePath, getClaudeRoot } from "@/lib/fs/resolve";
+import { resolvePath } from "@/lib/fs/resolve";
 
 type Registry = Record<string, string>;
 
@@ -101,7 +102,7 @@ async function scanDir(
   result: Map<string, string[]>
 ): Promise<void> {
   if (depth > 4) return;
-  let entries: fs.Dirent[];
+  let entries: Dirent[];
   try {
     entries = await fs.readdir(dir, { withFileTypes: true });
   } catch {

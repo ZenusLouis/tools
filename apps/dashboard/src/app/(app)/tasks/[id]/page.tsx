@@ -24,7 +24,7 @@ export default async function TaskDetailPage({ params }: Props) {
   if (!task) notFound();
 
   const projectCtx = await getProjectContext(task.projectName).catch(() => null);
-  const projectPath = projectCtx?.path;
+  const projectPath = projectCtx?.path ?? undefined;
 
   return (
     <>
@@ -34,7 +34,7 @@ export default async function TaskDetailPage({ params }: Props) {
           <TaskMetaCard task={task} log={log} />
           <FilesChangedCard files={log?.filesChanged ?? []} projectPath={projectPath} />
           <RisksCard risks={log?.risks ?? []} />
-          <LessonLinkCard lessonSaved={log?.lessonSaved ?? null} taskId={task.id} />
+          <LessonLinkCard lessonSaved={log?.lessonSaved ?? null} />
           <DiffCard files={log?.filesChanged ?? []} />
         </div>
       </PageShell>

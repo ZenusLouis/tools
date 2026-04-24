@@ -25,7 +25,7 @@ export default async function ProjectSettingsPage({ params }: Props) {
         <div className="flex flex-col gap-6 max-w-2xl">
           <SettingsForm
             projectName={ctx.name}
-            projectPath={ctx.path}
+            projectPath={ctx.path ?? ""}
             mcpProfile={ctx.mcpProfile ?? ""}
             profiles={profiles}
             docs={ctx.docs ?? {}}

@@ -3,10 +3,9 @@ import { BookOpen, ExternalLink } from "lucide-react";
 
 interface Props {
   lessonSaved: string | null;
-  taskId: string;
 }
 
-export function LessonLinkCard({ lessonSaved, taskId }: Props) {
+export function LessonLinkCard({ lessonSaved }: Props) {
   return (
     <div className="rounded-xl border bg-card p-5">
       <h3 className="text-xs font-semibold uppercase tracking-wide text-text-muted mb-3">Lesson Saved</h3>

@@ -1,5 +1,4 @@
 import type { FileChange } from "@/lib/task-detail";
-import { getClaudeRoot } from "@/lib/fs/resolve";
 import path from "path";
 
 interface Props {

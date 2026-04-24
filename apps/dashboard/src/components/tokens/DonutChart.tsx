@@ -19,6 +19,14 @@ function getColor(tool: string, idx: number): string {
   return fallbacks[idx % fallbacks.length];
 }
 
+function getPercent(payload: unknown): number {
+  if (payload && typeof payload === "object" && "percent" in payload) {
+    const percent = payload.percent;
+    return typeof percent === "number" ? percent : 0;
+  }
+  return 0;
+}
+
 interface Props {
   breakdown: ToolBreakdown[];
 }
@@ -55,12 +63,13 @@ export function DonutChart({ breakdown }: Props) {
           <Tooltip
             contentStyle={{ background: "#1a1a2e", border: "1px solid #2a2a3e", borderRadius: 8, fontSize: 12 }}
             itemStyle={{ color: "#e2e8f0" }}
-            formatter={(value: number) => [`${value.toLocaleString()} tokens`, ""]}
+            formatter={(value) => {
+              const tokens = typeof value === "number" ? value : Number(value ?? 0);
+              return [`${tokens.toLocaleString()} tokens`, ""];
+            }}
           />
           <Legend
-            formatter={(value: string, entry: { payload?: { percent?: number } }) =>
-              `${value} (${entry.payload?.percent ?? 0}%)`
-            }
+            formatter={(value, entry) => `${String(value)} (${getPercent(entry.payload)}%)`}
             wrapperStyle={{ fontSize: 11, color: "#94a3b8" }}
           />
         </PieChart>

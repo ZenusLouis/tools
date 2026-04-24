@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { CheckCircle, AlertCircle, Loader } from "lucide-react";
 import { createProject } from "@/app/(app)/projects/new/actions";
 import type { WizardData } from "./WizardShell";

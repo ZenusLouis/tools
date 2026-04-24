@@ -1,8 +1,5 @@
 "use client";
 
-import {
-  BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer,
-} from "recharts";
 import { BarChart2 } from "lucide-react";
 import type { DailyUsage } from "@/lib/analytics";
 

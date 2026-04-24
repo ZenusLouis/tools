@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { Plus, Eye, EyeOff, Trash2, Key, Copy, Check, Loader2 } from "lucide-react";
 import type { ApiKeyRow } from "@/lib/api-keys";
 

@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
 
   const parsed = EntrySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.errors }, { status: 400 });
+    return NextResponse.json({ error: parsed.error.issues }, { status: 400 });
   }
 
   const entry = parsed.data;

@@ -5,5 +5,5 @@ export function getClaudeRoot(): string {
 }
 
 export function resolvePath(...segments: string[]): string {
-  return path.join(getClaudeRoot(), ...segments);
+  return path.join(/*turbopackIgnore: true*/ getClaudeRoot(), ...segments);
 }

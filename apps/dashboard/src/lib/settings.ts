@@ -8,8 +8,27 @@ export type ProjectContext = {
   mcpProfile: string | null;
   docs: Record<string, string>;
   tools: Record<string, string>;
+  env: {
+    required: string[];
+    envFile: string;
+  };
   lastIndexed: string | null;
   activeTask: string | null;
+};
+
+export type ContextJSON = {
+  name: string;
+  path?: string;
+  framework?: string[];
+  mcpProfile?: string;
+  docs?: Record<string, string>;
+  tools?: Record<string, string>;
+  env?: {
+    required?: string[];
+    envFile?: string;
+  };
+  lastIndexed?: string;
+  activeTask?: string | null;
 };
 
 export async function getProjectContext(projectName: string): Promise<ProjectContext | null> {
@@ -22,6 +41,7 @@ export async function getProjectContext(projectName: string): Promise<ProjectCon
     mcpProfile: p.mcpProfile,
     docs: (p.docs as Record<string, string>) ?? {},
     tools: (p.links as Record<string, string>) ?? {},
+    env: { required: [], envFile: "" },
     lastIndexed: p.lastIndexed?.toISOString() ?? null,
     activeTask: p.activeTask,
   };
