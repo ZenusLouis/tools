@@ -11,8 +11,8 @@ spec:
     command: ['sleep']
     args: ['99d']
     resources:
-      requests: { memory: "1Gi", cpu: "500m" }
-      limits:   { memory: "2Gi", cpu: "1" }
+      requests: { memory: "2Gi", cpu: "1" }
+      limits:   { memory: "4Gi", cpu: "2" }
     volumeMounts:
     - name: npm-cache
       mountPath: /root/.npm
