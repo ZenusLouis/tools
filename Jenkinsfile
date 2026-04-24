@@ -13,6 +13,9 @@ spec:
     resources:
       requests: { memory: "1Gi", cpu: "500m" }
       limits:   { memory: "2Gi", cpu: "1" }
+    volumeMounts:
+    - name: npm-cache
+      mountPath: /root/.npm
   - name: kaniko
     image: gcr.io/kaniko-project/executor:debug
     command: ['sleep']
@@ -24,6 +27,10 @@ spec:
     image: alpine/git:latest
     command: ['sleep']
     args: ['99d']
+  volumes:
+  - name: npm-cache
+    persistentVolumeClaim:
+      claimName: npm-cache-pvc
 """
         }
     }
