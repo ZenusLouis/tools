@@ -65,7 +65,10 @@ spec:
                                 --destination ${APP_IMAGE}:${BUILD_ID} \\
                                 --destination ${APP_IMAGE}:latest \\
                                 --cache=true \\
-                                --cache-ttl=24h
+                                --cache-ttl=24h \\
+                                --snapshot-mode=redo \\
+                                --compressed-caching=false
+                                
                         """
                     }
                 }
