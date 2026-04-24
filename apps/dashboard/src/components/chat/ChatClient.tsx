@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 
-type Agent = { id: string; name: string; provider: string; mode: string; model?: string; roleType: string };
+type Agent = { id: string; name: string; slug: string; provider: string; mode: string; model?: string; roleType: string };
 type ChatMessage = { id: string; role: "user" | "assistant" | "system" | "tool"; content: string; createdAt: string };
 type ChatSession = { id: string; title: string; agentRoleId: string | null; messages: ChatMessage[] };
 type Diagnostics = {
@@ -15,7 +15,6 @@ type Diagnostics = {
 export function ChatClient() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [selectedAgentId, setSelectedAgentId] = useState("");
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [diagnostics, setDiagnostics] = useState<Diagnostics | null>(null);
@@ -32,19 +31,29 @@ export function ChatClient() {
     ]);
     const agentBody = await agentRes.json();
     const sessionBody = await sessionRes.json();
-    const nextAgents = agentBody.agents ?? [];
-    setAgents(nextAgents);
+    setAgents(agentBody.agents ?? []);
     setDiagnostics(agentBody.diagnostics ?? null);
     setSessions(Array.isArray(sessionBody) ? sessionBody : []);
-    setSelectedAgentId((prev) => prev || nextAgents[0]?.id || "");
   }
 
   const selectedSession = useMemo(
     () => sessions.find((session) => session.id === selectedSessionId) ?? sessions[0] ?? null,
-    [sessions, selectedSessionId]
+    [sessions, selectedSessionId],
   );
   const messages = selectedSession?.messages ?? [];
-  const canSend = agents.length > 0 && selectedAgentId && input.trim().length > 0 && !pending;
+  const mentionedAgent = useMemo(() => {
+    const mention = input.match(/@([a-zA-Z0-9][\w-]*)/)?.[1]?.toLowerCase();
+    return mention ? agents.find((agent) => agent.slug.toLowerCase() === mention) : null;
+  }, [agents, input]);
+  const canSend = agents.length > 0 && Boolean(mentionedAgent) && input.trim().length > 0 && !pending;
+
+  function mention(agent: Agent) {
+    setInput((prev) => {
+      const trimmed = prev.trimStart();
+      if (trimmed.startsWith(`@${agent.slug}`)) return prev;
+      return `@${agent.slug} ${trimmed}`.trimEnd();
+    });
+  }
 
   function send() {
     if (!canSend) return;
@@ -56,7 +65,6 @@ export function ChatClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sessionId: selectedSession?.id,
-          agentRoleId: selectedAgentId,
           message,
         }),
       });
@@ -67,19 +75,31 @@ export function ChatClient() {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 min-h-[calc(100vh-7rem)]">
+    <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6 min-h-[calc(100vh-7rem)]">
       <aside className="rounded-xl border bg-card p-4">
         <div className="mb-4">
-          <p className="text-xs font-bold uppercase tracking-wide text-text-muted mb-2">Agent</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-text-muted mb-2">Active Bots</p>
           {agents.length > 0 ? (
-            <select value={selectedAgentId} onChange={(e) => setSelectedAgentId(e.target.value)} className="w-full rounded-lg border border-border bg-bg-base px-3 py-2 text-sm text-text">
+            <div className="flex flex-col gap-2">
               {agents.map((agent) => (
-                <option key={agent.id} value={agent.id}>{agent.name} · {agent.provider} · {agent.mode}</option>
+                <button
+                  key={agent.id}
+                  type="button"
+                  onClick={() => mention(agent)}
+                  className="rounded-lg border border-border bg-bg-base p-3 text-left transition-colors hover:border-accent/60 hover:bg-accent/10"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold text-text">{agent.name}</span>
+                    <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-accent">{agent.provider}</span>
+                  </div>
+                  <p className="mt-1 text-[10px] text-text-muted">@{agent.slug}</p>
+                  <p className="mt-1 text-[10px] text-text-muted">{agent.mode}{agent.model ? ` - ${agent.model}` : ""}</p>
+                </button>
               ))}
-            </select>
+            </div>
           ) : (
             <div className="rounded-lg border border-in-progress/30 bg-in-progress/10 p-3 text-xs text-in-progress">
-              Dashboard-run needs an API key. Local-run does not need an API key, but it must see a bridge heartbeat.
+              No active bots. Local bots need a bridge heartbeat; dashboard bots need provider API keys.
             </div>
           )}
         </div>
@@ -87,10 +107,13 @@ export function ChatClient() {
         {agents.length === 0 && (
           <div className="mb-4 rounded-lg border border-border bg-bg-base p-3 text-xs text-text-muted">
             <p className="font-semibold text-text">Local bridge</p>
-            <p className="mt-1">Set `BRIDGE_TOKEN` from Settings, then run:</p>
-            <code className="mt-2 block rounded bg-card px-2 py-1 text-[10px] text-accent">python hooks/bridge-heartbeat.py</code>
-            <p className="mt-2">Claude online: {diagnostics?.local.claude ? "yes" : "no"} · Codex online: {diagnostics?.local.codex ? "yes" : "no"}</p>
-            <p>Roles: {diagnostics?.roles ?? 0} · API keys: {diagnostics?.apiKeys.length ?? 0}</p>
+            <p className="mt-1">Create a bridge token in Settings, then run from repo root:</p>
+            <code className="mt-2 block rounded bg-card px-2 py-1 text-[10px] text-accent">$env:BRIDGE_TOKEN=&quot;&lt;token&gt;&quot;</code>
+            <code className="mt-1 block rounded bg-card px-2 py-1 text-[10px] text-accent">python hooks/bridge-heartbeat.py</code>
+            <p className="mt-2">For Codex logging, run Codex through:</p>
+            <code className="mt-1 block rounded bg-card px-2 py-1 text-[10px] text-accent">powershell -File hooks/codex-gcs.ps1 &quot;prompt&quot;</code>
+            <p className="mt-2">Claude online: {diagnostics?.local.claude ? "yes" : "no"} - Codex online: {diagnostics?.local.codex ? "yes" : "no"}</p>
+            <p>Roles: {diagnostics?.roles ?? 0} - API keys: {diagnostics?.apiKeys.length ?? 0}</p>
             <a href="/settings" className="mt-2 inline-block text-accent">Open Settings</a>
           </div>
         )}
@@ -116,15 +139,16 @@ export function ChatClient() {
           {messages.length === 0 ? (
             <div className="flex h-full items-center justify-center p-6 text-sm text-text-muted">
               {agents.length === 0 ? (
-                <div className="max-w-lg rounded-xl border border-border bg-bg-base p-5">
-                  <p className="font-semibold text-text">No available agents yet.</p>
-                  <p className="mt-2">For local Claude/Codex, add a bridge token in Settings and run the heartbeat script. For dashboard-run ChatGPT/Claude, add the provider API key in Settings.</p>
+                <div className="max-w-xl rounded-xl border border-border bg-bg-base p-5">
+                  <p className="font-semibold text-text">No active bots yet.</p>
+                  <p className="mt-2">For local Claude/Codex, create a bridge token in Settings and run the heartbeat script. For dashboard-run ChatGPT/Claude, add the provider API key in Settings.</p>
                   <div className="mt-3 grid grid-cols-1 gap-2 text-xs">
+                    <code className="rounded bg-card px-2 py-1">$env:BRIDGE_TOKEN=&quot;&lt;token&gt;&quot;</code>
                     <code className="rounded bg-card px-2 py-1">python hooks/bridge-heartbeat.py</code>
-                    <code className="rounded bg-card px-2 py-1">set BRIDGE_TOKEN=&lt;token&gt;</code>
+                    <code className="rounded bg-card px-2 py-1">powershell -File hooks/codex-gcs.ps1 &quot;prompt&quot;</code>
                   </div>
                 </div>
-              ) : "Start a conversation with the selected agent."}
+              ) : "Mention a bot to start, for example @dev-implementer."}
             </div>
           ) : messages.map((message) => (
             <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
@@ -135,6 +159,14 @@ export function ChatClient() {
           ))}
         </div>
         <div className="border-t border-border p-4">
+          {mentionedAgent && (
+            <p className="mb-2 text-xs text-text-muted">
+              Sending to <span className="font-semibold text-accent">{mentionedAgent.name}</span>
+            </p>
+          )}
+          {agents.length > 0 && input.trim().length > 0 && !mentionedAgent && (
+            <p className="mb-2 text-xs text-in-progress">Mention one active bot first, for example @{agents[0]?.slug}.</p>
+          )}
           <div className="flex gap-2">
             <textarea
               value={input}
@@ -146,7 +178,7 @@ export function ChatClient() {
                 }
               }}
               disabled={agents.length === 0}
-              placeholder={agents.length === 0 ? "No available agent" : "Message the selected agent..."}
+              placeholder={agents.length === 0 ? "No active bot" : "Ask with @bot-name, e.g. @dev-implementer review this task"}
               className="min-h-12 flex-1 resize-none rounded-lg border border-border bg-bg-base px-3 py-2 text-sm text-text outline-none focus:border-accent disabled:opacity-60"
             />
             <button onClick={send} disabled={!canSend} className="rounded-lg bg-accent px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">

@@ -59,6 +59,19 @@
     @apply bg-accent text-white;
   }
 
+  select,
+  option {
+    background: var(--bg-base);
+    color: var(--text);
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    letter-spacing: 0;
+  }
+
   /* Scrollbar */
   ::-webkit-scrollbar {
     width: 6px;

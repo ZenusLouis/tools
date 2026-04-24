@@ -6,9 +6,17 @@ import { getApiKeyByService } from "@/lib/api-keys";
 
 const ChatSchema = z.object({
   sessionId: z.string().optional(),
-  agentRoleId: z.string().min(1),
+  agentRoleId: z.string().optional(),
   message: z.string().min(1),
 });
+
+function normalizeAgentHandle(value: string) {
+  return value.toLowerCase().replace(/^@/, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function extractMention(message: string) {
+  return message.match(/@([a-zA-Z0-9][\w-]*)/)?.[1] ?? null;
+}
 
 async function callOpenAI(apiKey: string, model: string, messages: Array<{ role: string; content: string }>) {
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -54,11 +62,26 @@ export async function POST(req: NextRequest) {
   const parsed = ChatSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues }, { status: 400 });
 
+  const mention = extractMention(parsed.data.message);
+  const requestedSlug = mention ? normalizeAgentHandle(mention) : null;
+  if (!parsed.data.agentRoleId && !requestedSlug) {
+    return NextResponse.json({ error: "Mention an active bot with @bot-name" }, { status: 400 });
+  }
   const role = await db.agentRole.findFirst({
-    where: { id: parsed.data.agentRoleId, workspaceId: user.workspaceId },
+    where: parsed.data.agentRoleId
+      ? { id: parsed.data.agentRoleId, workspaceId: user.workspaceId }
+      : requestedSlug
+        ? { slug: requestedSlug, workspaceId: user.workspaceId }
+        : { id: "__never__", workspaceId: user.workspaceId },
     include: { skills: true },
+    orderBy: { name: "asc" },
   });
-  if (!role) return NextResponse.json({ error: "Agent unavailable" }, { status: 404 });
+  if (!role) {
+    return NextResponse.json({ error: requestedSlug ? `Agent @${requestedSlug} is unavailable` : "Mention an agent with @agent-name" }, { status: 404 });
+  }
+  if (!(await isRoleAvailable(role, user.workspaceId))) {
+    return NextResponse.json({ error: `Agent @${role.slug} is not active yet` }, { status: 409 });
+  }
 
   const session = parsed.data.sessionId
     ? await db.chatSession.findFirst({ where: { id: parsed.data.sessionId, workspaceId: user.workspaceId } })
@@ -66,7 +89,7 @@ export async function POST(req: NextRequest) {
       data: {
         workspaceId: user.workspaceId,
         userId: user.id,
-        title: parsed.data.message.slice(0, 64),
+        title: parsed.data.message.replace(/@\S+\s*/, "").slice(0, 64) || role.name,
         agentRoleId: role.id,
         provider: role.provider,
         model: role.defaultModel,
@@ -115,3 +138,17 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ sessionId: session.id, message: assistant });
 }
 
+async function isRoleAvailable(role: { executionModeDefault: string; provider: string; credentialService: string }, workspaceId: string) {
+  if (role.executionModeDefault === "local") {
+    const devices = await db.bridgeDevice.findMany({
+      where: { workspaceId, lastSeenAt: { gte: new Date(Date.now() - 5 * 60_000) } },
+      select: { claudeAvailable: true, codexAvailable: true },
+    });
+    if (role.provider === "claude") return devices.some((device) => device.claudeAvailable);
+    if (role.provider === "codex") return devices.some((device) => device.codexAvailable);
+    return false;
+  }
+  if (role.credentialService === "none") return true;
+  const key = await getApiKeyByService(role.credentialService, workspaceId);
+  return Boolean(key);
+}

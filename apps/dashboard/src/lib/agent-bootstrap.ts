@@ -12,6 +12,7 @@ export async function ensureWorkspaceAgentDefaults(workspaceId: string) {
     includeMcp: true,
     includeSkillsAndRoles: true,
     includeLogs: true,
+    onlyIfEmpty: true,
   });
   syncedWorkspaces.add(workspaceId);
 }

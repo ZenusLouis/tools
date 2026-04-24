@@ -38,7 +38,7 @@ const SessionEntrySchema = z.object({
 const EntrySchema = z.discriminatedUnion("type", [ToolEntrySchema, SessionEntrySchema]);
 
 export async function POST(req: NextRequest) {
-  const bridgeCtx = await verifyBridgeRequest(bridgeTokenFromHeaders(req.headers));
+  let bridgeCtx = await verifyBridgeRequest(bridgeTokenFromHeaders(req.headers));
   if (!bridgeCtx && HOOK_SECRET) {
     const auth = req.headers.get("x-hook-secret");
     if (auth !== HOOK_SECRET) {
@@ -61,6 +61,10 @@ export async function POST(req: NextRequest) {
   }
 
   const entry = parsed.data;
+  if (!bridgeCtx) {
+    const workspace = await db.workspace.findUnique({ where: { slug: "default" }, select: { id: true } });
+    bridgeCtx = workspace ? { workspaceId: workspace.id, deviceId: null, tokenId: null } : null;
+  }
 
   if (entry.type === "tool") {
     await db.toolUsage.create({

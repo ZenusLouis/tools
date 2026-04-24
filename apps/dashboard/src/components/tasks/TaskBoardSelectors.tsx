@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import type { ProjectOption, ModuleOption } from "@/lib/tasks";
@@ -16,6 +17,7 @@ export function TaskBoardSelectors({ projects, modules, selectedProject, selecte
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
+  const [openMenu, setOpenMenu] = useState<"project" | "module" | null>(null);
 
   function setParam(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -24,53 +26,42 @@ export function TaskBoardSelectors({ projects, modules, selectedProject, selecte
     router.push(`${pathname}?${params.toString()}`);
   }
 
+  const selectedModuleLabel = modules.find((module) => module.id === selectedModule);
+
   return (
-    <div className="flex items-center gap-0 rounded-xl border bg-card overflow-hidden">
-      {/* PROJECT */}
-      <div className="flex items-center gap-2 px-4 py-2.5 border-r border-border">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Project</span>
-        <div className="relative flex items-center">
-          <select
-            value={selectedProject}
-            onChange={(e) => setParam("project", e.target.value)}
-            className="appearance-none bg-transparent text-sm font-semibold text-text focus:outline-none cursor-pointer pr-4"
-          >
-            {projects.length === 0 && <option value="">No projects</option>}
-            {projects.map((p) => (
-              <option key={p.name} value={p.name}>{p.name}</option>
-            ))}
-          </select>
-          <ChevronDown size={11} className="absolute right-0 text-text-muted pointer-events-none" />
-        </div>
-      </div>
+    <div className="flex flex-wrap items-stretch rounded-xl border bg-card shadow-sm shadow-black/10">
+      <Picker
+        label="Project"
+        value={selectedProject || "No projects"}
+        open={openMenu === "project"}
+        onToggle={() => setOpenMenu(openMenu === "project" ? null : "project")}
+        options={projects.map((project) => ({ value: project.name, label: project.name }))}
+        onSelect={(value) => {
+          setParam("project", value);
+          setOpenMenu(null);
+        }}
+      />
 
-      {/* MODULE */}
-      <div className="flex items-center gap-2 px-4 py-2.5 border-r border-border">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Module</span>
-        <div className="relative flex items-center">
-          <select
-            value={selectedModule}
-            onChange={(e) => setParam("module", e.target.value)}
-            disabled={modules.length === 0}
-            className="appearance-none bg-transparent text-sm font-semibold text-text focus:outline-none cursor-pointer pr-4 disabled:opacity-40"
-          >
-            {modules.length === 0 && <option value="">—</option>}
-            {modules.map((m) => (
-              <option key={m.id} value={m.id}>{m.id} — {m.name}</option>
-            ))}
-          </select>
-          <ChevronDown size={11} className="absolute right-0 text-text-muted pointer-events-none" />
-        </div>
-      </div>
+      <Picker
+        label="Module"
+        value={selectedModuleLabel ? `${selectedModuleLabel.id} - ${selectedModuleLabel.name}` : "No modules"}
+        open={openMenu === "module"}
+        disabled={modules.length === 0}
+        onToggle={() => setOpenMenu(openMenu === "module" ? null : "module")}
+        options={modules.map((module) => ({ value: module.id, label: `${module.id} - ${module.name}` }))}
+        onSelect={(value) => {
+          setParam("module", value);
+          setOpenMenu(null);
+        }}
+      />
 
-      {/* PROGRESS */}
       {progress && (
-        <div className="flex items-center gap-3 px-4 py-2.5">
+        <div className="flex min-w-72 flex-1 items-center gap-3 px-4 py-2.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Progress</span>
           <span className="text-sm font-semibold tabular-nums text-text">
             {progress.completed}/{progress.total}
           </span>
-          <div className="w-24 h-1.5 rounded-full bg-border overflow-hidden">
+          <div className="h-1.5 w-24 overflow-hidden rounded-full bg-border">
             <div
               className={`h-full rounded-full transition-all duration-500 ${progress.percent === 100 ? "bg-done" : "bg-accent"}`}
               style={{ width: `${progress.percent}%` }}
@@ -79,6 +70,58 @@ export function TaskBoardSelectors({ projects, modules, selectedProject, selecte
           <span className={`text-xs font-bold tabular-nums ${progress.percent === 100 ? "text-done" : "text-accent"}`}>
             {progress.percent}%
           </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Picker({
+  label,
+  value,
+  options,
+  open,
+  disabled,
+  onToggle,
+  onSelect,
+}: {
+  label: string;
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  open: boolean;
+  disabled?: boolean;
+  onToggle: () => void;
+  onSelect: (value: string) => void;
+}) {
+  return (
+    <div className="relative min-w-64 border-r border-border last:border-r-0">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={onToggle}
+        className="flex h-full w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-card-hover disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">{label}</span>
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text">{value}</span>
+        <ChevronDown size={13} className={`shrink-0 text-text-muted transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute left-2 top-full z-30 mt-2 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-bg-base shadow-2xl shadow-black/40">
+          <div className="max-h-80 overflow-y-auto p-1.5">
+            {options.length === 0 ? (
+              <div className="px-3 py-2 text-sm text-text-muted">No options</div>
+            ) : options.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => onSelect(option.value)}
+                className="block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-text-muted transition-colors hover:bg-accent/10 hover:text-text"
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>

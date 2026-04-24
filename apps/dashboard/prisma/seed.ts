@@ -66,6 +66,7 @@ async function main() {
     includeLessons: true,
     includeMcp: true,
     includeSkillsAndRoles: true,
+    onlyIfEmpty: process.env.FORCE_REPO_SYNC !== "true",
   });
   console.log(`  OK Repo sync: ${JSON.stringify(result)}`);
   console.log("Seed complete");

@@ -11,6 +11,7 @@ type SyncOptions = {
   includeMcp?: boolean;
   includeProjects?: boolean;
   includeSkillsAndRoles?: boolean;
+  onlyIfEmpty?: boolean;
 };
 
 type SyncResult = {
@@ -544,9 +545,14 @@ export async function syncWorkspaceFromRepo(db: Db, workspaceId: string, root: s
     includeMcp: true,
     includeSkillsAndRoles: true,
     includeLogs: false,
+    onlyIfEmpty: false,
     ...options,
   };
   const result = emptyResult();
+
+  if (opts.onlyIfEmpty && !(await isWorkspaceEmptyForRepoBootstrap(db, workspaceId))) {
+    return result;
+  }
 
   if (opts.includeProjects) await syncProjects(db, workspaceId, root, result);
   if (opts.includeLessons) await syncLessons(db, root, result);
@@ -555,4 +561,16 @@ export async function syncWorkspaceFromRepo(db: Db, workspaceId: string, root: s
   if (opts.includeLogs) await syncLogs(db, workspaceId, root, result);
 
   return result;
+}
+
+async function isWorkspaceEmptyForRepoBootstrap(db: Db, workspaceId: string) {
+  const [projects, skills, roles, sessions, toolUsages, lessons] = await Promise.all([
+    db.project.count({ where: { workspaceId } }),
+    db.skillDefinition.count({ where: { workspaceId } }),
+    db.agentRole.count({ where: { workspaceId } }),
+    db.session.count({ where: { workspaceId } }),
+    db.toolUsage.count({ where: { workspaceId } }),
+    db.lesson.count(),
+  ]);
+  return projects + skills + roles + sessions + toolUsages + lessons === 0;
 }

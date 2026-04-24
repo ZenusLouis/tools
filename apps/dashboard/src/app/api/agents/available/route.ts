@@ -42,6 +42,7 @@ export async function GET() {
     agents: available.map((role) => ({
       id: role.id,
       name: role.name,
+      slug: role.slug,
       provider: role.provider,
       mode: role.executionModeDefault,
       model: role.defaultModel,
