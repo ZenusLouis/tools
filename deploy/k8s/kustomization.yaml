@@ -6,9 +6,12 @@ namespace: gcs
 resources:
   - namespace.yaml
   - configmap.yaml
-  - secret.yaml
   - postgres/pvc.yaml
   - postgres/deployment.yaml
   - postgres/service.yaml
   - app/deployment.yaml
   - app/service.yaml
+
+images:
+  - name: ghcr.io/zenuslouis/gcs-dashboard
+    newTag: "22"
