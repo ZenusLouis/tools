@@ -2,14 +2,18 @@ import { TopBar } from "@/components/layout/TopBar";
 import { PageShell } from "@/components/layout/PageShell";
 import { GlobalSettingsClient } from "@/components/settings/GlobalSettingsClient";
 import { ApiKeysPanel } from "@/components/settings/ApiKeysPanel";
+import { BridgePanel } from "@/components/settings/BridgePanel";
+import { LogoutButton } from "@/components/auth/LogoutButton";
 import { getMcpProfiles } from "@/lib/mcp";
 import { listApiKeys } from "@/lib/api-keys";
+import { requireCurrentUser } from "@/lib/auth";
 import { Terminal, FolderOpen } from "lucide-react";
 
 export default async function SettingsPage() {
+  const user = await requireCurrentUser();
   const [profiles, apiKeys] = await Promise.all([
     getMcpProfiles(),
-    listApiKeys(),
+    listApiKeys(user.workspaceId),
   ]);
   const claudeRoot = process.env.CLAUDE_ROOT ?? "d:\\GlobalClaudeSkills";
 
@@ -22,7 +26,7 @@ export default async function SettingsPage() {
           <div>
             <h2 className="text-2xl font-bold tracking-tight text-text">System Configuration</h2>
             <p className="text-text-muted text-sm mt-1">
-              Manage your development environment, token budgets, and MCP server profiles.
+              Manage {user.workspaceName}, token budgets, bridge sync, and MCP server profiles.
             </p>
           </div>
 
@@ -32,6 +36,18 @@ export default async function SettingsPage() {
           {/* API Keys section */}
           <section className="bg-card border border-border rounded-xl p-6">
             <ApiKeysPanel initialKeys={apiKeys} />
+          </section>
+
+          <section className="bg-card border border-border rounded-xl p-6">
+            <BridgePanel />
+          </section>
+
+          <section className="bg-card border border-border rounded-xl p-6 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-text">Signed in</h3>
+              <p className="text-xs text-text-muted">{user.email}</p>
+            </div>
+            <LogoutButton />
           </section>
 
           {/* About card — glassmorphism */}

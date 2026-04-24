@@ -4,9 +4,11 @@ import { TopBar } from "@/components/layout/TopBar";
 import { PageShell } from "@/components/layout/PageShell";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 import { getActiveProjects } from "@/lib/projects";
+import { requireCurrentUser } from "@/lib/auth";
 
 export default async function ProjectsPage() {
-  const projects = await getActiveProjects();
+  const user = await requireCurrentUser();
+  const projects = await getActiveProjects(user.workspaceId);
 
   return (
     <>

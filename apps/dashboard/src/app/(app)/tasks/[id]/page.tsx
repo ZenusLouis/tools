@@ -6,6 +6,7 @@ import { FilesChangedCard } from "@/components/tasks/detail/FilesChangedCard";
 import { RisksCard } from "@/components/tasks/detail/RisksCard";
 import { LessonLinkCard } from "@/components/tasks/detail/LessonLinkCard";
 import { DiffCard } from "@/components/tasks/detail/DiffCard";
+import { ArtifactsCard } from "@/components/tasks/detail/ArtifactsCard";
 import { findTaskDetail, getTaskLogEntry } from "@/lib/task-detail";
 import { getProjectContext } from "@/lib/settings";
 
@@ -32,6 +33,7 @@ export default async function TaskDetailPage({ params }: Props) {
       <PageShell>
         <div className="max-w-2xl flex flex-col gap-4">
           <TaskMetaCard task={task} log={log} />
+          <ArtifactsCard task={task} />
           <FilesChangedCard files={log?.filesChanged ?? []} projectPath={projectPath} />
           <RisksCard risks={log?.risks ?? []} />
           <LessonLinkCard lessonSaved={log?.lessonSaved ?? null} />

@@ -23,6 +23,10 @@ SESSION_FILE = os.path.join(os.path.dirname(__file__), ".session_tokens.tmp")
 # Dashboard API config (set in env or .env)
 DASHBOARD_URL = os.environ.get("DASHBOARD_URL", "https://gcs-dashboard.zenus.dev")
 HOOK_SECRET   = os.environ.get("HOOK_SECRET", "")
+BRIDGE_TOKEN  = os.environ.get("BRIDGE_TOKEN", "")
+GCS_PROVIDER  = os.environ.get("GCS_PROVIDER", "claude")
+GCS_ROLE      = os.environ.get("GCS_ROLE", "")
+GCS_MODEL     = os.environ.get("GCS_MODEL", "")
 
 TOOL_ESTIMATES = {
     "Read":    lambda inp: max(200, len(str(inp.get("content", ""))) // 4 + 100),
@@ -77,6 +81,8 @@ def post_to_dashboard(payload: dict) -> bool:
     try:
         body = json.dumps(payload).encode("utf-8")
         headers = {"Content-Type": "application/json"}
+        if BRIDGE_TOKEN:
+            headers["x-bridge-token"] = BRIDGE_TOKEN
         if HOOK_SECRET:
             headers["x-hook-secret"] = HOOK_SECRET
 
@@ -138,6 +144,9 @@ def session_summary():
     post_to_dashboard({
         "type": "session",
         "project": os.environ.get("GCS_PROJECT", "unknown"),
+        "provider": GCS_PROVIDER,
+        "role": GCS_ROLE or None,
+        "model": GCS_MODEL or None,
         "date": datetime.now().isoformat(),
         "tasksCompleted": [],
         "totalTokens": session_total,
@@ -199,7 +208,14 @@ def main():
     tokens     = estimate_tokens(tool_name, tool_input)
     ts         = datetime.now().isoformat()
 
-    entry = {"ts": ts, "tool": tool_name, "tokens": tokens}
+    entry = {
+        "ts": ts,
+        "tool": tool_name,
+        "tokens": tokens,
+        "provider": GCS_PROVIDER,
+        "role": GCS_ROLE or None,
+        "model": GCS_MODEL or None,
+    }
 
     # 1. Send to dashboard API (primary)
     sent = post_to_dashboard({"type": "tool", **entry})

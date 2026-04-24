@@ -11,13 +11,15 @@ import { getDashboardStats } from "@/lib/stats";
 import { getActiveProjects } from "@/lib/projects";
 import { getRecentActivity } from "@/lib/activity";
 import { getRandomLessons } from "@/lib/lessons";
+import { requireCurrentUser } from "@/lib/auth";
 
 export const revalidate = 30;
 
 export default async function DashboardPage() {
+  const user = await requireCurrentUser();
   const [stats, projects, activity, lessons] = await Promise.all([
-    getDashboardStats(),
-    getActiveProjects(),
+    getDashboardStats(user.workspaceId),
+    getActiveProjects(user.workspaceId),
     getRecentActivity(8),
     getRandomLessons(3),
   ]);

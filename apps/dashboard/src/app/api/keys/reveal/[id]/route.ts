@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revealApiKey } from "@/lib/api-keys";
+import { requireCurrentUser } from "@/lib/auth";
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await requireCurrentUser();
     const { id } = await params;
     const value = await revealApiKey(id);
     return NextResponse.json({ value });

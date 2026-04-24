@@ -4,17 +4,19 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, FolderKanban, CheckSquare,
-  BarChart2, BookOpen, Server, Settings2, Terminal,
+  BarChart2, BookOpen, Server, Settings2, Terminal, MessageSquare, Wand2,
 } from "lucide-react";
 import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils/cn";
 
-const icons = { LayoutDashboard, FolderKanban, CheckSquare, BarChart2, BookOpen, Server, Settings2 };
+const icons = { LayoutDashboard, FolderKanban, CheckSquare, BarChart2, BookOpen, Server, Settings2, MessageSquare, Wand2 };
 
 const navItems = [
   { label: "Dashboard", href: "/", icon: "LayoutDashboard" },
   { label: "Projects", href: "/projects", icon: "FolderKanban" },
   { label: "Tasks", href: "/tasks", icon: "CheckSquare" },
+  { label: "Chat", href: "/chat", icon: "MessageSquare" },
+  { label: "Create", href: "/create", icon: "Wand2" },
   { label: "Token Stats", href: "/tokens", icon: "BarChart2" },
   { label: "Knowledge", href: "/knowledge", icon: "BookOpen" },
   { label: "MCP Monitor", href: "/mcp", icon: "Server" },

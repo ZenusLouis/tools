@@ -5,6 +5,8 @@ import fs from "fs/promises";
 import type { Dirent } from "fs";
 import { readJSON, writeJSON } from "@/lib/fs/json";
 import { resolvePath } from "@/lib/fs/resolve";
+import { requireCurrentUser } from "@/lib/auth";
+import { db } from "@/lib/db";
 
 type Registry = Record<string, string>;
 
@@ -153,6 +155,7 @@ export type CreateProjectInput = {
 };
 
 export async function createProject(input: CreateProjectInput): Promise<{ error?: string }> {
+  const user = await requireCurrentUser();
   const { name, folderPath, framework, mcpProfile, docs, tools } = input;
 
   // Check name uniqueness
@@ -213,6 +216,30 @@ export async function createProject(input: CreateProjectInput): Promise<{ error?
   // Register
   registry[name] = projectDir;
   await writeJSON(registryPath, registry);
+
+  await db.project.upsert({
+    where: { name },
+    create: {
+      name,
+      workspaceId: user.workspaceId,
+      path: folderPath,
+      frameworks: framework,
+      mcpProfile: mcpProfile || null,
+      docs: filteredDocs,
+      links: filteredTools,
+      lastIndexed: new Date(),
+      activeTask: null,
+    },
+    update: {
+      workspaceId: user.workspaceId,
+      path: folderPath,
+      frameworks: framework,
+      mcpProfile: mcpProfile || null,
+      docs: filteredDocs,
+      links: filteredTools,
+      lastIndexed: new Date(),
+    },
+  });
 
   return {};
 }

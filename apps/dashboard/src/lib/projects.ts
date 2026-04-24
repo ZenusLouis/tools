@@ -42,8 +42,8 @@ async function countTasks(projectName: string) {
   return { total, completed };
 }
 
-export async function getActiveProjects(): Promise<ProjectSummary[]> {
-  const projects = await db.project.findMany({ orderBy: { updatedAt: "desc" } });
+export async function getActiveProjects(workspaceId?: string): Promise<ProjectSummary[]> {
+  const projects = await db.project.findMany({ where: workspaceId ? { workspaceId } : undefined, orderBy: { updatedAt: "desc" } });
   return Promise.all(
     projects.map(async (p) => {
       const { total, completed } = await countTasks(p.name);
@@ -60,7 +60,7 @@ export async function getActiveProjects(): Promise<ProjectSummary[]> {
   );
 }
 
-export async function getProjectDetail(name: string): Promise<ProjectDetail | null> {
+export async function getProjectDetail(name: string, workspaceId?: string): Promise<ProjectDetail | null> {
   const project = await db.project.findUnique({
     where: { name },
     include: {
@@ -70,7 +70,7 @@ export async function getProjectDetail(name: string): Promise<ProjectDetail | nu
       },
     },
   });
-  if (!project) return null;
+  if (!project || (workspaceId && project.workspaceId !== workspaceId)) return null;
 
   let totalAll = 0;
   let completedAll = 0;

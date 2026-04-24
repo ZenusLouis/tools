@@ -4,6 +4,8 @@ import path from "path";
 import { revalidatePath } from "next/cache";
 import { readJSON, writeJSON } from "@/lib/fs/json";
 import { resolvePath, getClaudeRoot } from "@/lib/fs/resolve";
+import { db } from "@/lib/db";
+import { requireCurrentUser } from "@/lib/auth";
 
 type Registry = Record<string, string>;
 type ProgressTask = { id: string; name?: string; status: string; estimate?: string; deps?: string[]; [key: string]: unknown };
@@ -27,6 +29,7 @@ export async function addTask(
   moduleId: string,
   name: string
 ): Promise<{ ok: boolean; taskId?: string; error?: string }> {
+  const user = await requireCurrentUser();
   if (!name.trim()) return { ok: false, error: "Name required" };
   const progressPath = await getProgressPath(projectName);
   if (!progressPath) return { ok: false, error: "Project not found" };
@@ -48,6 +51,18 @@ export async function addTask(
 
     feat.tasks.push({ id: taskId, name: name.trim(), status: "pending", estimate: "?", deps: [] });
     await writeJSON(progressPath, progress);
+    await db.task.create({
+      data: {
+        id: taskId,
+        workspaceId: user.workspaceId,
+        featureId: feat.id.startsWith(moduleId) ? feat.id : `${moduleId}-${feat.id}`,
+        name: name.trim(),
+        status: "pending",
+        phase: "pending",
+        estimate: "?",
+        deps: [],
+      },
+    }).catch(() => null);
     revalidatePath("/tasks");
     return { ok: true, taskId };
   } catch (e) {
@@ -60,6 +75,7 @@ export async function markTaskStatus(
   taskId: string,
   status: "completed" | "blocked" | "in-progress" | "pending"
 ): Promise<{ ok: boolean; error?: string }> {
+  const user = await requireCurrentUser();
   const progressPath = await getProgressPath(projectName);
   if (!progressPath) return { ok: false, error: "Project not found" };
 
@@ -78,6 +94,14 @@ export async function markTaskStatus(
     }
     if (!found) return { ok: false, error: `Task ${taskId} not found` };
     await writeJSON(progressPath, progress);
+    const dbStatus = status === "in-progress" ? "in_progress" : status;
+    await db.task.updateMany({
+      where: { id: taskId, workspaceId: user.workspaceId },
+      data: {
+        status: dbStatus as never,
+        phase: status === "completed" ? "done" : status === "blocked" ? "blocked" : status === "in-progress" ? "implementation" : "pending",
+      },
+    });
     revalidatePath("/tasks");
     return { ok: true };
   } catch (e) {

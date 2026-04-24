@@ -9,6 +9,7 @@ datasource db {
 
 model Project {
   name        String    @id
+  workspaceId String?
   path        String?
   frameworks  String[]
   lastIndexed DateTime?
@@ -16,10 +17,13 @@ model Project {
   links       Json      @default("{}")
   docs        Json      @default("{}")
   mcpProfile  String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
   modules     Module[]
   decisions   Decision[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+
+  @@index([workspaceId])
 }
 
 model Module {
@@ -46,15 +50,29 @@ model Feature {
 
 model Task {
   id        String     @id
+  workspaceId String?
   featureId String
   name      String
   status    TaskStatus @default(pending)
   estimate  String?
   deps      String[]   @default([])
+  phase     TaskPhase?
+  baRoleId  String?
+  devRoleId String?
+  reviewRoleId String?
+  analysisBriefPath String?
+  implementationLogPath String?
+  reviewPath String?
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  baRole    AgentRole? @relation("TaskBaRole", fields: [baRoleId], references: [id], onDelete: SetNull)
+  devRole   AgentRole? @relation("TaskDevRole", fields: [devRoleId], references: [id], onDelete: SetNull)
+  reviewRole AgentRole? @relation("TaskReviewRole", fields: [reviewRoleId], references: [id], onDelete: SetNull)
   feature   Feature    @relation(fields: [featureId], references: [id], onDelete: Cascade)
 
   @@index([featureId])
   @@index([status])
+  @@index([workspaceId])
+  @@index([phase])
 }
 
 enum TaskStatus {
@@ -64,8 +82,214 @@ enum TaskStatus {
   blocked
 }
 
+enum TaskPhase {
+  pending
+  analysis
+  ready_for_dev
+  implementation
+  review
+  done
+  blocked
+}
+
+enum AgentProvider {
+  claude
+  codex
+  chatgpt
+}
+
+enum ExecutionMode {
+  local
+  dashboard
+}
+
+enum RolePhase {
+  analysis
+  implementation
+  review
+  research
+  design
+  custom
+}
+
+enum ChatMessageRole {
+  user
+  assistant
+  system
+  tool
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  lastLoginAt  DateTime?
+  memberships  WorkspaceMember[]
+  chatSessions ChatSession[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Workspace {
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique
+  members       WorkspaceMember[]
+  bridgeDevices BridgeDevice[]
+  bridgeTokens  BridgeToken[]
+  projects      Project[]
+  tasks         Task[]
+  apiKeys       ApiKey[]
+  skills        SkillDefinition[]
+  roles         AgentRole[]
+  chatSessions  ChatSession[]
+  sessions      Session[]
+  toolUsages    ToolUsage[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model WorkspaceMember {
+  id          String   @id @default(cuid())
+  userId      String
+  workspaceId String
+  role        String   @default("owner")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, workspaceId])
+  @@index([workspaceId])
+}
+
+model BridgeDevice {
+  id             String   @id @default(cuid())
+  workspaceId    String
+  name           String
+  deviceKey      String
+  claudeAvailable Boolean @default(false)
+  codexAvailable  Boolean @default(false)
+  lastSeenAt     DateTime?
+  metadata       Json     @default("{}")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tokens         BridgeToken[]
+
+  @@unique([workspaceId, deviceKey])
+  @@index([workspaceId])
+}
+
+model BridgeToken {
+  id          String   @id @default(cuid())
+  workspaceId String
+  deviceId    String?
+  name        String
+  tokenHash   String   @unique
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  device      BridgeDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  @@index([workspaceId])
+  @@index([deviceId])
+}
+
+model SkillDefinition {
+  id                    String   @id @default(cuid())
+  workspaceId            String?
+  name                  String
+  slug                  String
+  category              String
+  sourcePath            String?
+  description           String
+  providerCompatibility String[] @default([])
+  roleCompatibility     String[] @default([])
+  tags                  String[] @default([])
+  isImported            Boolean  @default(false)
+  isRemote              Boolean  @default(false)
+  workspace             Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  roles                 AgentRole[] @relation("AgentRoleSkills")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId])
+  @@index([category])
+}
+
+model AgentRole {
+  id                  String   @id @default(cuid())
+  workspaceId          String?
+  name                String
+  slug                String
+  description         String
+  provider            AgentProvider
+  defaultModel        String?
+  phase               RolePhase
+  executionModeDefault ExecutionMode @default(local)
+  credentialService   String   @default("none")
+  roleType            String   @default("custom")
+  rulesMarkdown       String   @default("")
+  mcpProfile          String?
+  generatedPaths      Json     @default("{}")
+  isBuiltin           Boolean  @default(false)
+  workspace           Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  skills              SkillDefinition[] @relation("AgentRoleSkills")
+  baTasks             Task[] @relation("TaskBaRole")
+  devTasks            Task[] @relation("TaskDevRole")
+  reviewTasks         Task[] @relation("TaskReviewRole")
+  chatSessions        ChatSession[]
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId])
+  @@index([provider])
+  @@index([phase])
+}
+
+model ChatSession {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String?
+  title       String
+  agentRoleId String?
+  provider    AgentProvider?
+  model       String?
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  agentRole   AgentRole? @relation(fields: [agentRoleId], references: [id], onDelete: SetNull)
+  messages    ChatMessage[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workspaceId])
+  @@index([userId])
+  @@index([agentRoleId])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  sessionId String
+  role      ChatMessageRole
+  content   String
+  metadata  Json     @default("{}")
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([sessionId])
+}
+
 model Session {
   id             String   @id @default(cuid())
+  workspaceId    String?
+  deviceId       String?
+  provider       AgentProvider @default(claude)
+  role           String?
+  model          String?
+  transcriptPath String?
+  cwd            String?
   type           String   @default("session")
   project        String
   date           DateTime
@@ -78,21 +302,36 @@ model Session {
   filesChanged   Json?
   risks          String[] @default([])
   lessonSaved    String?
+  workspace      Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
   createdAt      DateTime @default(now())
 
   @@index([project])
   @@index([date])
+  @@index([workspaceId])
+  @@index([provider])
+  @@index([role])
+  @@index([deviceId])
 }
 
 model ToolUsage {
   id        String   @id @default(cuid())
+  workspaceId String?
+  deviceId String?
+  provider  AgentProvider @default(claude)
+  role      String?
+  model     String?
   date      DateTime
   tool      String
   tokens    Int
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
 
   @@index([date])
   @@index([tool])
+  @@index([workspaceId])
+  @@index([provider])
+  @@index([role])
+  @@index([deviceId])
 }
 
 model Lesson {
@@ -134,12 +373,15 @@ model McpProfile {
 
 model ApiKey {
   id             String   @id @default(cuid())
+  workspaceId    String?
   name           String
   service        String
   encryptedValue String
   iv             String
+  workspace      Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   @@index([service])
+  @@index([workspaceId])
 }

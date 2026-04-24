@@ -5,6 +5,7 @@ import { TopBar } from "@/components/layout/TopBar";
 import { PageShell } from "@/components/layout/PageShell";
 import { getProjectDetail } from "@/lib/projects";
 import { getRecentActivity, timeAgo } from "@/lib/activity";
+import { requireCurrentUser } from "@/lib/auth";
 
 export default async function ProjectOverviewPage({
   params,
@@ -12,7 +13,8 @@ export default async function ProjectOverviewPage({
   params: Promise<{ name: string }>;
 }) {
   const { name } = await params;
-  const project = await getProjectDetail(name);
+  const user = await requireCurrentUser();
+  const project = await getProjectDetail(name, user.workspaceId);
   if (!project) notFound();
 
   const allActivity = await getRecentActivity(50);

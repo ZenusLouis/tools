@@ -22,12 +22,12 @@ function rangeStart(range: DateRange): Date {
   return new Date(Date.now() - 30 * 86_400_000);
 }
 
-export async function getAnalytics(range: DateRange): Promise<AnalyticsData> {
+export async function getAnalytics(range: DateRange, workspaceId?: string): Promise<AnalyticsData> {
   const since = rangeStart(range);
 
   const [sessions, toolUsage] = await Promise.all([
-    db.session.findMany({ where: { date: { gte: since } }, orderBy: { date: "desc" } }),
-    db.toolUsage.findMany({ where: { date: { gte: since } }, orderBy: { date: "asc" } }),
+    db.session.findMany({ where: { date: { gte: since }, ...(workspaceId ? { workspaceId } : {}) }, orderBy: { date: "desc" } }),
+    db.toolUsage.findMany({ where: { date: { gte: since }, ...(workspaceId ? { workspaceId } : {}) }, orderBy: { date: "asc" } }),
   ]);
 
   const totalTokens = sessions.reduce((s, r) => s + (r.totalTokens ?? 0), 0);

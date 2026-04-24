@@ -7,6 +7,7 @@ import { DonutChart } from "@/components/tokens/DonutChart";
 import { DailyBarChart } from "@/components/tokens/DailyBarChart";
 import { SessionsTable } from "@/components/tokens/SessionsTable";
 import { getAnalytics, type DateRange } from "@/lib/analytics";
+import { requireCurrentUser } from "@/lib/auth";
 
 const VALID_RANGES = new Set<DateRange>(["today", "week", "month"]);
 const DEFAULT_BUDGET = 100_000;
@@ -21,7 +22,8 @@ export default async function TokensPage({ searchParams }: Props) {
     ? (range as DateRange)
     : "today";
 
-  const analytics = await getAnalytics(dateRange);
+  const user = await requireCurrentUser();
+  const analytics = await getAnalytics(dateRange, user.workspaceId);
 
   return (
     <>

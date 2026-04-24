@@ -166,6 +166,16 @@ export function TaskDetailPanel({ task, projectName, completedIds, onClose }: Pr
                 View full task log &amp; implementation detail
               </Link>
 
+              <div className="rounded-xl border border-accent/20 bg-accent/5 p-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-accent mb-2">Multi-Agent Flow</p>
+                <div className="flex flex-col gap-1 text-xs text-text-muted">
+                  <span>Phase: <span className="font-semibold text-text">{task.phase}</span></span>
+                  <span>BA: <span className="font-semibold text-text">{task.baRoleName ?? "Claude BA Analyst"}</span></span>
+                  <span>Dev: <span className="font-semibold text-text">{task.devRoleName ?? "Codex Dev Implementer"}</span></span>
+                  <span>Review: <span className="font-semibold text-text">{task.reviewRoleName ?? "ChatGPT optional"}</span></span>
+                </div>
+              </div>
+
               {/* Resources placeholder */}
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-text-muted mb-2">Resources</p>
@@ -192,6 +202,18 @@ export function TaskDetailPanel({ task, projectName, completedIds, onClose }: Pr
                 Task implementation is done via <code className="font-mono text-accent">claude</code> CLI. Use buttons below to update status only.
               </p>
               <div className="flex gap-2">
+                <button
+                  onClick={() => navigator.clipboard.writeText(`gcs task brief ${projectName} ${task.id}`)}
+                  className="flex-1 rounded-xl bg-accent/15 border border-accent/30 text-accent text-xs font-semibold py-2.5 hover:bg-accent/25 transition-colors"
+                >
+                  Copy BA
+                </button>
+                <button
+                  onClick={() => navigator.clipboard.writeText(`gcs task implement ${projectName} ${task.id}`)}
+                  className="flex-1 rounded-xl bg-in-progress/15 border border-in-progress/30 text-in-progress text-xs font-semibold py-2.5 hover:bg-in-progress/25 transition-colors"
+                >
+                  Copy Dev
+                </button>
                 <button
                   onClick={() => handleMark("completed")}
                   disabled={isPending || task.status === "completed"}

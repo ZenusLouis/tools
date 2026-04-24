@@ -13,6 +13,8 @@ spec:
       labels:
         app: gcs-dashboard
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
       initContainers:
         - name: migrate
           image: ghcr.io/zenuslouis/gcs-dashboard:latest
@@ -34,6 +36,21 @@ spec:
                 secretKeyRef:
                   name: gcs-secrets
                   key: DATABASE_URL
+            - name: AUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: gcs-secrets
+                  key: AUTH_SECRET
+            - name: ADMIN_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: gcs-secrets
+                  key: ADMIN_EMAIL
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: gcs-secrets
+                  key: ADMIN_PASSWORD
             - name: NODE_ENV
               valueFrom:
                 configMapKeyRef:
@@ -59,6 +76,11 @@ spec:
                 secretKeyRef:
                   name: gcs-secrets
                   key: HOOK_SECRET
+            - name: BRIDGE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: gcs-secrets
+                  key: BRIDGE_TOKEN
           readinessProbe:
             httpGet:
               path: /

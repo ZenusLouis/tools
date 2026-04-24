@@ -12,6 +12,13 @@ export type TaskDetail = {
   featureId: string;
   featureName: string;
   projectName: string;
+  phase: string;
+  analysisBriefPath: string | null;
+  implementationLogPath: string | null;
+  reviewPath: string | null;
+  baRoleName: string | null;
+  devRoleName: string | null;
+  reviewRoleName: string | null;
 };
 
 export type FileChange = { path: string; added: number; removed: number };
@@ -31,7 +38,7 @@ export type TaskLogEntry = {
 export async function findTaskDetail(taskId: string): Promise<TaskDetail | null> {
   const task = await db.task.findUnique({
     where: { id: taskId },
-    include: { feature: { include: { module: true } } },
+    include: { feature: { include: { module: true } }, baRole: true, devRole: true, reviewRole: true },
   });
   if (!task) return null;
 
@@ -46,6 +53,13 @@ export async function findTaskDetail(taskId: string): Promise<TaskDetail | null>
     featureId: task.feature.id,
     featureName: task.feature.name,
     projectName: task.feature.module.projectName,
+    phase: task.phase ?? (task.status === "completed" ? "done" : task.status === "blocked" ? "blocked" : "pending"),
+    analysisBriefPath: task.analysisBriefPath,
+    implementationLogPath: task.implementationLogPath,
+    reviewPath: task.reviewPath,
+    baRoleName: task.baRole?.name ?? null,
+    devRoleName: task.devRole?.name ?? null,
+    reviewRoleName: task.reviewRole?.name ?? null,
   };
 }
 

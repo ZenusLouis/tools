@@ -13,13 +13,13 @@ export type DashboardStats = {
   dailyLimit: number;
 };
 
-export async function getDashboardStats(): Promise<DashboardStats> {
+export async function getDashboardStats(workspaceId?: string): Promise<DashboardStats> {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
   const [projectCount, todaySessions] = await Promise.all([
-    db.project.count(),
-    db.session.findMany({ where: { date: { gte: todayStart } } }),
+    db.project.count({ where: workspaceId ? { workspaceId } : undefined }),
+    db.session.findMany({ where: { date: { gte: todayStart }, ...(workspaceId ? { workspaceId } : {}) } }),
   ]);
 
   const tasksToday = todaySessions.reduce((s, r) => s + r.tasksCompleted.length, 0);

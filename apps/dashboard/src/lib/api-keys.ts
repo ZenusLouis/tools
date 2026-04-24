@@ -12,8 +12,8 @@ export type ApiKeyRow = {
 
 export type ApiKeyWithValue = ApiKeyRow & { value: string };
 
-export async function listApiKeys(): Promise<ApiKeyRow[]> {
-  const rows = await db.apiKey.findMany({ orderBy: { createdAt: "asc" } });
+export async function listApiKeys(workspaceId?: string): Promise<ApiKeyRow[]> {
+  const rows = await db.apiKey.findMany({ where: workspaceId ? { workspaceId } : undefined, orderBy: { createdAt: "asc" } });
   return rows.map((r) => ({
     id: r.id,
     name: r.name,
@@ -23,10 +23,10 @@ export async function listApiKeys(): Promise<ApiKeyRow[]> {
   }));
 }
 
-export async function createApiKey(name: string, service: string, value: string): Promise<ApiKeyRow> {
+export async function createApiKey(name: string, service: string, value: string, workspaceId?: string): Promise<ApiKeyRow> {
   const { encryptedValue, iv } = encrypt(value);
   const row = await db.apiKey.create({
-    data: { name, service, encryptedValue, iv },
+    data: { name, service, encryptedValue, iv, workspaceId },
   });
   return {
     id: row.id,
@@ -47,8 +47,8 @@ export async function deleteApiKey(id: string): Promise<void> {
   await db.apiKey.delete({ where: { id } });
 }
 
-export async function getApiKeyByService(service: string): Promise<string | null> {
-  const row = await db.apiKey.findFirst({ where: { service }, orderBy: { updatedAt: "desc" } });
+export async function getApiKeyByService(service: string, workspaceId?: string): Promise<string | null> {
+  const row = await db.apiKey.findFirst({ where: { service, ...(workspaceId ? { workspaceId } : {}) }, orderBy: { updatedAt: "desc" } });
   if (!row) return null;
   return decrypt(row.encryptedValue, row.iv);
 }

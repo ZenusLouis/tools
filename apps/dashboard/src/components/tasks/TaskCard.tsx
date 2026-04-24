@@ -53,6 +53,19 @@ export function TaskCard({ task, completedIds, onClick, isSelected }: Props) {
         <span className="rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-border text-text-muted">
           {task.featureId}
         </span>
+        <span className="rounded-md px-1.5 py-0.5 text-[10px] font-bold bg-accent/10 text-accent">
+          {task.phase}
+        </span>
+        {task.baRoleName && (
+          <span className="rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-card text-text-muted">
+            BA: {task.baRoleName}
+          </span>
+        )}
+        {task.devRoleName && (
+          <span className="rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-card text-text-muted">
+            Dev: {task.devRoleName}
+          </span>
+        )}
         {task.estimate && (
           <span className="rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-accent/10 text-accent">
             {task.estimate}

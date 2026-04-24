@@ -3,6 +3,7 @@ import { PageShell } from "@/components/layout/PageShell";
 import { TaskBoardSelectors } from "@/components/tasks/TaskBoardSelectors";
 import { TaskBoardClient } from "@/components/tasks/TaskBoardClient";
 import { getProjectOptions, getModuleOptions, getModuleProgress, getModuleTasks, getCompletedTaskIds } from "@/lib/tasks";
+import { requireCurrentUser } from "@/lib/auth";
 
 interface Props {
   searchParams: Promise<{ project?: string; module?: string }>;
@@ -10,16 +11,17 @@ interface Props {
 
 export default async function TasksPage({ searchParams }: Props) {
   const { project, module: mod } = await searchParams;
+  const user = await requireCurrentUser();
 
-  const projects = await getProjectOptions();
+  const projects = await getProjectOptions(user.workspaceId);
   const selectedProject = project ?? projects[0]?.name ?? "";
   const modules = selectedProject ? await getModuleOptions(selectedProject) : [];
   const selectedModule = mod ?? modules[0]?.id ?? "";
 
   const [moduleProgress, tasks, completedIdsSet] = await Promise.all([
-    selectedProject && selectedModule ? getModuleProgress(selectedProject, selectedModule) : Promise.resolve(null),
-    selectedProject && selectedModule ? getModuleTasks(selectedProject, selectedModule) : Promise.resolve([]),
-    selectedProject ? getCompletedTaskIds(selectedProject) : Promise.resolve(new Set<string>()),
+    selectedProject && selectedModule ? getModuleProgress(selectedProject, selectedModule, user.workspaceId) : Promise.resolve(null),
+    selectedProject && selectedModule ? getModuleTasks(selectedProject, selectedModule, user.workspaceId) : Promise.resolve([]),
+    selectedProject ? getCompletedTaskIds(selectedProject, user.workspaceId) : Promise.resolve(new Set<string>()),
   ]);
 
   return (
