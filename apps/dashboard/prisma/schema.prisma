@@ -1,0 +1,133 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  name        String    @id
+  path        String?
+  frameworks  String[]
+  lastIndexed DateTime?
+  activeTask  String?
+  links       Json      @default("{}")
+  docs        Json      @default("{}")
+  mcpProfile  String?
+  modules     Module[]
+  decisions   Decision[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Module {
+  id          String   @id
+  projectName String
+  name        String
+  order       Int      @default(0)
+  project     Project  @relation(fields: [projectName], references: [name], onDelete: Cascade)
+  features    Feature[]
+
+  @@index([projectName])
+}
+
+model Feature {
+  id       String @id
+  moduleId String
+  name     String
+  order    Int    @default(0)
+  module   Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  tasks    Task[]
+
+  @@index([moduleId])
+}
+
+model Task {
+  id        String     @id
+  featureId String
+  name      String
+  status    TaskStatus @default(pending)
+  estimate  String?
+  deps      String[]   @default([])
+  feature   Feature    @relation(fields: [featureId], references: [id], onDelete: Cascade)
+
+  @@index([featureId])
+  @@index([status])
+}
+
+enum TaskStatus {
+  pending
+  in_progress
+  completed
+  blocked
+}
+
+model Session {
+  id             String   @id @default(cuid())
+  type           String   @default("session")
+  project        String
+  date           DateTime
+  tasksCompleted String[] @default([])
+  commitHash     String?
+  sessionNotes   String?
+  totalTokens    Int?
+  totalCostUSD   Float?
+  durationMin    Float?
+  filesChanged   Json?
+  risks          String[] @default([])
+  lessonSaved    String?
+  createdAt      DateTime @default(now())
+
+  @@index([project])
+  @@index([date])
+}
+
+model ToolUsage {
+  id        String   @id @default(cuid())
+  date      DateTime
+  tool      String
+  tokens    Int
+  createdAt DateTime @default(now())
+
+  @@index([date])
+  @@index([tool])
+}
+
+model Lesson {
+  id        String    @id @default(cuid())
+  framework String
+  text      String
+  date      DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([framework])
+}
+
+model Decision {
+  id          String  @id @default(cuid())
+  projectName String
+  decisionKey String
+  title       String
+  body        String
+  project     Project @relation(fields: [projectName], references: [name], onDelete: Cascade)
+
+  @@index([projectName])
+}
+
+model McpServer {
+  name    String   @id
+  type    String
+  url     String?
+  command String?
+  args    String[] @default([])
+  headers Json?
+}
+
+model McpProfile {
+  profile     String   @id
+  description String
+  servers     String[]
+  useWhen     String
+}

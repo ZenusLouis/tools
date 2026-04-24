@@ -1,0 +1,33 @@
+# Dependencies
+apps/dashboard/node_modules/
+
+# Next.js build output
+apps/dashboard/.next/
+apps/dashboard/out/
+
+# Prisma generated client
+apps/dashboard/node_modules/.prisma/
+
+# MCP config (contains API keys)
+.mcp.json
+
+# Environment files
+apps/dashboard/.env
+apps/dashboard/.env.local
+apps/dashboard/.env.*.local
+.env
+.env.local
+
+# Logs
+logs/*.jsonl
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+*.swp
+
+# Claude local settings
+.claude/settings.local.json

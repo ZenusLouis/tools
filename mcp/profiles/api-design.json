@@ -1,0 +1,6 @@
+{
+  "profile": "api-design",
+  "description": "API design and documentation work",
+  "servers": ["github", "postman", "context7"],
+  "use_when": "Designing new APIs, writing OpenAPI specs, generating Postman collections"
+}

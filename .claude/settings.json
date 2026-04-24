@@ -1,0 +1,63 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(**)",
+      "Glob(**)",
+      "Grep(**)",
+      "Bash(git status*)",
+      "Bash(git log*)",
+      "Bash(git diff*)",
+      "Bash(git -C * diff --name-only*)",
+      "Bash(git -C * log*)",
+      "Bash(git -C * add*)",
+      "Bash(git -C * commit*)",
+      "Bash(python d:/GlobalClaudeSkills/hooks/*)",
+      "Bash(pandoc *)",
+      "Bash(pdftotext *)",
+      "Bash(find d:/GlobalClaudeSkills/* -name *)",
+      "Bash(find d:/Code/* -name *)",
+      "Bash(ls *)",
+      "Bash(dir *)",
+      "Bash(mkdir -p *)",
+      "Bash(New-Item -ItemType Directory *)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python d:/GlobalClaudeSkills/hooks/token-tracker.py --check-glob",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python d:/GlobalClaudeSkills/hooks/token-tracker.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python d:/GlobalClaudeSkills/hooks/token-tracker.py --session-end",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

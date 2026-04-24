@@ -1,0 +1,240 @@
+{
+  "project": "dashboard",
+  "version": "1.0",
+  "activeTask": null,
+  "modules": [
+    {
+      "id": "M0",
+      "name": "Shared Infrastructure",
+      "status": "pending",
+      "features": [
+        {
+          "id": "M0-F0",
+          "name": "Foundation",
+          "tasks": [
+            { "id": "M0-F0-T1", "name": "Sidebar navigation layout + routing", "status": "completed", "estimate": "1h", "deps": [] },
+            { "id": "M0-F0-T2", "name": "File system utilities (CLAUDE_ROOT, read/write helpers)", "status": "completed", "estimate": "1h", "deps": [] },
+            { "id": "M0-F0-T3", "name": "Global styles — dark mode, Geist font, status colors", "status": "completed", "estimate": "1h", "deps": ["M0-F0-T1"] }
+          ]
+        },
+        {
+          "id": "M0-F1",
+          "name": "UI Polish",
+          "tasks": [
+            { "id": "M0-F1-T1", "name": "Animations: page transitions, card hover, slide-in panels (Framer Motion)", "status": "completed", "estimate": "2h", "deps": ["M0-F0-T3"] },
+            { "id": "M0-F1-T2", "name": "Skeleton loading states cho tất cả data-fetching components", "status": "completed", "estimate": "1.5h", "deps": ["M0-F0-T3"] },
+            { "id": "M0-F1-T3", "name": "Micro-interactions: button press, status badge pulse, progress bar animated fill", "status": "completed", "estimate": "1h", "deps": ["M0-F0-T3"] }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "M1",
+      "name": "Dashboard",
+      "status": "pending",
+      "features": [
+        {
+          "id": "M1-F1",
+          "name": "Overview",
+          "tasks": [
+            { "id": "M1-F1-T1", "name": "4 stat cards (active projects, tasks today, tokens, cost)", "status": "completed", "estimate": "1h", "deps": ["M0-F0-T2"] },
+            { "id": "M1-F1-T2", "name": "Active Projects list with framework tags + progress bars", "status": "completed", "estimate": "1h", "deps": ["M0-F0-T2"] },
+            { "id": "M1-F1-T3", "name": "Recent Activity timeline from global JSONL logs", "status": "completed", "estimate": "1h", "deps": ["M0-F0-T2"] },
+            { "id": "M1-F1-T4", "name": "Knowledge Nuggets — 3 random lessons from lessons.md", "status": "completed", "estimate": "30m", "deps": ["M0-F0-T2"] },
+            { "id": "M1-F1-T5", "name": "Auto-refresh 30s (revalidate + client interval)", "status": "completed", "estimate": "30m", "deps": ["M1-F1-T1", "M1-F1-T2"] }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "M2",
+      "name": "Task Board",
+      "status": "pending",
+      "features": [
+        {
+          "id": "M2-F1",
+          "name": "Selectors",
+          "tasks": [
+            { "id": "M2-F1-T1", "name": "Project + Module selector dropdowns", "status": "completed", "estimate": "1h", "deps": ["M0-F0-T2"] }
+          ]
+        },
+        {
+          "id": "M2-F2",
+          "name": "Kanban",
+          "tasks": [
+            { "id": "M2-F2-T1", "name": "Module progress bar (x/n tasks, %)", "status": "completed", "estimate": "30m", "deps": ["M2-F1-T1"] },
+            { "id": "M2-F2-T2", "name": "4 Kanban columns with status colors", "status": "completed", "estimate": "1h", "deps": ["M0-F0-T3"] },
+            { "id": "M2-F2-T3", "name": "Task cards (ID, name, feature tag, estimate, dep lock icon)", "status": "completed", "estimate": "1h", "deps": ["M2-F2-T2"] },
+            { "id": "M2-F2-T4", "name": "Task detail slide-in panel + Mark Done/Blocked actions", "status": "completed", "estimate": "2h", "deps": ["M2-F2-T3"] },
+            { "id": "M2-F2-T5", "name": "Quick filter bar (status/feature)", "status": "completed", "estimate": "30m", "deps": ["M2-F2-T3"] },
+            { "id": "M2-F2-T6", "name": "Add Task inline form → writes to progress.json", "status": "completed", "estimate": "1h", "deps": ["M2-F2-T2"] },
+            { "id": "M2-F2-T7", "name": "Gate indicators (G1/G2/G3/G4 badges) on task cards", "status": "completed", "estimate": "30m", "deps": ["M2-F2-T3"] }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "M3",
+      "name": "Token Analytics",
+      "status": "pending",
+      "features": [
+        {
+          "id": "M3-F1",
+          "name": "Log Parser",
+          "tasks": [
+            { "id": "M3-F1-T1", "name": "JSONL log parser — group by tool/date, calculate cost from tokens", "status": "completed", "estimate": "1h", "deps": ["M0-F0-T2"] }
+          ]
+        },
+        {
+          "id": "M3-F2",
+          "name": "Analytics UI",
+          "tasks": [
+            { "id": "M3-F2-T1", "name": "Date range tabs + hero metric (tokens, cost, % daily budget)", "status": "completed", "estimate": "1h", "deps": ["M3-F1-T1"] },
+            { "id": "M3-F2-T2", "name": "Donut chart — token split by tool type", "status": "completed", "estimate": "1h", "deps": ["M3-F1-T1"] },
+            { "id": "M3-F2-T3", "name": "Bar chart — daily usage 7 days, today highlighted indigo", "status": "completed", "estimate": "1h", "deps": ["M3-F1-T1"] },
+            { "id": "M3-F2-T4", "name": "Sessions table (date, project, tasks, tokens, cost, duration)", "status": "completed", "estimate": "1h", "deps": ["M3-F1-T1"] },
+            { "id": "M3-F2-T5", "name": "Budget warning amber banner (>80% daily limit)", "status": "completed", "estimate": "30m", "deps": ["M3-F2-T1"] },
+            { "id": "M3-F2-T6", "name": "Budget threshold config input (localStorage, default 100k)", "status": "completed", "estimate": "30m", "deps": ["M3-F2-T1"] }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "M4",
+      "name": "Project Settings",
+      "status": "pending",
+      "features": [
+        {
+          "id": "M4-F1",
+          "name": "Settings Form",
+          "tasks": [
+            { "id": "M4-F1-T1", "name": "General section — name (read-only), path (read-only), MCP profile dropdown", "status": "completed", "estimate": "1h", "deps": ["M0-F0-T2"] },
+            { "id": "M4-F1-T2", "name": "Documents section — BRD/PRD/API spec file path inputs", "status": "completed", "estimate": "1h", "deps": ["M4-F1-T1"] },
+            { "id": "M4-F1-T3", "name": "Tools & Integrations — Figma, GitHub, Linear URL inputs", "status": "completed", "estimate": "30m", "deps": ["M4-F1-T1"] },
+            { "id": "M4-F1-T4", "name": "Env Variables — masked list, Copy button, Add/Remove", "status": "completed", "estimate": "1h", "deps": ["M4-F1-T1"] },
+            { "id": "M4-F1-T5", "name": "Save Changes Server Action → writes context.json", "status": "completed", "estimate": "1h", "deps": ["M4-F1-T1", "M4-F1-T2", "M4-F1-T3", "M4-F1-T4"] },
+            { "id": "M4-F1-T6", "name": "Danger Zone — Remove Project (registry only, no folder delete)", "status": "completed", "estimate": "30m", "deps": ["M4-F1-T5"] }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "M5",
+      "name": "Add Project Wizard",
+      "status": "pending",
+      "features": [
+        {
+          "id": "M5-F1",
+          "name": "Wizard Steps",
+          "tasks": [
+            { "id": "M5-F1-T1", "name": "Step 1 — folder path input + Scan button → detect framework", "status": "completed", "estimate": "1h", "deps": ["M0-F0-T2"] },
+            { "id": "M5-F1-T2", "name": "Step 2 — configure Figma, GitHub, BRD, MCP profile", "status": "completed", "estimate": "1h", "deps": ["M5-F1-T1"] },
+            { "id": "M5-F1-T3", "name": "Step 3 — index progress bar + Server Action (code-index equivalent)", "status": "completed", "estimate": "2h", "deps": ["M5-F1-T2"] },
+            { "id": "M5-F1-T4", "name": "Completion screen + Go to Dashboard button", "status": "completed", "estimate": "30m", "deps": ["M5-F1-T3"] },
+            { "id": "M5-F1-T5", "name": "Server Actions — write context.json + registry.json", "status": "completed", "estimate": "1h", "deps": ["M5-F1-T2"] }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "M6",
+      "name": "Knowledge Base",
+      "status": "pending",
+      "features": [
+        {
+          "id": "M6-F1",
+          "name": "Lessons",
+          "tasks": [
+            { "id": "M6-F1-T1", "name": "Tabs — Global Lessons / Project Decisions with project dropdown", "status": "completed", "estimate": "30m", "deps": ["M0-F0-T2"] },
+            { "id": "M6-F1-T2", "name": "Lesson list — parse lessons.md, show framework tag + date", "status": "completed", "estimate": "1h", "deps": ["M6-F1-T1"] },
+            { "id": "M6-F1-T3", "name": "Search + filter by framework tag", "status": "completed", "estimate": "1h", "deps": ["M6-F1-T2"] },
+            { "id": "M6-F1-T4", "name": "Add lesson form + Server Action → append to lessons.md", "status": "completed", "estimate": "1h", "deps": ["M6-F1-T2"] },
+            { "id": "M6-F1-T5", "name": "Edit/delete lesson (inline edit, confirm delete)", "status": "completed", "estimate": "1h", "deps": ["M6-F1-T4"] },
+            { "id": "M6-F1-T6", "name": "Decision log viewer — group by project, parse decisions.md", "status": "completed", "estimate": "1h", "deps": ["M6-F1-T1"] }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "M7",
+      "name": "MCP Monitor",
+      "status": "pending",
+      "features": [
+        {
+          "id": "M7-F1",
+          "name": "Monitor UI",
+          "tasks": [
+            { "id": "M7-F1-T1", "name": "Server list from .mcp.json — name, type, URL", "status": "completed", "estimate": "1h", "deps": ["M0-F0-T2"] },
+            { "id": "M7-F1-T2", "name": "Status badges (always Unknown, yellow)", "status": "completed", "estimate": "30m", "deps": ["M7-F1-T1"] },
+            { "id": "M7-F1-T3", "name": "Profile viewer — list profiles/*.json, expand to see servers", "status": "completed", "estimate": "1h", "deps": ["M7-F1-T1"] },
+            { "id": "M7-F1-T4", "name": "Copy `claude mcp add` command button per server", "status": "completed", "estimate": "30m", "deps": ["M7-F1-T1"] }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "M8",
+      "name": "Task Detail",
+      "status": "pending",
+      "features": [
+        {
+          "id": "M8-F1",
+          "name": "Detail View",
+          "tasks": [
+            { "id": "M8-F1-T1", "name": "Task metadata — ID, name, module, feature, status, dates, duration, commit", "status": "completed", "estimate": "1h", "deps": ["M0-F0-T2"] },
+            { "id": "M8-F1-T2", "name": "Files changed list with vscode:// URI links", "status": "completed", "estimate": "1h", "deps": ["M8-F1-T1"] },
+            { "id": "M8-F1-T3", "name": "Risks & assessment display from log entry", "status": "completed", "estimate": "30m", "deps": ["M8-F1-T1"] },
+            { "id": "M8-F1-T4", "name": "Lesson saved link → Knowledge Base entry", "status": "completed", "estimate": "30m", "deps": ["M8-F1-T1"] },
+            { "id": "M8-F1-T5", "name": "Simple diff view — +/- line counts per file from log metadata", "status": "completed", "estimate": "30m", "deps": ["M8-F1-T2"] }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "M9",
+      "name": "Projects Hub",
+      "status": "pending",
+      "features": [
+        {
+          "id": "M9-F1",
+          "name": "projects-list",
+          "tasks": [
+            { "id": "M9-F1-T1", "name": "Projects List page — grid 3 cols, project cards với framework chips, progress bar, active task, settings icon", "status": "completed", "estimate": null, "deps": ["M0-F0-T2"] }
+          ]
+        },
+        {
+          "id": "M9-F2",
+          "name": "project-overview",
+          "tasks": [
+            { "id": "M9-F2-T1", "name": "Project Overview page — stats row, module progress list, links section, recent activity, code index status", "status": "completed", "estimate": null, "deps": ["M0-F0-T2"] }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "M10",
+      "name": "Global Settings",
+      "status": "pending",
+      "features": [
+        {
+          "id": "M10-F1",
+          "name": "settings",
+          "tasks": [
+            { "id": "M10-F1-T1", "name": "Global Settings page — token budget input, default MCP profile dropdown, auto-refresh toggle, about section", "status": "completed", "estimate": null, "deps": ["M0-F0-T2"] }
+          ]
+        }
+      ]
+    }
+  ],
+  "risks": [
+    "File path handling on Windows — backslash vs forward slash in Server Actions",
+    "JSONL log parsing performance — may need streaming for large log files",
+    "M5-F1-T3: Code-index equivalent in Server Action may be slow for large projects"
+  ],
+  "gates": {
+    "G1": { "status": "passed", "date": "2026-04-19" },
+    "G2": { "status": "passed", "date": "2026-04-19" },
+    "G3": { "status": "pending" },
+    "G4": { "status": "pending" }
+  }
+}

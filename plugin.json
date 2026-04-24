@@ -1,0 +1,9 @@
+{
+  "name": "global-claude-skills",
+  "description": "Global skills, workflow commands, token tracking, and project management for all projects",
+  "version": "1.0.0",
+  "author": {
+    "name": "Tan",
+    "email": "duytan2092003@gmail.com"
+  }
+}

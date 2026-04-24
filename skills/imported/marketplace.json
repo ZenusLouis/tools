@@ -1,0 +1,40 @@
+{
+  "_comment": "Local cache of known Claude Code skills/plugins. Updated by /skill-install.",
+  "skills": [
+    {
+      "name": "commit-commands",
+      "description": "Official Anthropic git workflow commands — commit, PR, branch",
+      "stars": 1200,
+      "source": "https://github.com/anthropics/anthropic-quickstarts",
+      "tags": ["git", "workflow"]
+    },
+    {
+      "name": "qodo-skills",
+      "description": "AI-assisted test generation for unit and integration tests",
+      "stars": 234,
+      "source": "https://github.com/qodo-ai/qodo-skills",
+      "tags": ["testing", "unit-test"]
+    },
+    {
+      "name": "pr-review-toolkit",
+      "description": "Code review checklist + test coverage check for PRs",
+      "stars": 89,
+      "source": "https://github.com/anthropics/claude-code-base-action",
+      "tags": ["review", "pr", "testing"]
+    },
+    {
+      "name": "context7",
+      "description": "Version-aware docs lookup — replaces pasting documentation into chat",
+      "stars": 560,
+      "source": "https://github.com/upstash/context7",
+      "tags": ["docs", "research", "token-saver"]
+    },
+    {
+      "name": "session-report",
+      "description": "HTML token analytics report — which commands/skills cost most",
+      "stars": 45,
+      "source": "https://github.com/anthropics/claude-code-base-action",
+      "tags": ["analytics", "token", "reporting"]
+    }
+  ]
+}

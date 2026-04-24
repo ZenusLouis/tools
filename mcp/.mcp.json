@@ -1,0 +1,58 @@
+{
+  "mcpServers": {
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "note": "PR, issues, code search — dùng mọi project"
+    },
+    "context7": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"],
+      "note": "Docs lookup theo version — thay thế paste docs vào chat"
+    },
+    "figma": {
+      "type": "http",
+      "url": "https://mcp.figma.com/mcp",
+      "note": "Pull design → code — dùng khi có Figma URL"
+    },
+    "postman": {
+      "type": "http",
+      "url": "https://mcp.postman.com/mcp",
+      "note": "API collection, spec gen — dùng khi build API"
+    },
+    "supabase": {
+      "type": "http",
+      "url": "https://mcp.supabase.com/mcp",
+      "note": "DB queries, migrations — project dùng Supabase"
+    },
+    "prisma": {
+      "type": "http",
+      "url": "https://mcp.prisma.io/mcp",
+      "note": "Schema management — project dùng Prisma ORM"
+    },
+    "linear": {
+      "type": "http",
+      "url": "https://mcp.linear.app/mcp",
+      "note": "Issue tracking — sync task với Linear board"
+    },
+    "typescript-lsp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "typescript-lsp-mcp"],
+      "note": "Type queries, go-to-definition — thay vì Read full file"
+    },
+    "jdtls-lsp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "jdtls-mcp"],
+      "note": "Java class hierarchy, method signatures — Spring Boot. Requires JDK 17+ installed.",
+      "install_prereq": "JDK 17+ must be on PATH. Run: winget install Microsoft.OpenJDK.17"
+    },
+    "stitch": {
+      "type": "http",
+      "url": "https://mcp.stitch.design/mcp",
+      "note": "Generate Figma screens from text — /design --figma"
+    }
+  }
+}

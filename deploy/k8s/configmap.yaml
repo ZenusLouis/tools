@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gcs-config
+  namespace: gcs
+data:
+  NODE_ENV: "production"
+  CLAUDE_ROOT: "/data"
+  POSTGRES_USER: "gcs"
+  POSTGRES_DB: "gcs"

@@ -1,0 +1,6 @@
+{
+  "profile": "fullstack",
+  "description": "Next.js + NestJS projects: UI design + API + database",
+  "servers": ["github", "figma", "stitch", "postman", "supabase", "typescript-lsp", "context7"],
+  "use_when": "fullstack web project (Next.js + NestJS / React + Express)"
+}

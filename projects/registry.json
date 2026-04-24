@@ -1,0 +1,5 @@
+{
+  "_comment": "Project registry — lightweight index only. All URLs and config are in each project's context.json.",
+  "_format": "{ \"ProjectName\": \"projects/ProjectName\" }",
+  "dashboard": "projects/dashboard"
+}

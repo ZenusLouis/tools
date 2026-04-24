@@ -1,0 +1,14 @@
+{
+  "name": "dashboard",
+  "path": "d:\\GlobalClaudeSkills\\apps\\dashboard",
+  "framework": ["nextjs"],
+  "mcpProfile": "fullstack",
+  "docs": { "brd": "d:\\GlobalClaudeSkills\\docs\\BRD-dashboard.md" },
+  "tools": {},
+  "env": {
+    "required": ["NEXTAUTH_SECRET", "NEXTAUTH_URL", "NEXT_PUBLIC_API_URL"],
+    "envFile": ".env.local"
+  },
+  "lastIndexed": "2026-04-19",
+  "activeTask": "M0-F0-T3"
+}

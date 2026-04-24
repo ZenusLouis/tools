@@ -1,0 +1,39 @@
+{
+  "description": "Token tracking, scope guard, and session logging for GlobalClaudeSkills",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python d:\\GlobalClaudeSkills\\hooks\\token-tracker.py --check-glob",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python d:\\GlobalClaudeSkills\\hooks\\token-tracker.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python d:\\GlobalClaudeSkills\\hooks\\token-tracker.py --session-end",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

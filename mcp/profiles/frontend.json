@@ -1,0 +1,6 @@
+{
+  "profile": "frontend",
+  "description": "React / Angular / Vue UI-focused work",
+  "servers": ["github", "figma", "stitch", "context7", "typescript-lsp"],
+  "use_when": "UI-only work: component building, design implementation, styling"
+}

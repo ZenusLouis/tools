@@ -1,0 +1,6 @@
+{
+  "profile": "backend-java",
+  "description": "Spring Boot / Java backend projects",
+  "servers": ["github", "jdtls-lsp", "prisma", "context7"],
+  "use_when": "Java/Spring Boot project — pom.xml detected"
+}

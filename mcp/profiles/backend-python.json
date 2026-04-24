@@ -1,0 +1,6 @@
+{
+  "profile": "backend-python",
+  "description": "Django / FastAPI Python backend projects",
+  "servers": ["github", "context7", "supabase", "postman"],
+  "use_when": "Python backend project — requirements.txt or pyproject.toml detected (django, fastapi)"
+}

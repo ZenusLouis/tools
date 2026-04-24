@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg-base: var(--bg-base);
+  --color-card: var(--card);
+  --color-card-hover: var(--card-hover);
+  --color-border: var(--border);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+
+  --color-done: var(--done);
+  --color-in-progress: var(--in-progress);
+  --color-blocked: var(--blocked);
+  --color-pending: var(--pending);
+
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-muted: var(--muted);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+:root {
+  /* Surfaces */
+  --bg-base: #0f0f17;
+  --card: #1a1a2e;
+  --card-hover: #1e1e35;
+  --border: #2a2a3e;
+
+  /* Brand */
+  --accent: #6366f1;
+  --accent-hover: #4f46e5;
+
+  /* Status colors — NFR3 */
+  --done: #22c55e;
+  --in-progress: #eab308;
+  --blocked: #ef4444;
+  --pending: #6b7280;
+
+  /* Text */
+  --text: #e2e8f0;
+  --text-muted: #94a3b8;
+  --muted: #6b7280;
+}
+
+@layer base {
+  body {
+    @apply bg-bg-base text-text antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  ::selection {
+    @apply bg-accent text-white;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--bg-base);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--muted);
+  }
+}
