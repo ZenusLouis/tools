@@ -40,14 +40,14 @@ export function TokenUsageCard({
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-in-progress/15 text-in-progress">
           <Zap size={20} fill="currentColor" />
         </div>
-        <span className="font-mono text-[10px] font-bold text-in-progress">{topLabel}</span>
+        <span className="text-[10px] font-bold text-in-progress">{topLabel}</span>
       </div>
 
-      <p className="font-mono text-3xl font-black tracking-tight text-white">{total.toLocaleString()}</p>
+      <p className="text-4xl font-black tracking-tight text-white">{total.toLocaleString()}</p>
       <p className="mt-1 text-xs font-medium text-text-muted">Tokens {rangeLabel}</p>
 
       <div className="mt-4">
-        <div className="mb-1 flex justify-between font-mono text-[10px]">
+        <div className="mb-1 flex justify-between text-[10px] font-semibold">
           <span className="text-in-progress">Provider split</span>
           <span className="text-text-muted">no usage limit</span>
         </div>
@@ -64,11 +64,11 @@ export function TokenUsageCard({
           const ui = PROVIDER_UI[item.provider];
           return (
             <div key={item.provider} className="grid grid-cols-[64px_1fr_auto] items-center gap-2 text-[10px]">
-              <span className={`font-mono font-bold uppercase ${ui.color}`}>{ui.label}</span>
+              <span className={`font-bold uppercase ${ui.color}`}>{ui.label}</span>
               <div className="h-1.5 overflow-hidden rounded-full bg-bg-base">
                 <div className={`h-full rounded-full ${ui.bar}`} style={{ width: `${item.percent}%` }} />
               </div>
-              <span className="font-mono text-text-muted">{item.tokens.toLocaleString()}</span>
+              <span className="tabular-nums text-text-muted">{item.tokens.toLocaleString()}</span>
             </div>
           );
         })}

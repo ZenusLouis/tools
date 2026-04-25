@@ -12,7 +12,7 @@ export type ProviderBreakdown = {
   cost: number;
 };
 export type DailyUsage = { date: string; tokens: number; cost: number };
-export type SessionRow = { date: string; provider: string; role: string | null; model: string | null; project: string; tasksCompleted: number; tokens: number; cost: number; durationMin: number | null };
+export type SessionRow = { date: string; provider: string; role: string | null; model: string | null; project: string; tasksCompleted: number; tokens: number; cost: number; durationMin: number | null; source: "session" | "tool"; tool?: string };
 export type AnalyticsData = {
   totalTokens: number;
   totalCost: number;
@@ -82,17 +82,35 @@ export async function getAnalytics(range: DateRange, workspaceId?: string): Prom
     .sort((a, b) => a.date.localeCompare(b.date));
 
   // Session rows
-  const sessionRows: SessionRow[] = sessions.map((s) => ({
-    date: s.date.toISOString().slice(0, 10),
-    provider: s.provider,
-    role: s.role,
-    model: s.model,
-    project: s.project,
-    tasksCompleted: s.tasksCompleted.length,
-    tokens: s.totalTokens ?? 0,
-    cost: (s.totalTokens ?? 0) * (COST_PER_MILLION / 1_000_000),
-    durationMin: s.durationMin ?? null,
-  }));
+  const sessionRows: SessionRow[] = [
+    ...sessions
+      .filter((s) => (s.totalTokens ?? 0) > 0)
+      .map((s) => ({
+        date: s.date.toISOString().slice(0, 10),
+        provider: s.provider,
+        role: s.role,
+        model: s.model,
+        project: s.project,
+        tasksCompleted: s.tasksCompleted.length,
+        tokens: s.totalTokens ?? 0,
+        cost: (s.totalTokens ?? 0) * (COST_PER_MILLION / 1_000_000),
+        durationMin: s.durationMin ?? null,
+        source: "session" as const,
+      })),
+    ...toolUsage.map((usage) => ({
+      date: usage.date.toISOString().slice(0, 10),
+      provider: usage.provider,
+      role: usage.role,
+      model: usage.model,
+      project: "tool usage",
+      tasksCompleted: 0,
+      tokens: usage.tokens,
+      cost: usage.tokens * (COST_PER_MILLION / 1_000_000),
+      durationMin: null,
+      source: "tool" as const,
+      tool: usage.tool,
+    })),
+  ].sort((a, b) => b.date.localeCompare(a.date));
 
   return { totalTokens, totalCost, providerBreakdown, toolBreakdown, dailyUsage, sessions: sessionRows };
 }

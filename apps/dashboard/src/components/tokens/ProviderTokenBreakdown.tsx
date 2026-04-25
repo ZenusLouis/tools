@@ -32,7 +32,7 @@ export function ProviderTokenBreakdown({ breakdown }: { breakdown: ProviderBreak
 
             <div className="mt-5 flex items-end justify-between gap-4">
               <div>
-                <p className="font-mono text-3xl font-black text-text">{item.tokens.toLocaleString()}</p>
+                <p className="text-3xl font-black tabular-nums text-text">{item.tokens.toLocaleString()}</p>
                 <p className="mt-1 text-xs text-text-muted">${item.cost.toFixed(4)} estimated</p>
               </div>
               <div className="text-right text-[11px] text-text-muted">

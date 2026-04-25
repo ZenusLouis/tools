@@ -98,7 +98,7 @@ export function ConceptScreen({ kind, metrics }: { kind: ConceptKind; metrics: L
           <section className="grid grid-cols-1 gap-5 lg:grid-cols-3">
             <Panel title="Runtime Feed" lines={metrics.recentEvents.length ? metrics.recentEvents.map((event) => `${event.label}: ${event.detail}`) : ["No runtime events yet"]} />
             <Panel title="Agent Graph" lines={[`${metrics.roles} roles available`, `${metrics.skills} skills attached`, `${metrics.bridgeDevices} bridge devices registered`]} />
-            <Panel title="Artifacts" lines={["brief.md", "implementation.md", "review.md", "activity export"]} />
+            <Panel title="Artifacts" lines={metrics.recentEvents.length ? metrics.recentEvents.map((event) => `${event.date.slice(0, 10)} - ${event.label}`) : ["No synced artifacts yet"]} />
           </section>
         </div>
       </PageShell>

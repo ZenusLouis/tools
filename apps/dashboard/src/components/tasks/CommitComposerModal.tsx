@@ -14,18 +14,12 @@ type Props = {
   onClose: () => void;
 };
 
-const FALLBACK_FILES: FileChange[] = [
-  { path: "src/app/api/route.ts", added: 42, removed: 12 },
-  { path: "src/lib/service.ts", added: 18, removed: 4 },
-  { path: "prisma/schema.prisma", added: 5, removed: 2 },
-];
-
 export function CommitComposerModal({ open, taskId, taskName, projectName, files = [], agentName, onClose }: Props) {
   const [stagedFiles, setStagedFiles] = useState<FileChange[]>([]);
   const [gitStatus, setGitStatus] = useState<string | null>(null);
   const [loadingGit, setLoadingGit] = useState(false);
   const [committing, setCommitting] = useState(false);
-  const changedFiles = stagedFiles.length > 0 ? stagedFiles : files.length > 0 ? files : FALLBACK_FILES;
+  const changedFiles = stagedFiles.length > 0 ? stagedFiles : files;
   const [message, setMessage] = useState(`[${taskId}] ${taskName}`);
   const [copied, setCopied] = useState(false);
   const totals = useMemo(
@@ -116,7 +110,11 @@ export function CommitComposerModal({ open, taskId, taskName, projectName, files
             </div>
           </div>
           <div className="mb-8 space-y-3">
-            {changedFiles.map((file) => (
+            {changedFiles.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border bg-bg-base/60 p-5 text-sm text-text-muted">
+                No staged files found. Stage files in git first, then refresh this composer.
+              </div>
+            ) : changedFiles.map((file) => (
               <div key={file.path} className="flex items-center justify-between rounded-lg border border-border bg-bg-base/60 p-3">
                 <div className="flex min-w-0 items-center gap-3">
                   {file.path.endsWith(".prisma") ? <Settings size={15} className="shrink-0 text-text-muted" /> : <FileText size={15} className="shrink-0 text-text-muted" />}

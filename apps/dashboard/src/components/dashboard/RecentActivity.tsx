@@ -3,10 +3,11 @@ import { AlertTriangle, CheckCircle2, GitCommit, History, RefreshCw } from "luci
 import type { ActivityItem } from "@/lib/activity";
 import { timeAgo } from "@/lib/activity";
 
-type ActivityType = "commit" | "complete" | "index" | "alert";
+type ActivityType = "commit" | "complete" | "project" | "index" | "alert";
 
 function detectType(item: ActivityItem): ActivityType {
   const note = (item.note ?? "").toLowerCase();
+  if (!item.taskId) return "project";
   if (item.commitHash) return "commit";
   if (note.includes("rate limit") || note.includes("error") || note.includes("blocked")) return "alert";
   if (note.includes("index") || note.includes("indexed") || note.includes("code-index")) return "index";
@@ -22,6 +23,7 @@ const TYPE_CONFIG: Record<ActivityType, {
 }> = {
   commit: { icon: GitCommit, iconClass: "text-accent", bgClass: "bg-accent/20", borderClass: "border-accent/30", label: "Commit" },
   complete: { icon: CheckCircle2, iconClass: "text-done", bgClass: "bg-done/20", borderClass: "border-done/30", label: "Task Completed" },
+  project: { icon: RefreshCw, iconClass: "text-accent", bgClass: "bg-accent/20", borderClass: "border-accent/30", label: "Project Event" },
   index: { icon: RefreshCw, iconClass: "text-text-muted", bgClass: "bg-card-hover", borderClass: "border-border", label: "Re-indexed" },
   alert: { icon: AlertTriangle, iconClass: "text-in-progress", bgClass: "bg-in-progress/20", borderClass: "border-in-progress/30", label: "Alert" },
 };

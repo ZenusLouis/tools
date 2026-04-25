@@ -37,7 +37,7 @@ export function Sidebar() {
           </div>
           <div>
             <div className="text-xl font-black leading-none tracking-tight text-accent">GCS Console</div>
-            <div className="mt-2 font-mono text-[10px] uppercase tracking-[0.24em] text-text-muted">v4.2.0-stable</div>
+            <div className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-text-muted">v4.2.0-stable</div>
           </div>
         </div>
       </div>
@@ -54,7 +54,7 @@ export function Sidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 px-6 py-3 font-mono text-xs uppercase tracking-[0.18em] transition-all duration-150",
+                "flex items-center gap-3 px-6 py-3 text-sm font-semibold transition-all duration-150",
                 active
                   ? "border-r-2 border-accent bg-accent/10 text-accent"
                   : "text-text-muted hover:bg-card/50 hover:text-text"
@@ -70,11 +70,11 @@ export function Sidebar() {
       {/* Footer user */}
       <div className="mt-auto border-t border-border p-4">
         <div className="mb-3 space-y-1">
-          <Link href="/knowledge" className="flex items-center gap-3 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted transition-colors hover:text-text">
+          <Link href="/knowledge" className="flex items-center gap-3 px-4 py-2 text-xs font-semibold text-text-muted transition-colors hover:text-text">
             <BookOpen size={16} />
             Documentation
           </Link>
-          <Link href="/settings" className="flex items-center gap-3 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted transition-colors hover:text-text">
+          <Link href="/settings" className="flex items-center gap-3 px-4 py-2 text-xs font-semibold text-text-muted transition-colors hover:text-text">
             <HelpCircle size={16} />
             Support
           </Link>
@@ -85,7 +85,7 @@ export function Sidebar() {
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-xs font-bold text-text truncate">{siteConfig.name}</div>
-            <div className="font-mono text-[10px] uppercase text-text-muted truncate">Pro Plan</div>
+            <div className="text-[11px] text-text-muted truncate">Pro Plan</div>
           </div>
         </div>
       </div>

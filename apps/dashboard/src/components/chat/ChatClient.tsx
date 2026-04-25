@@ -49,6 +49,10 @@ export function ChatClient() {
     [sessions, selectedSessionId],
   );
   const messages = selectedSession?.messages ?? [];
+  const generatedPaths = useMemo(
+    () => Object.values(selectedSession?.agentRole?.generatedPaths ?? {}).filter(Boolean),
+    [selectedSession],
+  );
   const mentionedAgent = useMemo(() => {
     const mention = input.match(/@([a-zA-Z0-9][\w-]*)/)?.[1]?.toLowerCase();
     return mention ? agents.find((agent) => agent.slug.toLowerCase() === mention) : null;
@@ -216,11 +220,15 @@ export function ChatClient() {
 
         <p className="mb-3 mt-5 text-xs font-bold uppercase tracking-wide text-text-muted">Attached Files</p>
         <div className="space-y-2">
-          {["agents/registry.json", "agents/roles/*.json", "skills/**/SKILL.md"].map((file) => (
+          {generatedPaths.length > 0 ? generatedPaths.map((file) => (
             <div key={file} className="rounded-lg border border-border bg-bg-base px-3 py-2 font-mono text-[11px] text-text-muted">
               {file}
             </div>
-          ))}
+          )) : (
+            <div className="rounded-lg border border-dashed border-border bg-bg-base px-3 py-3 text-xs text-text-muted">
+              No files attached to this session yet.
+            </div>
+          )}
         </div>
 
         <p className="mb-3 mt-5 text-xs font-bold uppercase tracking-wide text-text-muted">MCP Active Tools</p>
@@ -237,18 +245,16 @@ export function ChatClient() {
 
         <p className="mb-3 mt-5 text-xs font-bold uppercase tracking-wide text-text-muted">Generated Artifacts</p>
         <div className="space-y-2">
-          {Object.values(selectedSession?.agentRole?.generatedPaths ?? {}).length > 0 ? (
-            Object.values(selectedSession?.agentRole?.generatedPaths ?? {}).map((path) => (
+          {generatedPaths.length > 0 ? (
+            generatedPaths.map((path) => (
               <div key={path} className="rounded-lg border border-border bg-bg-base px-3 py-2 font-mono text-[11px] text-text-muted">
                 {path}
               </div>
             ))
           ) : (
-            ["brief.md", "implementation.md", "review.md"].map((path) => (
-              <div key={path} className="rounded-lg border border-border bg-bg-base px-3 py-2 font-mono text-[11px] text-text-muted">
-                {path}
-              </div>
-            ))
+            <div className="rounded-lg border border-dashed border-border bg-bg-base px-3 py-3 text-xs text-text-muted">
+              No generated artifacts recorded in DB for this agent/session.
+            </div>
           )}
         </div>
       </aside>

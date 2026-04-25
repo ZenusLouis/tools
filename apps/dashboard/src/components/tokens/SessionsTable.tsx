@@ -43,11 +43,16 @@ export function SessionsTable({ sessions }: { sessions: SessionRow[] }) {
                   <td className="px-6 py-4 text-sm text-text-muted">{session.date}</td>
                   <td className="px-6 py-4">
                     <div className="flex flex-col">
-                      <span className="font-mono text-xs font-bold uppercase text-accent">{session.provider}</span>
+                      <span className="text-xs font-bold uppercase text-accent">{session.provider}</span>
                       <span className="max-w-36 truncate text-[10px] text-text-muted">{session.role ?? session.model ?? "--"}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm font-semibold text-text">{session.project}</td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-semibold text-text">{session.project}</span>
+                      <span className="text-[10px] text-text-muted">{session.source === "tool" ? session.tool : "session"}</span>
+                    </div>
+                  </td>
                   <td className="px-6 py-4">
                     {session.tasksCompleted > 0 ? (
                       <span className="rounded border border-border bg-card-hover px-2 py-0.5 text-[10px] text-text-muted">

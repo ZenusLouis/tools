@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bell, Settings } from "lucide-react";
+import { TopBarControls } from "./TopBarControls";
 
 export type TopBarRange = "today" | "week" | "month";
 
@@ -47,14 +47,7 @@ export function TopBar({
       </div>
       <div className="flex items-center gap-3">
         {actions}
-        <button className="flex h-10 w-10 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-card-hover hover:text-text" aria-label="Notifications">
-          <Bell size={18} />
-        </button>
-        <button className="flex h-10 w-10 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-card-hover hover:text-text" aria-label="Settings">
-          <Settings size={18} />
-        </button>
-        <div className="h-6 w-px bg-border" />
-        <div className="flex h-8 w-8 items-center justify-center rounded-full border border-accent/50 bg-card font-mono text-xs font-bold text-accent">N</div>
+        <TopBarControls />
       </div>
     </header>
   );

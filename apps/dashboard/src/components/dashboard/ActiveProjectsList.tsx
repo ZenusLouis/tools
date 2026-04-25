@@ -84,8 +84,8 @@ export function ActiveProjectsList({ projects }: { projects: ProjectSummary[] })
           <span className="h-5 w-1 rounded-full bg-accent" />
           Active Projects
         </h3>
-        <Link href="/projects" className="font-mono text-xs uppercase tracking-wider text-accent hover:underline">
-          View_all_repos
+        <Link href="/projects" className="text-sm font-semibold text-accent hover:underline">
+          View all projects
         </Link>
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
