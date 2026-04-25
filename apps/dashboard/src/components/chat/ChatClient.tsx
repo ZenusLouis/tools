@@ -111,7 +111,7 @@ export function ChatClient() {
             <code className="mt-2 block rounded bg-card px-2 py-1 text-[10px] text-accent">$env:BRIDGE_TOKEN=&quot;&lt;token&gt;&quot;</code>
             <code className="mt-1 block rounded bg-card px-2 py-1 text-[10px] text-accent">python hooks/bridge-heartbeat.py</code>
             <p className="mt-2">For Codex logging, run Codex through:</p>
-            <code className="mt-1 block rounded bg-card px-2 py-1 text-[10px] text-accent">powershell -File hooks/codex-gcs.ps1 &quot;prompt&quot;</code>
+            <code className="mt-1 block rounded bg-card px-2 py-1 text-[10px] text-accent">powershell -NoProfile -ExecutionPolicy Bypass -File hooks/codex-gcs.ps1 &quot;prompt&quot;</code>
             <p className="mt-2">Claude online: {diagnostics?.local.claude ? "yes" : "no"} - Codex online: {diagnostics?.local.codex ? "yes" : "no"}</p>
             <p>Roles: {diagnostics?.roles ?? 0} - API keys: {diagnostics?.apiKeys.length ?? 0}</p>
             <a href="/settings" className="mt-2 inline-block text-accent">Open Settings</a>
@@ -145,7 +145,7 @@ export function ChatClient() {
                   <div className="mt-3 grid grid-cols-1 gap-2 text-xs">
                     <code className="rounded bg-card px-2 py-1">$env:BRIDGE_TOKEN=&quot;&lt;token&gt;&quot;</code>
                     <code className="rounded bg-card px-2 py-1">python hooks/bridge-heartbeat.py</code>
-                    <code className="rounded bg-card px-2 py-1">powershell -File hooks/codex-gcs.ps1 &quot;prompt&quot;</code>
+                    <code className="rounded bg-card px-2 py-1">powershell -NoProfile -ExecutionPolicy Bypass -File hooks/codex-gcs.ps1 &quot;prompt&quot;</code>
                   </div>
                 </div>
               ) : "Mention a bot to start, for example @dev-implementer."}

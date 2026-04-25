@@ -8,7 +8,8 @@ import { ensureWorkspaceAgentDefaults } from "@/lib/agent-bootstrap";
 export default async function CreatePage() {
   const user = await requireCurrentUser();
   await ensureWorkspaceAgentDefaults(user.workspaceId);
-  const [skills, profiles] = await Promise.all([
+  const [roles, skills, profiles] = await Promise.all([
+    db.agentRole.findMany({ where: { workspaceId: user.workspaceId }, include: { skills: true }, orderBy: { name: "asc" } }),
     db.skillDefinition.findMany({ where: { workspaceId: user.workspaceId }, orderBy: [{ category: "asc" }, { name: "asc" }] }),
     db.mcpProfile.findMany({ orderBy: { profile: "asc" } }),
   ]);
@@ -17,7 +18,7 @@ export default async function CreatePage() {
     <>
       <TopBar title="Create" />
       <PageShell>
-        <CreateRoleClient skills={skills} profiles={profiles.map((p) => p.profile)} />
+        <CreateRoleClient roles={roles} skills={skills} profiles={profiles.map((p) => p.profile)} />
       </PageShell>
     </>
   );

@@ -1,0 +1,40 @@
+{
+  "dashboard": {
+    "url": "https://gcs-dashboard.zenus.dev",
+    "envFiles": [
+      "apps/dashboard/.env.local",
+      "apps/dashboard/.env"
+    ]
+  },
+  "bridge": {
+    "deviceKeyEnv": "COMPUTERNAME",
+    "deviceNameEnv": "COMPUTERNAME",
+    "userAgent": "GCS-Local-Bridge/1.0"
+  },
+  "agent": {
+    "provider": "codex",
+    "defaultProject": "dashboard",
+    "defaultRole": "dev-implementer",
+    "defaultModel": "local"
+  },
+  "runner": {
+    "mode": "local-wrapper",
+    "workingDirectory": ".",
+    "command": "powershell",
+    "args": [
+      "-NoProfile",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      "hooks/codex-gcs.ps1"
+    ],
+    "promptArg": "<prompt>",
+    "displayCommand": "powershell -NoProfile -ExecutionPolicy Bypass -File hooks/codex-gcs.ps1 \"<prompt>\"",
+    "autoLog": true,
+    "heartbeatBeforeRun": true
+  },
+  "logging": {
+    "enabled": true,
+    "localFallbackDir": "logs"
+  }
+}

@@ -11,6 +11,10 @@ import os
 import urllib.request
 from datetime import datetime, date
 
+from gcs_env import bridge_user_agent, load_dashboard_env
+
+load_dashboard_env()
+
 # Fix Windows console encoding
 if sys.stdout.encoding != 'utf-8':
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
@@ -80,7 +84,7 @@ def post_to_dashboard(payload: dict) -> bool:
     """Fire-and-forget POST. Returns True on success, False on any error."""
     try:
         body = json.dumps(payload).encode("utf-8")
-        headers = {"Content-Type": "application/json"}
+        headers = {"Content-Type": "application/json", "User-Agent": bridge_user_agent()}
         if BRIDGE_TOKEN:
             headers["x-bridge-token"] = BRIDGE_TOKEN
         if HOOK_SECRET:

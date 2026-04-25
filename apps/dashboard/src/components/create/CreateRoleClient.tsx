@@ -4,8 +4,20 @@ import { useMemo, useState, useTransition } from "react";
 import { Check, Search, Sparkles } from "lucide-react";
 
 type Skill = { id: string; name: string; slug: string; category: string; description: string; isRemote: boolean };
+type Role = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  provider: "claude" | "codex" | "chatgpt";
+  phase: string;
+  executionModeDefault: "local" | "dashboard";
+  skills: Skill[];
+};
 
-export function CreateRoleClient({ skills, profiles }: { skills: Skill[]; profiles: string[] }) {
+export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; skills: Skill[]; profiles: string[] }) {
+  const [mode, setMode] = useState<"list" | "create">("list");
+  const [roleList, setRoleList] = useState(roles);
   const [skillList] = useState(skills);
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
   const [suggested, setSuggested] = useState<Skill[]>([]);
@@ -77,9 +89,60 @@ export function CreateRoleClient({ skills, profiles }: { skills: Skill[]; profil
       });
       if (res.ok) {
         const saved = await res.json();
+        setRoleList((prev) => [saved, ...prev.filter((role) => role.id !== saved.id)]);
         setSavedName(saved.name);
+        setMode("list");
       }
     });
+  }
+
+  if (mode === "list") {
+    return (
+      <div className="space-y-6">
+        <section className="rounded-2xl border border-border bg-card p-5">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-accent">Agent Studio</p>
+              <h2 className="mt-1 text-xl font-bold text-text">Current Bot Roles</h2>
+              <p className="mt-1 text-sm text-text-muted">View existing bots here. Create a new custom AI only when you press the button.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setMode("create")}
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-hover"
+            >
+              Create Custom AI
+            </button>
+          </div>
+        </section>
+
+        {savedName && (
+          <div className="rounded-lg border border-done/30 bg-done/10 px-3 py-2 text-sm text-done">
+            Created {savedName}. It is available in Library and Chat when its provider is connected.
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          {roleList.map((role) => (
+            <article key={role.id} className="rounded-2xl border border-border bg-card p-5 transition-colors hover:border-accent/40 hover:bg-card-hover">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-bold text-text">{role.name}</h3>
+                  <p className="mt-1 text-xs text-text-muted">@{role.slug}</p>
+                </div>
+                <span className="rounded-full bg-accent/15 px-2.5 py-1 text-[10px] font-bold uppercase text-accent">{role.provider}</span>
+              </div>
+              <p className="mt-3 min-h-10 text-sm leading-relaxed text-text-muted">{role.description}</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <span className="rounded bg-bg-base px-2 py-1 text-[10px] text-text-muted">{role.phase}</span>
+                <span className="rounded bg-bg-base px-2 py-1 text-[10px] text-text-muted">{role.executionModeDefault}</span>
+                <span className="rounded bg-bg-base px-2 py-1 text-[10px] text-text-muted">{role.skills.length} skills</span>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -90,9 +153,12 @@ export function CreateRoleClient({ skills, profiles }: { skills: Skill[]; profil
             <h2 className="text-base font-bold text-text">Custom AI Builder</h2>
             <p className="text-xs text-text-muted">Create a role, assign a provider, attach skills, and generate local artifacts.</p>
           </div>
-          <button disabled={pending} className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
-            {pending ? "Creating..." : "Create Role"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setMode("list")} className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text-muted hover:bg-card-hover">Cancel</button>
+            <button disabled={pending} className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+              {pending ? "Creating..." : "Create Role"}
+            </button>
+          </div>
         </div>
 
         {savedName && (

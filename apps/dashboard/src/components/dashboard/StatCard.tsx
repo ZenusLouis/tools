@@ -31,14 +31,14 @@ export function StatCard({ label, value, sub, progress, variant = "default", bad
 
   return (
     <motion.div
-      className={`rounded-xl border border-border bg-card p-6 shadow-sm transition-all ${hoverBorder}`}
+      className={`rounded-2xl border border-border bg-card p-5 shadow-sm shadow-black/10 transition-all ${hoverBorder}`}
       whileHover={{ y: -1 }}
       transition={{ duration: 0.15, ease: "easeOut" }}
     >
-      <div className="flex justify-between items-start mb-4">
+      <div className="mb-4 flex items-start justify-between">
         {Icon && (
-          <div className={`p-2 rounded-lg ${iconBg}`}>
-            <Icon size={18} className={iconColor} />
+          <div className={`rounded-lg p-2 ${iconBg}`}>
+            <Icon size={17} className={iconColor} />
           </div>
         )}
         {badge && (
@@ -46,8 +46,8 @@ export function StatCard({ label, value, sub, progress, variant = "default", bad
         )}
       </div>
 
-      <p className="text-text-muted text-sm font-medium">{label}</p>
-      <p className="text-2xl font-bold text-text mt-1">{value}</p>
+      <p className="text-sm font-medium text-text-muted">{label}</p>
+      <p className="mt-1 text-2xl font-bold text-text">{value}</p>
 
       {progress !== undefined && (
         <div className="w-full bg-card-hover h-1.5 rounded-full mt-4 overflow-hidden">

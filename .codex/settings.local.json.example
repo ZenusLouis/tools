@@ -1,0 +1,10 @@
+{
+  "dashboard": {
+    "url": "https://gcs-dashboard.zenus.dev"
+  },
+  "env": {
+    "BRIDGE_TOKEN": "gcsb_your_token_here",
+    "GCS_DEVICE_KEY": "your-machine-key",
+    "GCS_DEVICE_NAME": "Your machine name"
+  }
+}

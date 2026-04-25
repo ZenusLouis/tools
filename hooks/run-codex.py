@@ -10,13 +10,17 @@ import time
 import urllib.request
 from datetime import datetime
 
+from gcs_env import bridge_user_agent, load_dashboard_env
+
+load_dashboard_env()
+
 DASHBOARD_URL = os.environ.get("DASHBOARD_URL", "https://gcs-dashboard.zenus.dev").rstrip("/")
 BRIDGE_TOKEN = os.environ.get("BRIDGE_TOKEN", "")
 HOOK_SECRET = os.environ.get("HOOK_SECRET", "")
 
 
 def post_json(path: str, payload: dict) -> bool:
-    headers = {"Content-Type": "application/json"}
+    headers = {"Content-Type": "application/json", "User-Agent": bridge_user_agent()}
     if BRIDGE_TOKEN:
         headers["x-bridge-token"] = BRIDGE_TOKEN
     if HOOK_SECRET:
@@ -35,7 +39,7 @@ def post_json(path: str, payload: dict) -> bool:
 
 
 def send_heartbeat() -> None:
-    if not BRIDGE_TOKEN:
+    if not BRIDGE_TOKEN and not HOOK_SECRET:
         return
     post_json(
         "/api/bridge/heartbeat",
@@ -59,7 +63,7 @@ def append_local_session(payload: dict) -> None:
 
 
 def main() -> int:
-    codex = shutil.which("codex")
+    codex = os.environ.get("GCS_CODEX_BIN") or shutil.which("codex")
     if not codex:
         print("codex executable not found in PATH", file=sys.stderr)
         return 127
