@@ -33,6 +33,19 @@
     "autoLog": true,
     "heartbeatBeforeRun": true
   },
+  "ideChatSync": {
+    "mode": "manual-summary",
+    "command": "powershell",
+    "args": [
+      "-NoProfile",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      "hooks/log-codex-ide-chat.ps1"
+    ],
+    "displayCommand": "powershell -NoProfile -ExecutionPolicy Bypass -File hooks/log-codex-ide-chat.ps1 \"<summary>\"",
+    "note": "Codex IDE sessions do not expose automatic message hooks here, so this logs a curated summary/session note."
+  },
   "logging": {
     "enabled": true,
     "localFallbackDir": "logs"

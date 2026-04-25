@@ -44,3 +44,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File hooks/run-codex-from-setting
 ```
 
 The wrapper auto-loads repo-local settings and dashboard auth from `.codex/settings.json`, `.codex/settings.local.json`, and `apps/dashboard/.env.local`, then sends a bridge heartbeat, runs `codex`, and posts a session log to `/api/log`.
+
+## IDE Chat Sync
+
+Codex IDE chat does not expose the same automatic hook lifecycle as Claude Code. To record the current IDE conversation on the dashboard, log a curated summary:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File hooks/log-codex-ide-chat.ps1 "Discussed Codex local bridge logging and repo-local settings."
+```
+
+The command is also recorded in `.codex/settings.json` under `ideChatSync.displayCommand`.
