@@ -7,7 +7,7 @@ interface Props {
 
 export function LessonLinkCard({ lessonSaved }: Props) {
   return (
-    <div className="rounded-xl border bg-card p-5">
+    <div className="rounded-xl border border-border bg-card p-5">
       <h3 className="text-xs font-semibold uppercase tracking-wide text-text-muted mb-3">Lesson Saved</h3>
       {lessonSaved ? (
         <div className="flex items-start gap-3 rounded-lg bg-done/5 border border-done/20 px-3 py-2.5">

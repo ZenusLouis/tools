@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import type { Lesson, ProjectDecisions } from "@/lib/knowledge";
-import { LessonsList } from "./LessonsList";
 import { AddLessonForm } from "./AddLessonForm";
 import { DecisionLog } from "./DecisionLog";
+import { LessonsList } from "./LessonsList";
 
 type Tab = "lessons" | "decisions";
 
@@ -19,41 +19,37 @@ export function KnowledgeClient({ lessons, frameworks, projectDecisions, project
   const [tab, setTab] = useState<Tab>("lessons");
   const [search, setSearch] = useState("");
   const [filterFramework, setFilterFramework] = useState("all");
-  const [selectedProject, setSelectedProject] = useState<string>("all");
+  const [selectedProject, setSelectedProject] = useState("all");
 
-  const TABS: { key: Tab; label: string }[] = [
+  const tabs: { key: Tab; label: string }[] = [
     { key: "lessons", label: "Global Lessons" },
     { key: "decisions", label: "Project Decisions" },
   ];
 
   return (
-    <div className="flex flex-col gap-5">
-      {/* Tab bar */}
+    <div className="mx-auto flex max-w-[1400px] flex-col gap-5">
       <div className="flex items-center gap-1 border-b border-border">
-        {TABS.map((t) => (
+        {tabs.map((item) => (
           <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
-              tab === t.key
-                ? "border-accent text-accent"
-                : "border-transparent text-text-muted hover:text-text"
+            key={item.key}
+            onClick={() => setTab(item.key)}
+            className={`-mb-px border-b-2 px-4 py-2 text-sm font-semibold transition-colors ${
+              tab === item.key ? "border-accent text-accent" : "border-transparent text-text-muted hover:text-text"
             }`}
           >
-            {t.label}
+            {item.label}
           </button>
         ))}
 
-        {/* Project dropdown (decisions tab only) */}
         {tab === "decisions" && (
           <select
             value={selectedProject}
-            onChange={(e) => setSelectedProject(e.target.value)}
-            className="ml-auto rounded-lg border bg-bg-base px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-accent text-text"
+            onChange={(event) => setSelectedProject(event.target.value)}
+            className="ml-auto rounded-lg border border-border bg-bg-base px-3 py-1.5 text-xs text-text focus:outline-none focus:ring-1 focus:ring-accent"
           >
             <option value="all">All Projects</option>
-            {projectNames.map((p) => (
-              <option key={p} value={p}>{p}</option>
+            {projectNames.map((project) => (
+              <option key={project} value={project}>{project}</option>
             ))}
           </select>
         )}
@@ -61,42 +57,33 @@ export function KnowledgeClient({ lessons, frameworks, projectDecisions, project
 
       {tab === "lessons" && (
         <>
-          {/* Search + filter */}
           <div className="flex gap-3">
             <input
               type="text"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search lessons…"
-              className="flex-1 rounded-lg border bg-bg-base px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-text-muted"
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search lessons..."
+              className="flex-1 rounded-lg border border-border bg-bg-base px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
             <select
               value={filterFramework}
-              onChange={(e) => setFilterFramework(e.target.value)}
-              className="rounded-lg border bg-bg-base px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent text-text min-w-[140px]"
+              onChange={(event) => setFilterFramework(event.target.value)}
+              className="min-w-[160px] rounded-lg border border-border bg-bg-base px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent"
             >
               <option value="all">All Frameworks</option>
-              {frameworks.map((f) => (
-                <option key={f} value={f}>{f}</option>
+              {frameworks.map((framework) => (
+                <option key={framework} value={framework}>{framework}</option>
               ))}
             </select>
           </div>
 
-          <LessonsList
-            lessons={lessons}
-            search={search}
-            filterFramework={filterFramework}
-          />
-
+          <LessonsList lessons={lessons} search={search} filterFramework={filterFramework} />
           <AddLessonForm frameworks={frameworks} />
         </>
       )}
 
       {tab === "decisions" && (
-        <DecisionLog
-          allDecisions={projectDecisions}
-          selectedProject={selectedProject}
-        />
+        <DecisionLog allDecisions={projectDecisions} selectedProject={selectedProject} />
       )}
     </div>
   );

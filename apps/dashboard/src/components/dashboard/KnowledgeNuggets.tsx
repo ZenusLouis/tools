@@ -44,7 +44,7 @@ function NuggetCard({ lesson }: { lesson: Lesson }) {
   const fwColor = FW_COLORS[fwKey] ?? FW_COLORS.general;
 
   return (
-    <div className={`p-4 ${bgClass} border ${borderClass} rounded-xl`}>
+    <div className={`border-l-4 p-4 ${bgClass} ${borderClass} rounded-r-xl`}>
       <div className={`text-[10px] font-bold uppercase mb-2 ${iconClass}`}>{label}</div>
       <p
         className="text-sm text-text leading-relaxed"
@@ -68,8 +68,8 @@ export function KnowledgeNuggets({ lessons }: { lessons: Lesson[] }) {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-text flex items-center gap-2">
-        <Lightbulb size={18} className="text-in-progress" />
+      <h3 className="flex items-center gap-3 text-lg font-bold text-white">
+        <span className="h-5 w-1 rounded-full bg-in-progress" />
         Knowledge Nuggets
       </h3>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

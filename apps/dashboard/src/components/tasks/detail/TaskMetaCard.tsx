@@ -23,8 +23,8 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 export function TaskMetaCard({ task, log }: Props) {
   return (
-    <div className="rounded-xl border bg-card p-5">
-      <h2 className="text-sm font-semibold mb-4">{task.name}</h2>
+    <div className="rounded-xl border border-border bg-card p-5">
+      <h2 className="mb-4 text-sm font-semibold text-text">{task.name}</h2>
       <div className="flex flex-col">
         <Row label="Task ID">
           <span className="font-mono text-accent text-sm">{task.id}</span>

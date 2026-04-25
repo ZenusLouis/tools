@@ -1,13 +1,13 @@
-import { TopBar } from "@/components/layout/TopBar";
+import { FolderOpen, Terminal } from "lucide-react";
+import { LogoutButton } from "@/components/auth/LogoutButton";
 import { PageShell } from "@/components/layout/PageShell";
-import { GlobalSettingsClient } from "@/components/settings/GlobalSettingsClient";
+import { TopBar } from "@/components/layout/TopBar";
 import { ApiKeysPanel } from "@/components/settings/ApiKeysPanel";
 import { BridgePanel } from "@/components/settings/BridgePanel";
-import { LogoutButton } from "@/components/auth/LogoutButton";
-import { getMcpProfiles } from "@/lib/mcp";
-import { listApiKeys } from "@/lib/api-keys";
+import { GlobalSettingsClient } from "@/components/settings/GlobalSettingsClient";
 import { requireCurrentUser } from "@/lib/auth";
-import { Terminal, FolderOpen } from "lucide-react";
+import { listApiKeys } from "@/lib/api-keys";
+import { getMcpProfiles } from "@/lib/mcp";
 
 export default async function SettingsPage() {
   const user = await requireCurrentUser();
@@ -21,28 +21,26 @@ export default async function SettingsPage() {
     <>
       <TopBar title="Settings" />
       <PageShell>
-        <div className="max-w-5xl mx-auto space-y-8">
-          {/* Header */}
+        <div className="mx-auto max-w-[1200px] space-y-8">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight text-text">System Configuration</h2>
-            <p className="text-text-muted text-sm mt-1">
-              Manage {user.workspaceName}, token budgets, bridge sync, and MCP server profiles.
+            <p className="text-[10px] font-bold uppercase tracking-widest text-accent">Control Plane</p>
+            <h2 className="mt-1 text-2xl font-bold tracking-tight text-text">System Configuration</h2>
+            <p className="mt-1 text-sm text-text-muted">
+              Manage {user.workspaceName}, token telemetry, bridge sync, and MCP server profiles.
             </p>
           </div>
 
-          {/* 3-column bento grid */}
           <GlobalSettingsClient profiles={profiles} />
 
-          {/* API Keys section */}
-          <section className="bg-card border border-border rounded-xl p-6">
+          <section className="rounded-xl border border-border bg-card p-6">
             <ApiKeysPanel initialKeys={apiKeys} />
           </section>
 
-          <section className="bg-card border border-border rounded-xl p-6">
+          <section className="rounded-xl border border-border bg-card p-6">
             <BridgePanel />
           </section>
 
-          <section className="bg-card border border-border rounded-xl p-6 flex items-center justify-between">
+          <section className="flex items-center justify-between rounded-xl border border-border bg-card p-6">
             <div>
               <h3 className="text-sm font-bold text-text">Signed in</h3>
               <p className="text-xs text-text-muted">{user.email}</p>
@@ -50,34 +48,32 @@ export default async function SettingsPage() {
             <LogoutButton />
           </section>
 
-          {/* About card — glassmorphism */}
-          <section className="relative overflow-hidden bg-linear-to-br from-card to-bg-base border border-border rounded-xl p-8 group">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-accent/5 rounded-full blur-[100px] -mr-32 -mt-32 pointer-events-none" />
-            <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+          <section className="relative overflow-hidden rounded-xl border border-border bg-card p-8">
+            <div className="relative z-10 flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
               <div className="flex items-center gap-6">
-                <div className="w-16 h-16 rounded-2xl bg-accent flex items-center justify-center shadow-xl shadow-accent/20 group-hover:scale-105 transition-transform shrink-0">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-accent shadow-xl shadow-accent/20 transition-transform group-hover:scale-105">
                   <Terminal size={28} className="text-white" />
                 </div>
                 <div className="space-y-1">
-                  <h3 className="text-xl font-black text-text tracking-tight">GCS v1.0</h3>
-                  <p className="text-text-muted text-sm">Global Claude Skills Developer Environment</p>
+                  <h3 className="text-xl font-black tracking-tight text-text">GCS v1.0</h3>
+                  <p className="text-sm text-text-muted">Global Claude Skills Developer Environment</p>
                 </div>
               </div>
-              <div className="flex flex-col md:items-end gap-2">
-                <span className="text-[10px] uppercase font-bold text-text-muted tracking-widest">Installation Path</span>
-                <div className="flex items-center gap-2 bg-bg-base border border-border rounded-lg px-4 py-2 font-mono text-xs text-accent">
+              <div className="flex flex-col gap-2 md:items-end">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Installation Path</span>
+                <div className="flex items-center gap-2 rounded-lg border border-border bg-bg-base px-4 py-2 font-mono text-xs text-accent">
                   <FolderOpen size={13} />
                   {claudeRoot}
                 </div>
               </div>
             </div>
-            <div className="mt-8 pt-6 border-t border-border/50 flex flex-wrap gap-4">
-              <div className="flex items-center gap-2 px-3 py-1 bg-card-hover border border-border rounded-full">
-                <div className="w-1.5 h-1.5 rounded-full bg-done animate-pulse" />
+            <div className="mt-8 flex flex-wrap gap-4 border-t border-border/50 pt-6">
+              <div className="flex items-center gap-2 rounded-full border border-border bg-card-hover px-3 py-1">
+                <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-done" />
                 <span className="text-[10px] text-text">System Ready</span>
               </div>
-              <div className="flex items-center gap-2 px-3 py-1 bg-card-hover border border-border rounded-full">
-                <span className="text-[10px] text-accent">↻</span>
+              <div className="flex items-center gap-2 rounded-full border border-border bg-card-hover px-3 py-1">
+                <span className="text-[10px] text-accent">sync</span>
                 <span className="text-[10px] text-text">Last check: 2m ago</span>
               </div>
             </div>

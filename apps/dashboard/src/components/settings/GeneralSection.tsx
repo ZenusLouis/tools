@@ -7,47 +7,28 @@ interface Props {
 
 export function GeneralSection({ name, projectPath, mcpProfile, profiles }: Props) {
   return (
-    <section className="rounded-xl border bg-card p-6 flex flex-col gap-5">
-      <h2 className="text-sm font-semibold">General</h2>
+    <section className="flex flex-col gap-5 rounded-xl border border-border bg-card p-6">
+      <h2 className="text-sm font-semibold text-text">General</h2>
 
-      <div className="grid grid-cols-2 gap-4">
-        {/* Name — read-only */}
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-text-muted">Project Name</label>
-          <input
-            name="name"
-            defaultValue={name}
-            readOnly
-            className="rounded-lg border bg-card-hover px-3 py-2 text-sm text-text-muted cursor-not-allowed focus:outline-none"
-          />
-        </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-text-muted">Project Name</span>
+          <input name="name" defaultValue={name} readOnly className="cursor-not-allowed rounded-lg border border-border bg-card-hover px-3 py-2 text-sm text-text-muted focus:outline-none" />
+        </label>
 
-        {/* MCP Profile — editable */}
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-text-muted">MCP Profile</label>
-          <select
-            name="mcpProfile"
-            defaultValue={mcpProfile}
-            className="rounded-lg border bg-card-hover px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent cursor-pointer"
-          >
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-text-muted">MCP Profile</span>
+          <select name="mcpProfile" defaultValue={mcpProfile} className="cursor-pointer rounded-lg border border-border bg-card-hover px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent">
             {profiles.length === 0 && <option value="">No profiles</option>}
-            {profiles.map((p) => (
-              <option key={p} value={p}>{p}</option>
-            ))}
+            {profiles.map((profile) => <option key={profile} value={profile}>{profile}</option>)}
           </select>
-        </div>
+        </label>
       </div>
 
-      {/* Path — read-only, full width */}
-      <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-text-muted">Folder Path</label>
-        <input
-          name="path"
-          defaultValue={projectPath}
-          readOnly
-          className="rounded-lg border bg-card-hover px-3 py-2 text-sm font-mono text-text-muted cursor-not-allowed focus:outline-none"
-        />
-      </div>
+      <label className="flex flex-col gap-1.5">
+        <span className="text-xs font-medium text-text-muted">Folder Path</span>
+        <input name="path" defaultValue={projectPath} readOnly className="cursor-not-allowed rounded-lg border border-border bg-card-hover px-3 py-2 font-mono text-sm text-text-muted focus:outline-none" />
+      </label>
     </section>
   );
 }

@@ -2,15 +2,14 @@ import Link from "next/link";
 import { TopBar } from "@/components/layout/TopBar";
 import { PageShell } from "@/components/layout/PageShell";
 import { HeroMetric } from "@/components/tokens/HeroMetric";
-import { BudgetWarningBanner } from "@/components/tokens/BudgetWarningBanner";
 import { DonutChart } from "@/components/tokens/DonutChart";
 import { DailyBarChart } from "@/components/tokens/DailyBarChart";
 import { SessionsTable } from "@/components/tokens/SessionsTable";
+import { ProviderTokenBreakdown } from "@/components/tokens/ProviderTokenBreakdown";
 import { getAnalytics, type DateRange } from "@/lib/analytics";
 import { requireCurrentUser } from "@/lib/auth";
 
 const VALID_RANGES = new Set<DateRange>(["today", "week", "month"]);
-const DEFAULT_BUDGET = 100_000;
 
 interface Props {
   searchParams: Promise<{ range?: string }>;
@@ -48,24 +47,19 @@ export default async function TokensPage({ searchParams }: Props) {
         }
       />
       <PageShell>
-        <div className="space-y-8">
-          {/* Budget warning */}
-          <BudgetWarningBanner totalTokens={analytics.totalTokens} dailyBudget={DEFAULT_BUDGET} />
-
-          {/* Hero metric */}
+        <div className="mx-auto max-w-[1400px] space-y-8">
           <HeroMetric
             totalTokens={analytics.totalTokens}
             totalCost={analytics.totalCost}
-            dailyBudget={DEFAULT_BUDGET}
           />
 
-          {/* Charts: 2-col grid */}
+          <ProviderTokenBreakdown breakdown={analytics.providerBreakdown} />
+
           <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <DonutChart breakdown={analytics.toolBreakdown} />
             <DailyBarChart dailyUsage={analytics.dailyUsage} />
           </section>
 
-          {/* Sessions table */}
           <SessionsTable sessions={analytics.sessions} />
         </div>
       </PageShell>

@@ -7,55 +7,20 @@ export default function DashboardLoading() {
     <>
       <TopBar title="Dashboard" />
       <PageShell>
-        <div className="flex flex-col gap-6">
-          {/* Stat cards */}
-          <div className="grid grid-cols-4 gap-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="rounded-xl border bg-card p-5 flex flex-col gap-3">
+        <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
+          <Skeleton className="h-48 rounded-2xl" />
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="flex min-h-36 flex-col gap-3 rounded-xl border border-border bg-card p-5">
+                <Skeleton className="h-9 w-9 rounded-lg" />
                 <Skeleton className="h-3 w-24" />
-                <Skeleton className="h-8 w-16" />
-                <Skeleton className="h-1.5 w-full" />
+                <Skeleton className="h-8 w-20" />
               </div>
             ))}
           </div>
-
-          <div className="grid grid-cols-3 gap-6">
-            <div className="col-span-2 flex flex-col gap-6">
-              {/* Active projects */}
-              <div className="rounded-xl border bg-card p-5 flex flex-col gap-3">
-                <Skeleton className="h-4 w-32" />
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="flex items-center gap-3 py-2">
-                    <Skeleton className="h-4 w-40" />
-                    <Skeleton className="h-3 w-16 ml-auto" />
-                  </div>
-                ))}
-              </div>
-              {/* Recent activity */}
-              <div className="rounded-xl border bg-card p-5 flex flex-col gap-3">
-                <Skeleton className="h-4 w-32" />
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="flex gap-3 items-start py-1">
-                    <Skeleton className="h-3 w-3 rounded-full mt-0.5 shrink-0" />
-                    <div className="flex flex-col gap-1.5 flex-1">
-                      <Skeleton className="h-3 w-48" />
-                      <Skeleton className="h-2.5 w-24" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            {/* Knowledge nuggets */}
-            <div className="rounded-xl border bg-card p-5 flex flex-col gap-4">
-              <Skeleton className="h-4 w-40" />
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="flex flex-col gap-2">
-                  <Skeleton className="h-3 w-16" />
-                  <Skeleton className="h-3 w-full" />
-                  <Skeleton className="h-3 w-3/4" />
-                </div>
-              ))}
-            </div>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_390px]">
+            <Skeleton className="h-64 rounded-xl" />
+            <Skeleton className="h-64 rounded-xl" />
           </div>
         </div>
       </PageShell>

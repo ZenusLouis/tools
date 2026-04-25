@@ -1,46 +1,23 @@
-const DEFAULT_BUDGET = 100_000;
-
 interface Props {
   totalTokens: number;
   totalCost: number;
-  dailyBudget?: number;
 }
 
-export function HeroMetric({ totalTokens, totalCost, dailyBudget = DEFAULT_BUDGET }: Props) {
-  const budgetPercent = Math.min((totalTokens / dailyBudget) * 100, 100);
-  const barColor = budgetPercent >= 80 ? "bg-in-progress" : budgetPercent >= 50 ? "bg-accent" : "bg-done";
-
+export function HeroMetric({ totalTokens, totalCost }: Props) {
   return (
-    <section className="bg-card rounded-2xl p-8 border border-border shadow-2xl relative overflow-hidden">
-      {/* Background glow */}
-      <div className="absolute -right-24 -top-24 w-64 h-64 bg-accent/10 blur-[100px] pointer-events-none" />
-
-      <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
-        {/* Left: big number */}
+    <section className="relative overflow-hidden rounded-2xl border border-border bg-card p-8 shadow-2xl">
+      <div className="relative z-10 flex flex-col justify-between gap-6 md:flex-row md:items-end">
         <div>
-          <p className="text-text-muted text-sm font-medium mb-1">Total Consumption</p>
-          <h2 className="text-5xl font-black text-text tracking-tight">
-            {totalTokens.toLocaleString()}{" "}
-            <span className="text-accent text-2xl font-bold">tokens</span>
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-accent">Token Analytics</p>
+          <h2 className="font-mono text-5xl font-black tracking-tight text-text">
+            {totalTokens.toLocaleString()} <span className="text-2xl font-bold text-accent">tokens</span>
           </h2>
-          <p className="text-text-muted mt-2 font-medium">${totalCost.toFixed(4)} est. cost</p>
+          <p className="mt-2 text-sm font-medium text-text-muted">${totalCost.toFixed(4)} estimated cost across connected agents</p>
         </div>
 
-        {/* Right: daily limit */}
-        <div className="w-full md:w-72 space-y-2">
-          <div className="flex justify-between text-xs font-bold uppercase tracking-widest text-text-muted">
-            <span>Daily Limit</span>
-            <span className="text-text">{Math.round(budgetPercent)}%</span>
-          </div>
-          <div className="h-3 w-full bg-card-hover rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-700 ${barColor}`}
-              style={{ width: `${budgetPercent}%` }}
-            />
-          </div>
-          <p className="text-[10px] text-text-muted text-right italic">
-            {(dailyBudget / 1000).toFixed(0)}k daily budget
-          </p>
+        <div className="rounded-xl border border-border bg-bg-base px-5 py-4 text-right">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Policy</p>
+          <p className="mt-1 font-mono text-sm font-bold text-done">No usage limit</p>
         </div>
       </div>
     </section>

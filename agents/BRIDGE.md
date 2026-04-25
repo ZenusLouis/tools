@@ -25,6 +25,23 @@ python hooks/bridge-heartbeat.py
 
 The request uses `User-Agent: GCS-Local-Bridge/1.0` so Cloudflare can allow bridge traffic.
 
+## Long-Running Bridge
+
+Run this when you want the local machine to stay visible and sync new local JSONL logs until the terminal is closed:
+
+```text
+powershell -NoProfile -ExecutionPolicy Bypass -File hooks/start-gcs-bridge.ps1
+```
+
+Default behavior:
+
+- sends heartbeat every 30 seconds
+- checks `logs/global-*.jsonl` every 5 seconds
+- stays quiet for successful heartbeat responses
+- starts tailing from the end on first run so old history is not duplicated
+- use `--from-start` once if you intentionally want to backfill existing local logs
+- use `--verbose` when you want to print every heartbeat response
+
 ## Log Events
 
 `hooks/token-tracker.py` sends provider, role, model, workspace, and device metadata when the relevant env vars are set.

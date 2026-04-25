@@ -45,10 +45,13 @@ export function AgentLibraryClient({ roles, skills, sourceSummary }: { roles: Ro
   }
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-6">
-      <section className="rounded-xl border bg-card p-4">
+    <div className="mx-auto grid max-w-[1500px] grid-cols-1 gap-6 xl:grid-cols-[380px_1fr]">
+      <section className="rounded-xl border border-border bg-card p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="text-sm font-bold text-text">Role Library</h2>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-accent">Library</p>
+            <h2 className="text-sm font-bold text-text">Active Bot Roles</h2>
+          </div>
           <a href="/create" className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-accent hover:bg-accent/10">Create Role</a>
         </div>
         <div className="flex max-h-[calc(100vh-12rem)] flex-col gap-2 overflow-y-auto pr-1">
@@ -57,7 +60,7 @@ export function AgentLibraryClient({ roles, skills, sourceSummary }: { roles: Ro
               No roles found yet.
             </div>
           ) : roles.map((role) => (
-            <div key={role.id} className="rounded-lg border border-border bg-bg-base p-3">
+            <div key={role.id} className="rounded-lg border border-border bg-bg-base p-3 transition-colors hover:border-accent/40">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-text">{role.name}</p>
                 <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-accent">{role.provider}</span>
@@ -74,7 +77,7 @@ export function AgentLibraryClient({ roles, skills, sourceSummary }: { roles: Ro
       </section>
 
       <div className="flex flex-col gap-6">
-        <section className="rounded-xl border bg-card p-4">
+        <section className="rounded-xl border border-border bg-card p-4">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
               <h2 className="text-sm font-bold text-text">Skill Sources</h2>
@@ -104,8 +107,9 @@ export function AgentLibraryClient({ roles, skills, sourceSummary }: { roles: Ro
           </div>
         </section>
 
-        <section className="rounded-xl border bg-card p-4">
-          <h2 className="text-sm font-bold text-text">Recommended Imports</h2>
+        <section className="rounded-xl border border-border bg-card p-4">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-accent">Top Candidates</p>
+          <h2 className="mt-1 text-sm font-bold text-text">Recommended Imports</h2>
           <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
             {sourceSummary.recommended.map((skill) => (
               <div key={`${skill.sourceName}-${skill.name}`} className="rounded-lg border border-border bg-bg-base p-3">
@@ -131,8 +135,9 @@ export function AgentLibraryClient({ roles, skills, sourceSummary }: { roles: Ro
           </div>
         </section>
 
-        <section className="rounded-xl border bg-card p-4">
-          <h2 className="text-sm font-bold text-text">Installed Skills</h2>
+        <section className="rounded-xl border border-border bg-card p-4">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-accent">Installed</p>
+          <h2 className="mt-1 text-sm font-bold text-text">Installed Skills</h2>
           <div className="mt-3 flex flex-wrap gap-2">
             {skillList.slice(0, 80).map((skill) => (
               <span key={skill.id} className="rounded-lg border border-border bg-bg-base px-2 py-1 text-xs text-text-muted">

@@ -8,7 +8,7 @@ export function ArtifactsCard({ task }: { task: TaskDetail }) {
   ];
 
   return (
-    <div className="rounded-xl border bg-card p-5">
+    <div className="rounded-xl border border-border bg-card p-5">
       <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-text-muted">Artifacts</h3>
       <div className="flex flex-col gap-2">
         <div className="rounded-lg border border-accent/20 bg-accent/5 px-3 py-2 text-xs">
@@ -24,4 +24,3 @@ export function ArtifactsCard({ task }: { task: TaskDetail }) {
     </div>
   );
 }
-

@@ -10,8 +10,8 @@ const TOOL_FIELDS: { key: string; label: string; placeholder: string }[] = [
 
 export function ToolsSection({ tools }: Props) {
   return (
-    <section className="rounded-xl border bg-card p-6 flex flex-col gap-5">
-      <h2 className="text-sm font-semibold">Tools & Integrations</h2>
+    <section className="flex flex-col gap-5 rounded-xl border border-border bg-card p-6">
+      <h2 className="text-sm font-semibold text-text">Tools & Integrations</h2>
       <div className="flex flex-col gap-4">
         {TOOL_FIELDS.map(({ key, label, placeholder }) => (
           <div key={key} className="flex flex-col gap-1.5">
@@ -20,7 +20,7 @@ export function ToolsSection({ tools }: Props) {
               name={`tools.${key}`}
               defaultValue={tools[key] ?? ""}
               placeholder={placeholder}
-              className="rounded-lg border bg-card-hover px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent"
+              className="rounded-lg border border-border bg-card-hover px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
           </div>
         ))}

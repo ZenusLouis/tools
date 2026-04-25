@@ -98,7 +98,7 @@ export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; s
 
   if (mode === "list") {
     return (
-      <div className="space-y-6">
+      <div className="mx-auto max-w-[1500px] space-y-6">
         <section className="rounded-2xl border border-border bg-card p-5">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
@@ -122,7 +122,7 @@ export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; s
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 2xl:grid-cols-4">
           {roleList.map((role) => (
             <article key={role.id} className="rounded-2xl border border-border bg-card p-5 transition-colors hover:border-accent/40 hover:bg-card-hover">
               <div className="flex items-start justify-between gap-3">
@@ -146,8 +146,8 @@ export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; s
   }
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6">
-      <form action={createRole} className="rounded-xl border bg-card p-5">
+    <div className="mx-auto grid max-w-[1500px] grid-cols-1 gap-6 xl:grid-cols-[1fr_360px]">
+      <form action={createRole} className="rounded-xl border border-border bg-card p-5">
         <div className="flex items-start justify-between gap-4 mb-5">
           <div>
             <h2 className="text-base font-bold text-text">Custom AI Builder</h2>
@@ -281,7 +281,7 @@ export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; s
         </div>
       </form>
 
-      <aside className="rounded-xl border bg-card p-4 text-xs text-text-muted">
+      <aside className="rounded-xl border border-border bg-card p-4 text-xs text-text-muted">
         <p className="flex items-center gap-2 font-semibold text-text"><Sparkles size={14} className="text-accent" /> Generated artifacts</p>
         <div className="mt-3 space-y-1">
           <p><code>agents/roles/&lt;slug&gt;.json</code></p>

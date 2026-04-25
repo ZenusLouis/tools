@@ -3,11 +3,20 @@ import { db } from "@/lib/db";
 
 export type DateRange = "today" | "week" | "month";
 export type ToolBreakdown = { tool: string; tokens: number; percent: number };
+export type ProviderBreakdown = {
+  provider: "claude" | "codex" | "chatgpt";
+  tokens: number;
+  sessionTokens: number;
+  toolTokens: number;
+  percent: number;
+  cost: number;
+};
 export type DailyUsage = { date: string; tokens: number; cost: number };
-export type SessionRow = { date: string; project: string; tasksCompleted: number; tokens: number; cost: number };
+export type SessionRow = { date: string; provider: string; role: string | null; model: string | null; project: string; tasksCompleted: number; tokens: number; cost: number; durationMin: number | null };
 export type AnalyticsData = {
   totalTokens: number;
   totalCost: number;
+  providerBreakdown: ProviderBreakdown[];
   toolBreakdown: ToolBreakdown[];
   dailyUsage: DailyUsage[];
   sessions: SessionRow[];
@@ -30,8 +39,23 @@ export async function getAnalytics(range: DateRange, workspaceId?: string): Prom
     db.toolUsage.findMany({ where: { date: { gte: since }, ...(workspaceId ? { workspaceId } : {}) }, orderBy: { date: "asc" } }),
   ]);
 
-  const totalTokens = sessions.reduce((s, r) => s + (r.totalTokens ?? 0), 0);
+  const providers = ["claude", "codex", "chatgpt"] as const;
+  const rawProviderBreakdown = providers.map((provider) => {
+    const sessionTokens = sessions
+      .filter((session) => session.provider === provider)
+      .reduce((sum, session) => sum + (session.totalTokens ?? 0), 0);
+    const toolTokens = toolUsage
+      .filter((usage) => usage.provider === provider)
+      .reduce((sum, usage) => sum + usage.tokens, 0);
+    return { provider, sessionTokens, toolTokens, tokens: Math.max(sessionTokens, toolTokens) };
+  });
+  const totalTokens = rawProviderBreakdown.reduce((sum, row) => sum + row.tokens, 0);
   const totalCost = totalTokens * (COST_PER_MILLION / 1_000_000);
+  const providerBreakdown: ProviderBreakdown[] = rawProviderBreakdown.map((row) => ({
+    ...row,
+    percent: totalTokens > 0 ? Math.round((row.tokens / totalTokens) * 100) : 0,
+    cost: row.tokens * (COST_PER_MILLION / 1_000_000),
+  }));
 
   // Tool breakdown
   const toolMap = new Map<string, number>();
@@ -49,6 +73,10 @@ export async function getAnalytics(range: DateRange, workspaceId?: string): Prom
     const day = s.date.toISOString().slice(0, 10);
     dayMap.set(day, (dayMap.get(day) ?? 0) + (s.totalTokens ?? 0));
   }
+  for (const usage of toolUsage) {
+    const day = usage.date.toISOString().slice(0, 10);
+    dayMap.set(day, (dayMap.get(day) ?? 0) + usage.tokens);
+  }
   const dailyUsage: DailyUsage[] = [...dayMap.entries()]
     .map(([date, tokens]) => ({ date, tokens, cost: tokens * (COST_PER_MILLION / 1_000_000) }))
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -56,11 +84,15 @@ export async function getAnalytics(range: DateRange, workspaceId?: string): Prom
   // Session rows
   const sessionRows: SessionRow[] = sessions.map((s) => ({
     date: s.date.toISOString().slice(0, 10),
+    provider: s.provider,
+    role: s.role,
+    model: s.model,
     project: s.project,
     tasksCompleted: s.tasksCompleted.length,
     tokens: s.totalTokens ?? 0,
     cost: (s.totalTokens ?? 0) * (COST_PER_MILLION / 1_000_000),
+    durationMin: s.durationMin ?? null,
   }));
 
-  return { totalTokens, totalCost, toolBreakdown, dailyUsage, sessions: sessionRows };
+  return { totalTokens, totalCost, providerBreakdown, toolBreakdown, dailyUsage, sessions: sessionRows };
 }

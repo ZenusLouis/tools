@@ -1,26 +1,52 @@
 import Link from "next/link";
-import { Bot, MessageSquare, Plus, Radio } from "lucide-react";
+import { Bot, MessageSquare, Play, Plus } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { PageShell } from "@/components/layout/PageShell";
 import { StatCard } from "@/components/dashboard/StatCard";
+import { TokenUsageCard } from "@/components/dashboard/TokenUsageCard";
 import { ActiveProjectsList } from "@/components/dashboard/ActiveProjectsList";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { KnowledgeNuggets } from "@/components/dashboard/KnowledgeNuggets";
 import { AutoRefresh } from "@/components/dashboard/AutoRefresh";
+import { OnboardingEmptyState } from "@/components/projects/OnboardingEmptyState";
 import { getDashboardStats } from "@/lib/stats";
 import { getActiveProjects } from "@/lib/projects";
 import { getRecentActivity } from "@/lib/activity";
 import { getRandomLessons } from "@/lib/lessons";
 import { requireCurrentUser } from "@/lib/auth";
+import type { DashboardRange } from "@/lib/stats";
 
 export const revalidate = 30;
 
-export default async function DashboardPage() {
+const VALID_RANGES = new Set<DashboardRange>(["today", "week", "month"]);
+const RANGE_LABEL: Record<DashboardRange, string> = {
+  today: "Today",
+  week: "This Week",
+  month: "This Month",
+};
+const RANGE_COPY: Record<DashboardRange, string> = {
+  today: "today",
+  week: "this week",
+  month: "this month",
+};
+
+function rangeStart(range: DashboardRange): Date {
+  const now = new Date();
+  if (range === "today") return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (range === "week") return new Date(Date.now() - 7 * 86_400_000);
+  return new Date(Date.now() - 30 * 86_400_000);
+}
+
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
+  const { range } = await searchParams;
+  const selectedRange: DashboardRange = VALID_RANGES.has(range as DashboardRange) ? (range as DashboardRange) : "today";
+  const label = RANGE_LABEL[selectedRange];
+  const copy = RANGE_COPY[selectedRange];
   const user = await requireCurrentUser();
   const [stats, projects, activity, lessons] = await Promise.all([
-    getDashboardStats(user.workspaceId),
+    getDashboardStats(user.workspaceId, selectedRange),
     getActiveProjects(user.workspaceId),
-    getRecentActivity(8),
+    getRecentActivity(8, user.workspaceId, rangeStart(selectedRange)),
     getRandomLessons(3),
   ]);
 
@@ -29,6 +55,8 @@ export default async function DashboardPage() {
       <AutoRefresh intervalMs={30_000} />
       <TopBar
         title="Dashboard"
+        range={selectedRange}
+        rangeBasePath="/"
         actions={
           <Link
             href="/projects/new"
@@ -40,76 +68,70 @@ export default async function DashboardPage() {
         }
       />
       <PageShell>
+        {projects.length === 0 ? (
+          <OnboardingEmptyState />
+        ) : (
         <div className="flex flex-col gap-6">
           <section className="overflow-hidden rounded-2xl border border-border bg-card">
-            <div className="grid gap-6 p-6 lg:grid-cols-[1fr_360px]">
+            <div className="flex flex-col gap-6 p-8 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-accent">
-                  <Radio size={13} />
-                  Workspace Live
-                </div>
-                <h1 className="mt-3 text-2xl font-bold text-text">GlobalClaudeSkills control room</h1>
-                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-text-muted">
+                <h1 className="text-[32px] font-black tracking-tight text-white">Good morning, Dev.</h1>
+                <p className="mt-3 flex flex-wrap items-center gap-3 font-mono text-sm text-text-muted">
+                  <span className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-accent" />
+                    {projects.length} active projects
+                  </span>
+                  <span className="text-border">/</span>
+                  <span>{stats.tokenCount.toLocaleString()} tokens used {copy}</span>
+                </p>
+                <p className="mt-3 max-w-2xl text-sm leading-relaxed text-text-muted">
                   {projects.length > 0
-                    ? `${projects.length} active project tracked. ${stats.tasksToday} tasks completed today.`
+                    ? `${projects.length} active project tracked. ${stats.tasksCompleted} tasks completed ${copy}.`
                     : "No projects tracked yet. Add a project to start building the workspace graph."}
                 </p>
-                <div className="mt-5 flex flex-wrap gap-2">
-                  <Link href="/chat" className="inline-flex items-center gap-2 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white hover:bg-accent-hover">
-                    <MessageSquare size={15} />
-                    Open Chat
-                  </Link>
-                  <Link href="/create" className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-semibold text-text-muted hover:bg-card-hover hover:text-text">
-                    <Bot size={15} />
-                    Manage Bots
-                  </Link>
-                </div>
               </div>
-              <div className="rounded-xl border border-border bg-bg-base p-4">
-                <p className="text-xs font-bold uppercase tracking-wide text-text-muted">Today</p>
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <MiniMetric label="Tokens" value={stats.tokenCount.toLocaleString()} />
-                  <MiniMetric label="Cost" value={`$${stats.sessionCost.toFixed(4)}`} />
-                  <MiniMetric label="Projects" value={stats.activeProjects} />
-                  <MiniMetric label="Done" value={stats.tasksToday} />
-                </div>
+              <div className="flex flex-wrap gap-3">
+                <Link href="/projects/new" className="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-accent-hover">
+                  <Plus size={17} />
+                  New Project
+                </Link>
+                <Link href="/tasks" className="inline-flex items-center gap-2 rounded-xl border border-border px-5 py-2.5 text-sm font-bold text-text transition-colors hover:border-text-muted hover:bg-card-hover">
+                  <Play size={16} fill="currentColor" />
+                  Run Task
+                </Link>
+                <Link href="/chat" className="inline-flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold text-text-muted transition-colors hover:text-text">
+                  <MessageSquare size={16} />
+                  Chat
+                </Link>
+                <Link href="/create" className="inline-flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold text-text-muted transition-colors hover:text-text">
+                  <Bot size={16} />
+                  Bots
+                </Link>
               </div>
             </div>
           </section>
 
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <StatCard label="Active Projects" value={stats.activeProjects} variant="projects" badge={stats.activeProjects > 0 ? `+${stats.activeProjects}` : undefined} />
-            <StatCard label="Tasks Done Today" value={stats.tasksToday} variant="tasks" badge={stats.tasksToday > 0 ? "100%" : undefined} />
-            <StatCard
-              label="Tokens Today"
-              value={stats.tokenCount.toLocaleString()}
-              progress={stats.tokenPercent}
-              sub={`${stats.tokenPercent.toFixed(1)}% of ${(stats.dailyLimit / 1_000).toFixed(0)}k limit`}
-              variant="tokens"
-              badge={`${Math.round(stats.tokenPercent)}%`}
+            <StatCard label={`Tasks Done ${label}`} value={stats.tasksCompleted} variant="tasks" badge={stats.tasksCompleted > 0 ? "done" : undefined} />
+            <TokenUsageCard
+              total={stats.tokenCount}
+              rangeLabel={label}
+              breakdown={stats.tokenBreakdown}
             />
-            <StatCard label="Session Cost" value={`$${stats.sessionCost.toFixed(4)}`} variant="cost" badge="Today" />
+            <StatCard label="Session Cost" value={`$${stats.sessionCost.toFixed(4)}`} variant="cost" badge={label.toLowerCase()} />
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <div className="lg:col-span-2">
+            <div className="space-y-6 lg:col-span-2">
               <ActiveProjectsList projects={projects} />
+              <KnowledgeNuggets lessons={lessons} />
             </div>
             <RecentActivity items={activity} />
           </div>
-
-          <KnowledgeNuggets lessons={lessons} />
         </div>
+        )}
       </PageShell>
     </>
-  );
-}
-
-function MiniMetric({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="rounded-lg border border-border bg-card px-3 py-2">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-text-muted">{label}</p>
-      <p className="mt-1 text-lg font-bold text-text">{value}</p>
-    </div>
   );
 }

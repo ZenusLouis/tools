@@ -7,6 +7,7 @@ import { RisksCard } from "@/components/tasks/detail/RisksCard";
 import { LessonLinkCard } from "@/components/tasks/detail/LessonLinkCard";
 import { DiffCard } from "@/components/tasks/detail/DiffCard";
 import { ArtifactsCard } from "@/components/tasks/detail/ArtifactsCard";
+import { CommitComposerButton } from "@/components/tasks/detail/CommitComposerButton";
 import { findTaskDetail, getTaskLogEntry } from "@/lib/task-detail";
 import { getProjectContext } from "@/lib/settings";
 
@@ -29,15 +30,30 @@ export default async function TaskDetailPage({ params }: Props) {
 
   return (
     <>
-      <TopBar title={`Task ${task.id}`} />
+      <TopBar
+        title={`Task ${task.id}`}
+        actions={
+          <CommitComposerButton
+            taskId={task.id}
+            taskName={task.name}
+            projectName={task.projectName}
+            files={log?.filesChanged ?? []}
+            agentName={task.devRoleName}
+          />
+        }
+      />
       <PageShell>
-        <div className="max-w-2xl flex flex-col gap-4">
-          <TaskMetaCard task={task} log={log} />
-          <ArtifactsCard task={task} />
-          <FilesChangedCard files={log?.filesChanged ?? []} projectPath={projectPath} />
-          <RisksCard risks={log?.risks ?? []} />
-          <LessonLinkCard lessonSaved={log?.lessonSaved ?? null} />
-          <DiffCard files={log?.filesChanged ?? []} />
+        <div className="mx-auto grid max-w-[1400px] grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
+          <div className="flex flex-col gap-4">
+            <TaskMetaCard task={task} log={log} />
+            <ArtifactsCard task={task} />
+            <FilesChangedCard files={log?.filesChanged ?? []} projectPath={projectPath} />
+          </div>
+          <div className="flex flex-col gap-4">
+            <RisksCard risks={log?.risks ?? []} />
+            <LessonLinkCard lessonSaved={log?.lessonSaved ?? null} />
+            <DiffCard files={log?.filesChanged ?? []} />
+          </div>
         </div>
       </PageShell>
     </>

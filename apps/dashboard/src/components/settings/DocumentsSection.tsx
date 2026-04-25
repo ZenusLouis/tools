@@ -10,8 +10,8 @@ const DOC_FIELDS: { key: string; label: string; placeholder: string }[] = [
 
 export function DocumentsSection({ docs }: Props) {
   return (
-    <section className="rounded-xl border bg-card p-6 flex flex-col gap-5">
-      <h2 className="text-sm font-semibold">Documents</h2>
+    <section className="flex flex-col gap-5 rounded-xl border border-border bg-card p-6">
+      <h2 className="text-sm font-semibold text-text">Documents</h2>
       <div className="flex flex-col gap-4">
         {DOC_FIELDS.map(({ key, label, placeholder }) => (
           <div key={key} className="flex flex-col gap-1.5">
@@ -20,7 +20,7 @@ export function DocumentsSection({ docs }: Props) {
               name={`docs.${key}`}
               defaultValue={docs[key] ?? ""}
               placeholder={placeholder}
-              className="rounded-lg border bg-card-hover px-3 py-2 text-sm font-mono text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent"
+              className="rounded-lg border border-border bg-card-hover px-3 py-2 font-mono text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
           </div>
         ))}

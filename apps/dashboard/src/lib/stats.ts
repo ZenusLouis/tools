@@ -1,31 +1,76 @@
 import "server-only";
 import { db } from "@/lib/db";
 
-const DAILY_TOKEN_LIMIT = 100_000;
 const COST_PER_MILLION = 3.0;
+
+export type DashboardRange = "today" | "week" | "month";
 
 export type DashboardStats = {
   activeProjects: number;
-  tasksToday: number;
+  tasksCompleted: number;
   tokenCount: number;
   sessionCost: number;
-  tokenPercent: number;
-  dailyLimit: number;
+  tokenBreakdown: Array<{
+    provider: "claude" | "codex" | "chatgpt";
+    tokens: number;
+    sessionTokens: number;
+    toolTokens: number;
+    percent: number;
+  }>;
 };
 
-export async function getDashboardStats(workspaceId?: string): Promise<DashboardStats> {
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
+function getRangeStart(range: DashboardRange): Date {
+  const now = new Date();
+  if (range === "today") {
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  }
+  if (range === "week") {
+    return new Date(Date.now() - 7 * 86_400_000);
+  }
+  return new Date(Date.now() - 30 * 86_400_000);
+}
 
-  const [projectCount, todaySessions] = await Promise.all([
+export async function getDashboardStats(workspaceId?: string, range: DashboardRange = "today"): Promise<DashboardStats> {
+  const since = getRangeStart(range);
+
+  const [projectCount, sessions, toolUsage] = await Promise.all([
     db.project.count({ where: workspaceId ? { workspaceId } : undefined }),
-    db.session.findMany({ where: { date: { gte: todayStart }, ...(workspaceId ? { workspaceId } : {}) } }),
+    db.session.findMany({ where: { date: { gte: since }, ...(workspaceId ? { workspaceId } : {}) } }),
+    db.toolUsage.findMany({ where: { date: { gte: since }, ...(workspaceId ? { workspaceId } : {}) } }),
   ]);
 
-  const tasksToday = todaySessions.reduce((s, r) => s + r.tasksCompleted.length, 0);
-  const tokenCount = todaySessions.reduce((s, r) => s + (r.totalTokens ?? 0), 0);
+  const tasksCompleted = sessions.reduce((sum, session) => sum + session.tasksCompleted.length, 0);
+  const providers = ["claude", "codex", "chatgpt"] as const;
+  const tokenBreakdown = providers.map((provider) => {
+    const sessionTokens = sessions
+      .filter((session) => session.provider === provider)
+      .reduce((sum, session) => sum + (session.totalTokens ?? 0), 0);
+    const toolTokens = toolUsage
+      .filter((usage) => usage.provider === provider)
+      .reduce((sum, usage) => sum + usage.tokens, 0);
+    return {
+      provider,
+      sessionTokens,
+      toolTokens,
+      // Claude can stream tool usage before Stop emits a session summary.
+      // Taking the max keeps today's dashboard live without double-counting
+      // when both tool rows and session summaries exist for the same work.
+      tokens: Math.max(sessionTokens, toolTokens),
+      percent: 0,
+    };
+  });
+  const tokenCount = tokenBreakdown.reduce((sum, item) => sum + item.tokens, 0);
   const sessionCost = tokenCount * (COST_PER_MILLION / 1_000_000);
-  const tokenPercent = Math.min((tokenCount / DAILY_TOKEN_LIMIT) * 100, 100);
+  const breakdownWithPercent = tokenBreakdown.map((item) => ({
+    ...item,
+    percent: tokenCount > 0 ? Math.round((item.tokens / tokenCount) * 100) : 0,
+  }));
 
-  return { activeProjects: projectCount, tasksToday, tokenCount, sessionCost, tokenPercent, dailyLimit: DAILY_TOKEN_LIMIT };
+  return {
+    activeProjects: projectCount,
+    tasksCompleted,
+    tokenCount,
+    sessionCost,
+    tokenBreakdown: breakdownWithPercent,
+  };
 }

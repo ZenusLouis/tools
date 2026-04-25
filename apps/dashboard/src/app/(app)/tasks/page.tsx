@@ -28,8 +28,7 @@ export default async function TasksPage({ searchParams }: Props) {
     <>
       <TopBar title="Task Board" />
       <PageShell>
-        <div className="flex flex-col gap-4">
-          {/* Breadcrumb bar with inline progress */}
+        <div className="mx-auto flex max-w-[1500px] flex-col gap-4">
           <TaskBoardSelectors
             projects={projects}
             modules={modules}
@@ -38,7 +37,6 @@ export default async function TasksPage({ searchParams }: Props) {
             progress={moduleProgress ?? undefined}
           />
 
-          {/* Kanban board + slide-out detail panel */}
           <TaskBoardClient
             tasks={tasks}
             completedIdList={Array.from(completedIdsSet)}

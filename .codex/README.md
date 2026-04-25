@@ -45,12 +45,34 @@ powershell -NoProfile -ExecutionPolicy Bypass -File hooks/run-codex-from-setting
 
 The wrapper auto-loads repo-local settings and dashboard auth from `.codex/settings.json`, `.codex/settings.local.json`, and `apps/dashboard/.env.local`, then sends a bridge heartbeat, runs `codex`, and posts a session log to `/api/log`.
 
+Codex token usage is recorded as an estimate because Codex CLI/IDE does not expose provider billing tokens through a hook here. The wrapper logs:
+
+- `CodexPrompt` tool usage from prompt length
+- session `totalTokens` from prompt + overhead + duration-based activity estimate
+- estimated cost using `GCS_CODEX_TOKEN_PRICE_PER_MILLION` or the default in `.codex/settings.json`
+
+## Long-Running Bridge
+
+To keep this local machine online on the dashboard and sync new `logs/global-*.jsonl` entries until the terminal is closed:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File hooks/start-gcs-bridge.ps1
+```
+
+Successful heartbeats are quiet by default; the daemon prints startup, errors, and sync events. Add `--verbose` if you want every heartbeat response.
+
+The command is recorded in `.codex/settings.json` under `bridge.daemon.displayCommand`.
+
 ## IDE Chat Sync
 
-Codex IDE chat does not expose the same automatic hook lifecycle as Claude Code. To record the current IDE conversation on the dashboard, log a curated summary:
+Codex IDE chat does not expose the same automatic hook lifecycle as Claude Code. To record the current IDE conversation through the bridge daemon, log a curated summary:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File hooks/log-codex-ide-chat.ps1 "Discussed Codex local bridge logging and repo-local settings."
 ```
 
+The command appends a session event to `logs/global-YYYY-MM-DD.jsonl`. If `hooks/start-gcs-bridge.ps1` is running, it will sync that event automatically. Use `--post-now` only when you want the logger to POST directly without waiting for the daemon.
+
 The command is also recorded in `.codex/settings.json` under `ideChatSync.displayCommand`.
+
+IDE chat sync also records estimated `totalTokens` and `totalCostUSD` from the supplied summary plus a context multiplier, because this Codex IDE session does not expose the raw full transcript or provider billing tokens.

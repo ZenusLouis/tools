@@ -2,7 +2,7 @@ import "server-only";
 import { db } from "@/lib/db";
 
 export type ActivityItem = {
-  taskId: string;
+  taskId: string | null;
   project: string;
   date: string;
   commitHash: string | null;
@@ -21,17 +21,28 @@ export function timeAgo(dateStr: string): string {
   return `${days}d ago`;
 }
 
-export async function getRecentActivity(limit = 5): Promise<ActivityItem[]> {
-  const since = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+export async function getRecentActivity(limit = 5, workspaceId?: string, since?: Date): Promise<ActivityItem[]> {
+  const start = since ?? new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
 
   const sessions = await db.session.findMany({
-    where: { date: { gte: since } },
+    where: { date: { gte: start }, ...(workspaceId ? { workspaceId } : {}) },
     orderBy: { date: "desc" },
     take: limit * 3,
   });
 
   const items: ActivityItem[] = [];
   for (const s of sessions) {
+    if (s.tasksCompleted.length === 0) {
+      items.push({
+        taskId: null,
+        project: s.project,
+        date: s.date.toISOString(),
+        commitHash: s.commitHash,
+        note: s.sessionNotes ?? s.type,
+      });
+      if (items.length >= limit) return items;
+      continue;
+    }
     for (const taskId of s.tasksCompleted) {
       items.push({
         taskId,

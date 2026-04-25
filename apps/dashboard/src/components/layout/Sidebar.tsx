@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, FolderKanban, CheckSquare,
-  BarChart2, BookOpen, Server, Settings2, Terminal, MessageSquare, Wand2, Library,
+  LayoutDashboard, FolderKanban, CheckSquare, TerminalSquare,
+  BarChart2, BookOpen, Server, Settings2, MessageSquare, Wand2, Library, HelpCircle,
 } from "lucide-react";
 import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils/cn";
@@ -28,15 +28,17 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="flex flex-col w-60 min-h-screen shrink-0 border-r border-border bg-bg-base">
+    <aside className="flex w-60 min-h-screen shrink-0 flex-col border-r border-border bg-[#080d1b]">
       {/* Brand */}
-      <div className="flex items-center gap-3 px-6 py-5 mb-2">
-        <div className="w-8 h-8 rounded bg-accent flex items-center justify-center shrink-0">
-          <Terminal size={16} className="text-white" />
-        </div>
-        <div>
-          <div className="text-xl font-black text-accent tracking-tight leading-none">GCS</div>
-          <div className="text-[10px] uppercase tracking-widest text-text-muted font-bold mt-0.5">Developer Tools</div>
+      <div className="px-6 py-7">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-accent/40 bg-accent text-white shadow-[0_0_24px_rgba(99,102,241,0.25)]">
+            <TerminalSquare size={20} />
+          </div>
+          <div>
+            <div className="text-xl font-black leading-none tracking-tight text-accent">GCS Console</div>
+            <div className="mt-2 font-mono text-[10px] uppercase tracking-[0.24em] text-text-muted">v4.2.0-stable</div>
+          </div>
         </div>
       </div>
 
@@ -52,10 +54,10 @@ export function Sidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-all duration-150",
+                "flex items-center gap-3 px-6 py-3 font-mono text-xs uppercase tracking-[0.18em] transition-all duration-150",
                 active
-                  ? "bg-accent/10 text-accent border-r-2 border-accent"
-                  : "text-text-muted hover:text-text hover:bg-card/60 rounded-lg"
+                  ? "border-r-2 border-accent bg-accent/10 text-accent"
+                  : "text-text-muted hover:bg-card/50 hover:text-text"
               )}
             >
               <Icon size={18} className="shrink-0" />
@@ -66,14 +68,24 @@ export function Sidebar() {
       </nav>
 
       {/* Footer user */}
-      <div className="p-4 border-t border-border">
-        <div className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-card/60 transition-colors cursor-pointer">
+      <div className="mt-auto border-t border-border p-4">
+        <div className="mb-3 space-y-1">
+          <Link href="/knowledge" className="flex items-center gap-3 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted transition-colors hover:text-text">
+            <BookOpen size={16} />
+            Documentation
+          </Link>
+          <Link href="/settings" className="flex items-center gap-3 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted transition-colors hover:text-text">
+            <HelpCircle size={16} />
+            Support
+          </Link>
+        </div>
+        <div className="flex items-center gap-3 rounded-xl bg-card/40 px-4 py-3 transition-colors hover:bg-card/70">
           <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
             <span className="text-xs font-bold text-accent">N</span>
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-xs font-bold text-text truncate">{siteConfig.name}</div>
-            <div className="text-[10px] text-text-muted truncate">Premium Plan</div>
+            <div className="font-mono text-[10px] uppercase text-text-muted truncate">Pro Plan</div>
           </div>
         </div>
       </div>

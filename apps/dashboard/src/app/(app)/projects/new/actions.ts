@@ -128,7 +128,7 @@ function buildCodeIndex(projectName: string, fileMap: Map<string, string[]>): st
   const dirs = [...fileMap.keys()].sort();
   const totalFiles = [...fileMap.values()].reduce((s, f) => s + f.length, 0);
   const lines: string[] = [
-    `# Code Index: ${projectName} [HEADER — load on /start]`,
+    `# Code Index: ${projectName} [HEADER - load on /start]`,
     `Total: ${totalFiles} files | Last indexed: ${new Date().toISOString().slice(0, 10)}`,
     `---FULL INDEX BELOW---`,
     "",

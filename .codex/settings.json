@@ -9,7 +9,20 @@
   "bridge": {
     "deviceKeyEnv": "COMPUTERNAME",
     "deviceNameEnv": "COMPUTERNAME",
-    "userAgent": "GCS-Local-Bridge/1.0"
+    "userAgent": "GCS-Local-Bridge/1.0",
+    "daemon": {
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "hooks/start-gcs-bridge.ps1"
+      ],
+      "displayCommand": "powershell -NoProfile -ExecutionPolicy Bypass -File hooks/start-gcs-bridge.ps1",
+      "heartbeatIntervalSeconds": 30,
+      "syncIntervalSeconds": 5
+    }
   },
   "agent": {
     "provider": "codex",
@@ -34,7 +47,7 @@
     "heartbeatBeforeRun": true
   },
   "ideChatSync": {
-    "mode": "manual-summary",
+    "mode": "local-jsonl-queue",
     "command": "powershell",
     "args": [
       "-NoProfile",
@@ -44,10 +57,25 @@
       "hooks/log-codex-ide-chat.ps1"
     ],
     "displayCommand": "powershell -NoProfile -ExecutionPolicy Bypass -File hooks/log-codex-ide-chat.ps1 \"<summary>\"",
-    "note": "Codex IDE sessions do not expose automatic message hooks here, so this logs a curated summary/session note."
+    "syncPath": "logs/global-YYYY-MM-DD.jsonl",
+    "bridgeDaemonSync": true,
+    "tokenEstimate": {
+      "enabled": true,
+      "mode": "summary-plus-context",
+      "pricePerMillionUSDEnv": "GCS_CODEX_IDE_TOKEN_PRICE_PER_MILLION",
+      "defaultPricePerMillionUSD": 3.0
+    },
+    "note": "Codex IDE sessions do not expose automatic message hooks here, so this queues a curated summary/session note into local JSONL for the bridge daemon to sync."
   },
   "logging": {
     "enabled": true,
-    "localFallbackDir": "logs"
+    "localFallbackDir": "logs",
+    "codexTokenEstimate": {
+      "enabled": true,
+      "mode": "prompt-plus-duration",
+      "pricePerMillionUSDEnv": "GCS_CODEX_TOKEN_PRICE_PER_MILLION",
+      "defaultPricePerMillionUSD": 3.0,
+      "note": "Codex CLI/IDE does not expose provider token usage here. Wrapper records prompt tokens plus a conservative duration-based activity estimate."
+    }
   }
 }

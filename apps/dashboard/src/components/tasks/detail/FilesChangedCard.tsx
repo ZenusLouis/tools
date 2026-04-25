@@ -13,9 +13,9 @@ function vsCodeUri(filePath: string): string {
 export function FilesChangedCard({ files, projectPath }: Props) {
   if (files.length === 0) {
     return (
-      <div className="rounded-xl border bg-card p-5">
+      <div className="rounded-xl border border-border bg-card p-5">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-text-muted mb-3">Files Changed</h3>
-        <p className="text-xs text-text-muted italic">Not logged — enrich session entries with a <code className="font-mono text-accent">filesChanged</code> array to enable this.</p>
+        <p className="text-xs text-text-muted italic">Not logged. Enrich session entries with a <code className="font-mono text-accent">filesChanged</code> array to enable this.</p>
       </div>
     );
   }
@@ -24,7 +24,7 @@ export function FilesChangedCard({ files, projectPath }: Props) {
   const totalRemoved = files.reduce((s, f) => s + f.removed, 0);
 
   return (
-    <div className="rounded-xl border bg-card p-5">
+    <div className="rounded-xl border border-border bg-card p-5">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-text-muted">Files Changed</h3>
         <div className="flex gap-2 text-xs">

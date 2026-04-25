@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp, Layers, Settings2, Paintbrush, Cpu } from "lucide-react";
 import type { McpProfile, McpServer } from "@/lib/mcp";
+import { McpProfileForm } from "@/components/mcp/McpForms";
 
 interface Props {
   profiles: McpProfile[];
@@ -82,7 +83,7 @@ export function McpProfileViewer({ profiles, serverMap }: Props) {
                   })}
                 </div>
                 <div className="pt-2 border-t border-border flex justify-end">
-                  <button className="text-accent text-[10px] font-bold hover:underline">Manage profile</button>
+                  <McpProfileForm serverNames={Object.keys(serverMap)} />
                 </div>
               </div>
             )}

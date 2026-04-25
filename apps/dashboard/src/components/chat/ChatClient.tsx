@@ -4,7 +4,15 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 
 type Agent = { id: string; name: string; slug: string; provider: string; mode: string; model?: string; roleType: string };
 type ChatMessage = { id: string; role: "user" | "assistant" | "system" | "tool"; content: string; createdAt: string };
-type ChatSession = { id: string; title: string; agentRoleId: string | null; messages: ChatMessage[] };
+type ChatSession = {
+  id: string;
+  title: string;
+  agentRoleId: string | null;
+  provider?: string | null;
+  model?: string | null;
+  agentRole?: { name: string; slug: string; provider: string; roleType: string; mcpProfile?: string | null; generatedPaths?: Record<string, string> | null } | null;
+  messages: ChatMessage[];
+};
 type Diagnostics = {
   roles: number;
   apiKeys: string[];
@@ -75,8 +83,8 @@ export function ChatClient() {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6 min-h-[calc(100vh-7rem)]">
-      <aside className="rounded-xl border bg-card p-4">
+    <div className="mx-auto grid min-h-[calc(100vh-7rem)] max-w-[1600px] grid-cols-1 gap-6 xl:grid-cols-[320px_minmax(0,1fr)_300px]">
+      <aside className="rounded-xl border border-border bg-card p-4">
         <div className="mb-4">
           <p className="text-xs font-bold uppercase tracking-wide text-text-muted mb-2">Active Bots</p>
           {agents.length > 0 ? (
@@ -134,7 +142,7 @@ export function ChatClient() {
         </div>
       </aside>
 
-      <section className="rounded-xl border bg-card flex min-h-[600px] flex-col">
+      <section className="flex min-h-[600px] flex-col rounded-xl border border-border bg-card">
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {messages.length === 0 ? (
             <div className="flex h-full items-center justify-center p-6 text-sm text-text-muted">
@@ -187,6 +195,63 @@ export function ChatClient() {
           </div>
         </div>
       </section>
+
+      <aside className="rounded-xl border border-border bg-card p-4">
+        <p className="mb-3 text-xs font-bold uppercase tracking-wide text-text-muted">Context</p>
+        <div className="rounded-lg border border-border bg-bg-base p-3">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Selected Agent</p>
+          <p className="mt-1 text-sm font-bold text-text">{selectedSession?.agentRole?.name ?? mentionedAgent?.name ?? "None"}</p>
+          <p className="mt-1 font-mono text-[10px] text-accent">
+            @{selectedSession?.agentRole?.slug ?? mentionedAgent?.slug ?? "mention-agent"}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-1">
+            <span className="rounded bg-accent/10 px-2 py-0.5 text-[10px] font-bold uppercase text-accent">
+              {selectedSession?.provider ?? mentionedAgent?.provider ?? "provider"}
+            </span>
+            <span className="rounded bg-card px-2 py-0.5 text-[10px] text-text-muted">
+              {selectedSession?.model ?? mentionedAgent?.model ?? "local"}
+            </span>
+          </div>
+        </div>
+
+        <p className="mb-3 mt-5 text-xs font-bold uppercase tracking-wide text-text-muted">Attached Files</p>
+        <div className="space-y-2">
+          {["agents/registry.json", "agents/roles/*.json", "skills/**/SKILL.md"].map((file) => (
+            <div key={file} className="rounded-lg border border-border bg-bg-base px-3 py-2 font-mono text-[11px] text-text-muted">
+              {file}
+            </div>
+          ))}
+        </div>
+
+        <p className="mb-3 mt-5 text-xs font-bold uppercase tracking-wide text-text-muted">MCP Active Tools</p>
+        <div className="flex flex-wrap gap-2">
+          {(selectedSession?.agentRole?.mcpProfile ? [selectedSession.agentRole.mcpProfile] : diagnostics?.onlineDevices.map((d) => d.name) ?? []).slice(0, 6).map((tool) => (
+            <span key={tool} className="rounded-full border border-accent/30 bg-accent/10 px-2 py-1 text-[10px] text-accent">
+              {tool}
+            </span>
+          ))}
+          {!selectedSession?.agentRole?.mcpProfile && (diagnostics?.onlineDevices.length ?? 0) === 0 && (
+            <span className="text-xs text-text-muted">No active tools.</span>
+          )}
+        </div>
+
+        <p className="mb-3 mt-5 text-xs font-bold uppercase tracking-wide text-text-muted">Generated Artifacts</p>
+        <div className="space-y-2">
+          {Object.values(selectedSession?.agentRole?.generatedPaths ?? {}).length > 0 ? (
+            Object.values(selectedSession?.agentRole?.generatedPaths ?? {}).map((path) => (
+              <div key={path} className="rounded-lg border border-border bg-bg-base px-3 py-2 font-mono text-[11px] text-text-muted">
+                {path}
+              </div>
+            ))
+          ) : (
+            ["brief.md", "implementation.md", "review.md"].map((path) => (
+              <div key={path} className="rounded-lg border border-border bg-bg-base px-3 py-2 font-mono text-[11px] text-text-muted">
+                {path}
+              </div>
+            ))
+          )}
+        </div>
+      </aside>
     </div>
   );
 }

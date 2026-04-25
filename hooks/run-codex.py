@@ -17,6 +17,31 @@ load_dashboard_env()
 DASHBOARD_URL = os.environ.get("DASHBOARD_URL", "https://gcs-dashboard.zenus.dev").rstrip("/")
 BRIDGE_TOKEN = os.environ.get("BRIDGE_TOKEN", "")
 HOOK_SECRET = os.environ.get("HOOK_SECRET", "")
+TOKEN_PRICE_PER_MILLION = float(os.environ.get("GCS_CODEX_TOKEN_PRICE_PER_MILLION", "3.0"))
+
+
+def estimate_text_tokens(value: str) -> int:
+    text = value.strip()
+    if not text:
+        return 0
+    return max(1, round(len(text) / 4))
+
+
+def estimate_codex_tokens(args: list[str], duration_min: float) -> dict[str, int]:
+    prompt_text = " ".join(args)
+    prompt_tokens = estimate_text_tokens(prompt_text)
+    overhead_tokens = 250 if prompt_tokens else 0
+    # Without an extension transcript hook, output tokens are not observable here.
+    # Use a conservative duration-based activity estimate so Codex sessions
+    # appear in token analytics without pretending this is provider billing.
+    activity_tokens = min(4000, max(0, round(duration_min * 180)))
+    total_tokens = prompt_tokens + overhead_tokens + activity_tokens
+    return {
+        "promptTokens": prompt_tokens,
+        "overheadTokens": overhead_tokens,
+        "activityTokens": activity_tokens,
+        "totalTokens": total_tokens,
+    }
 
 
 def post_json(path: str, payload: dict) -> bool:
@@ -77,6 +102,22 @@ def main() -> int:
     started = time.time()
     result = subprocess.run([codex, *args], cwd=os.getcwd())
     duration_min = round((time.time() - started) / 60, 3)
+    token_estimate = estimate_codex_tokens(args, duration_min)
+
+    if token_estimate["promptTokens"] > 0:
+        post_json(
+            "/api/log",
+            {
+                "type": "tool",
+                "ts": datetime.now().isoformat(),
+                "tool": "CodexPrompt",
+                "tokens": token_estimate["promptTokens"],
+                "project": os.environ.get("GCS_PROJECT", "local"),
+                "provider": "codex",
+                "role": os.environ.get("GCS_ROLE") or "dev-implementer",
+                "model": os.environ.get("GCS_MODEL") or None,
+            },
+        )
 
     payload = {
         "type": "session",
@@ -88,7 +129,14 @@ def main() -> int:
         "tasksCompleted": [],
         "cwd": os.getcwd(),
         "durationMin": duration_min,
-        "sessionNotes": f"Codex local session exited with code {result.returncode}",
+        "totalTokens": token_estimate["totalTokens"],
+        "totalCostUSD": round(token_estimate["totalTokens"] * TOKEN_PRICE_PER_MILLION / 1_000_000, 6),
+        "sessionNotes": (
+            f"Codex local session exited with code {result.returncode}. "
+            f"Estimated tokens: prompt={token_estimate['promptTokens']}, "
+            f"overhead={token_estimate['overheadTokens']}, "
+            f"activity={token_estimate['activityTokens']}."
+        ),
         "risks": [] if result.returncode == 0 else [f"codex exit code {result.returncode}"],
     }
 

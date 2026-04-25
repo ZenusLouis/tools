@@ -7,7 +7,7 @@ interface Props {
 export function RisksCard({ risks }: Props) {
   if (risks.length === 0) {
     return (
-      <div className="rounded-xl border bg-card p-5">
+      <div className="rounded-xl border border-border bg-card p-5">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-text-muted mb-3">Risks & Assessment</h3>
         <p className="text-xs text-text-muted italic">No risks logged for this task.</p>
       </div>
@@ -15,7 +15,7 @@ export function RisksCard({ risks }: Props) {
   }
 
   return (
-    <div className="rounded-xl border bg-card p-5">
+    <div className="rounded-xl border border-border bg-card p-5">
       <h3 className="text-xs font-semibold uppercase tracking-wide text-text-muted mb-3">Risks & Assessment</h3>
       <div className="flex flex-col gap-2">
         {risks.map((risk, i) => (

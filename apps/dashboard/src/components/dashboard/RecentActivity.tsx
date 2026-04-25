@@ -42,7 +42,14 @@ function ActivityRow({ item }: { item: ActivityItem }) {
             {item.commitHash && <span className="font-mono text-xs text-accent">{item.commitHash.slice(0, 7)}</span>}
           </div>
           <div className="mt-0.5 text-xs text-text-muted">
-            {item.project} - <Link href={`/tasks/${item.taskId}`} className="font-mono text-accent hover:underline">{item.taskId}</Link>
+            {item.project}{" "}
+            {item.taskId ? (
+              <>
+                - <Link href={`/tasks/${item.taskId}`} className="font-mono text-accent hover:underline">{item.taskId}</Link>
+              </>
+            ) : (
+              <span className="font-mono text-accent">project event</span>
+            )}
           </div>
         </div>
         <span className="ml-2 whitespace-nowrap text-[10px] text-text-muted">{timeAgo(item.date)}</span>
@@ -53,33 +60,36 @@ function ActivityRow({ item }: { item: ActivityItem }) {
 
 export function RecentActivity({ items }: { items: ActivityItem[] }) {
   return (
-    <div className="h-full rounded-2xl border border-border bg-card p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <h3 className="flex items-center gap-2 font-semibold text-text">
+    <div className="h-full overflow-hidden rounded-xl border border-border bg-card">
+      <div className="border-b border-border px-6 py-5">
+        <h3 className="flex items-center gap-2 text-lg font-bold text-white">
           <History size={16} className="text-text-muted" />
           Activity Log
         </h3>
+        <p className="mt-1 text-xs text-text-muted">Live stream of system events</p>
+      </div>
+      <div className="flex items-center justify-end px-6 pt-4">
         <button className="text-text-muted transition-colors hover:text-text">
           <RefreshCw size={15} />
         </button>
       </div>
 
       {items.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border bg-bg-base px-4 py-8 text-center">
+        <div className="mx-6 mb-6 mt-2 rounded-xl border border-dashed border-border bg-bg-base px-4 py-8 text-center">
           <p className="text-sm font-medium text-text">No activity today</p>
           <p className="mt-1 text-xs text-text-muted">Run a local bridge or complete a task to populate this feed.</p>
         </div>
       ) : (
-        <div className="relative space-y-6 before:absolute before:bottom-2 before:left-3.5 before:top-2 before:w-px before:bg-border">
+        <div className="relative mx-6 mb-6 mt-2 space-y-7 before:absolute before:bottom-2 before:left-3.5 before:top-2 before:w-px before:bg-border">
           {items.map((item, index) => (
-            <ActivityRow key={`${item.taskId}-${index}`} item={item} />
+            <ActivityRow key={`${item.taskId ?? "project"}-${index}`} item={item} />
           ))}
         </div>
       )}
 
-      <button className="mt-8 w-full rounded-lg border border-border py-2 text-xs font-medium text-text-muted transition-colors hover:bg-card-hover hover:text-text">
-        View Activity History
-      </button>
+      <a href="/api/activity/export" className="block w-full border-t border-border py-4 text-center font-mono text-xs font-bold uppercase tracking-wider text-text-muted transition-colors hover:bg-card-hover hover:text-text">
+        Download_logs.json
+      </a>
     </div>
   );
 }

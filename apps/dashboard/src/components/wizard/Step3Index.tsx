@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle, AlertCircle, Loader } from "lucide-react";
+import { AlertCircle, CheckCircle, Loader } from "lucide-react";
 import { createProject } from "@/app/(app)/projects/new/actions";
 import type { WizardData } from "./WizardShell";
 
@@ -13,7 +13,7 @@ interface Props {
 
 type Status = "idle" | "running" | "done" | "error";
 
-const STEPS_LABELS = [
+const STEP_LABELS = [
   "Writing context.json",
   "Creating progress.json",
   "Scanning project files",
@@ -24,19 +24,14 @@ const STEPS_LABELS = [
 export function Step3Index({ data, onBack, onDone }: Props) {
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
-  const [stepIdx, setStepIdx] = useState(-1);
+  const [stepIndex, setStepIndex] = useState(-1);
 
   async function run() {
     setStatus("running");
     setError(null);
 
-    // Animate through steps while the server action runs
-    let i = 0;
     const interval = setInterval(() => {
-      setStepIdx((prev) => {
-        i = prev + 1;
-        return i < STEPS_LABELS.length - 1 ? i : prev;
-      });
+      setStepIndex((prev) => (prev < STEP_LABELS.length - 1 ? prev + 1 : prev));
     }, 600);
 
     const result = await createProject({
@@ -56,7 +51,7 @@ export function Step3Index({ data, onBack, onDone }: Props) {
     });
 
     clearInterval(interval);
-    setStepIdx(STEPS_LABELS.length - 1);
+    setStepIndex(STEP_LABELS.length - 1);
 
     if (result.error) {
       setStatus("error");
@@ -70,14 +65,15 @@ export function Step3Index({ data, onBack, onDone }: Props) {
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <h2 className="text-base font-semibold mb-1">Step 3 — Index & Create</h2>
-        <p className="text-xs text-text-muted">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-accent">Step 3</p>
+        <h2 className="mt-1 text-base font-semibold text-text">Index and Create</h2>
+        <p className="mt-1 text-xs text-text-muted">
           Creating <span className="font-mono text-accent">{data.name}</span> and scanning project files.
         </p>
       </div>
 
       {status === "idle" && (
-        <div className="rounded-lg border bg-bg-base px-4 py-3 flex flex-col gap-2 text-xs text-text-muted">
+        <div className="flex flex-col gap-2 rounded-lg border border-border bg-bg-base px-4 py-3 text-xs text-text-muted">
           <p className="font-medium text-text">Ready to index</p>
           <p>Path: <span className="font-mono">{data.folderPath}</span></p>
           <p>Framework: <span className="font-mono">{data.framework.join(", ") || "none detected"}</span></p>
@@ -87,21 +83,13 @@ export function Step3Index({ data, onBack, onDone }: Props) {
 
       {(status === "running" || status === "done") && (
         <div className="flex flex-col gap-2">
-          {STEPS_LABELS.map((label, i) => {
-            const isDone = status === "done" || i < stepIdx;
-            const isActive = status === "running" && i === stepIdx;
+          {STEP_LABELS.map((label, index) => {
+            const isDone = status === "done" || index < stepIndex;
+            const isActive = status === "running" && index === stepIndex;
             return (
               <div key={label} className="flex items-center gap-2.5 text-xs">
-                {isDone ? (
-                  <CheckCircle className="h-4 w-4 text-done shrink-0" />
-                ) : isActive ? (
-                  <Loader className="h-4 w-4 text-accent shrink-0 animate-spin" />
-                ) : (
-                  <div className="h-4 w-4 rounded-full border border-border shrink-0" />
-                )}
-                <span className={isDone ? "text-text" : isActive ? "text-accent" : "text-text-muted"}>
-                  {label}
-                </span>
+                {isDone ? <CheckCircle className="h-4 w-4 shrink-0 text-done" /> : isActive ? <Loader className="h-4 w-4 shrink-0 animate-spin text-accent" /> : <div className="h-4 w-4 shrink-0 rounded-full border border-border" />}
+                <span className={isDone ? "text-text" : isActive ? "text-accent" : "text-text-muted"}>{label}</span>
               </div>
             );
           })}
@@ -109,36 +97,16 @@ export function Step3Index({ data, onBack, onDone }: Props) {
       )}
 
       {status === "error" && (
-        <div className="rounded-lg border border-blocked/30 bg-blocked/10 px-4 py-3 flex gap-2">
-          <AlertCircle className="h-4 w-4 text-blocked shrink-0 mt-0.5" />
+        <div className="flex gap-2 rounded-lg border border-blocked/30 bg-blocked/10 px-4 py-3">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-blocked" />
           <p className="text-xs text-blocked">{error}</p>
         </div>
       )}
 
       <div className="flex justify-between">
-        <button
-          onClick={onBack}
-          disabled={status === "running"}
-          className="rounded-lg border text-xs font-medium px-4 py-2 hover:bg-card-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          ← Back
-        </button>
-        {status === "idle" && (
-          <button
-            onClick={run}
-            className="rounded-lg bg-accent text-white text-xs font-semibold px-4 py-2 hover:bg-accent/90 transition-colors"
-          >
-            Create Project
-          </button>
-        )}
-        {status === "error" && (
-          <button
-            onClick={run}
-            className="rounded-lg bg-accent text-white text-xs font-semibold px-4 py-2 hover:bg-accent/90 transition-colors"
-          >
-            Retry
-          </button>
-        )}
+        <button onClick={onBack} disabled={status === "running"} className="rounded-lg border border-border px-4 py-2 text-xs font-medium transition-colors hover:bg-card-hover disabled:cursor-not-allowed disabled:opacity-40">Back</button>
+        {status === "idle" && <button onClick={run} className="rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-accent/90">Create Project</button>}
+        {status === "error" && <button onClick={run} className="rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-accent/90">Retry</button>}
       </div>
     </div>
   );

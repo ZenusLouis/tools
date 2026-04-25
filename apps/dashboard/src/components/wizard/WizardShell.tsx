@@ -19,18 +19,20 @@ export type WizardData = {
 };
 
 const EMPTY: WizardData = {
-  folderPath: "", name: "", framework: [],
-  mcpProfile: "", figmaUrl: "", githubUrl: "",
-  linearUrl: "", brdPath: "", prdPath: "",
+  folderPath: "",
+  name: "",
+  framework: [],
+  mcpProfile: "",
+  figmaUrl: "",
+  githubUrl: "",
+  linearUrl: "",
+  brdPath: "",
+  prdPath: "",
 };
 
 const STEPS = ["Path", "Configure", "Index", "Done"];
 
-interface Props {
-  mcpProfiles: string[];
-}
-
-export function WizardShell({ mcpProfiles }: Props) {
+export function WizardShell({ mcpProfiles }: { mcpProfiles: string[] }) {
   const [step, setStep] = useState(1);
   const [data, setData] = useState<WizardData>(EMPTY);
 
@@ -39,32 +41,29 @@ export function WizardShell({ mcpProfiles }: Props) {
   }
 
   return (
-    <div className="max-w-xl mx-auto flex flex-col gap-6">
-      {/* Step indicator */}
-      <div className="flex items-center gap-0">
-        {STEPS.map((label, i) => {
-          const num = i + 1;
-          const done = step > num;
-          const active = step === num;
-          return (
-            <div key={label} className="flex items-center flex-1 last:flex-none">
-              <div className="flex items-center gap-2 shrink-0">
-                <div className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors
-                  ${done ? "bg-done/20 text-done" : active ? "bg-accent text-white" : "bg-border text-text-muted"}`}>
-                  {done ? "✓" : num}
+    <div className="mx-auto flex max-w-2xl flex-col gap-6">
+      <div className="rounded-xl border border-border bg-card p-4">
+        <div className="flex items-center gap-0">
+          {STEPS.map((label, index) => {
+            const num = index + 1;
+            const done = step > num;
+            const active = step === num;
+            return (
+              <div key={label} className="flex flex-1 items-center last:flex-none">
+                <div className="flex shrink-0 items-center gap-2">
+                  <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-colors ${done ? "bg-done/20 text-done" : active ? "bg-accent text-white" : "bg-border text-text-muted"}`}>
+                    {done ? "OK" : num}
+                  </div>
+                  <span className={`text-xs font-medium ${active ? "text-text" : "text-text-muted"}`}>{label}</span>
                 </div>
-                <span className={`text-xs font-medium ${active ? "text-text" : "text-text-muted"}`}>{label}</span>
+                {index < STEPS.length - 1 && <div className={`mx-3 h-px flex-1 ${step > num ? "bg-done/40" : "bg-border"}`} />}
               </div>
-              {i < STEPS.length - 1 && (
-                <div className={`flex-1 h-px mx-3 ${step > num ? "bg-done/40" : "bg-border"}`} />
-              )}
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
-      {/* Step content */}
-      <div className="rounded-xl border bg-card p-6">
+      <div className="rounded-xl border border-border bg-card p-6">
         {step === 1 && (
           <Step1Path
             initial={data.folderPath}
@@ -86,11 +85,7 @@ export function WizardShell({ mcpProfiles }: Props) {
           />
         )}
         {step === 3 && (
-          <Step3Index
-            data={data}
-            onBack={() => setStep(2)}
-            onDone={() => setStep(4)}
-          />
+          <Step3Index data={data} onBack={() => setStep(2)} onDone={() => setStep(4)} />
         )}
         {step === 4 && <Step4Done name={data.name} />}
       </div>

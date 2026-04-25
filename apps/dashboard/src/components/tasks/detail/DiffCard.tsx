@@ -19,9 +19,9 @@ function DiffBar({ added, removed }: { added: number; removed: number }) {
 export function DiffCard({ files }: Props) {
   if (files.length === 0) {
     return (
-      <div className="rounded-xl border bg-card p-5">
+      <div className="rounded-xl border border-border bg-card p-5">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-text-muted mb-3">Diff Summary</h3>
-        <p className="text-xs text-text-muted italic">Not logged — add <code className="font-mono text-accent">filesChanged</code> with +/- counts to session entries.</p>
+        <p className="text-xs text-text-muted italic">Not logged. Add <code className="font-mono text-accent">filesChanged</code> with +/- counts to session entries.</p>
       </div>
     );
   }
@@ -30,7 +30,7 @@ export function DiffCard({ files }: Props) {
   const totalRemoved = files.reduce((s, f) => s + f.removed, 0);
 
   return (
-    <div className="rounded-xl border bg-card p-5">
+    <div className="rounded-xl border border-border bg-card p-5">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-text-muted">Diff Summary</h3>
         <span className="text-xs text-text-muted">

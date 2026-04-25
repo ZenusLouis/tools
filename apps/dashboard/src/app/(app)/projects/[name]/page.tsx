@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Settings, FileText, CheckCircle2, Zap, GitCommit, RefreshCw, Palette, GitBranch, LayoutGrid, Database, Layers } from "lucide-react";
+import { Settings, FileText, CheckCircle2, Zap, GitCommit, Palette, GitBranch, LayoutGrid, Database, Layers, PanelRightOpen } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { PageShell } from "@/components/layout/PageShell";
+import { ProjectActionButtons } from "@/components/projects/ProjectActionButtons";
 import { getProjectDetail } from "@/lib/projects";
 import { getRecentActivity, timeAgo } from "@/lib/activity";
 import { requireCurrentUser } from "@/lib/auth";
@@ -32,20 +33,25 @@ export default async function ProjectOverviewPage({
               </span>
             ))}
             <Link
+              href={`/projects/${project.name}/detail`}
+              className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs text-text-muted hover:text-text hover:bg-card-hover transition-colors"
+            >
+              <PanelRightOpen size={13} />
+              Detail
+            </Link>
+            <Link
               href={`/projects/${project.name}/settings`}
               className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs text-text-muted hover:text-text hover:bg-card-hover transition-colors"
             >
               <Settings size={13} />
               Settings
             </Link>
-            <button className="flex items-center gap-1.5 rounded bg-accent px-4 py-1.5 text-sm font-bold text-white hover:bg-accent-hover transition-all active:scale-95">
-              Deploy
-            </button>
+            <ProjectActionButtons projectName={project.name} projectPath={project.projectPath} />
           </div>
         }
       />
       <PageShell>
-        {/* Stats row */}
+        <div className="mx-auto max-w-[1500px]">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-card p-5 border border-border rounded-xl">
             <div className="text-text-muted text-xs font-bold uppercase tracking-wider mb-1">
@@ -64,7 +70,7 @@ export default async function ProjectOverviewPage({
           </div>
           <div className="bg-card p-5 border border-border rounded-xl">
             <div className="text-text-muted text-xs font-bold uppercase tracking-wider mb-1">Active Status</div>
-            <div className="text-xl font-mono text-accent font-bold">{project.activeTask ?? "—"}</div>
+            <div className="text-xl font-mono text-accent font-bold">{project.activeTask ?? "--"}</div>
           </div>
           <div className="bg-card p-5 border border-border rounded-xl">
             <div className="text-text-muted text-xs font-bold uppercase tracking-wider mb-1">Last Indexed</div>
@@ -176,14 +182,14 @@ export default async function ProjectOverviewPage({
               </section>
             )}
 
-            {/* External Links — 3-col icon grid */}
+            {/* External Links */}
             <section className="bg-card border border-border rounded-xl p-6">
               <h2 className="text-xs font-bold text-text-muted uppercase tracking-widest mb-4">External Links</h2>
               {(!project.links.figma && !project.links.github && !project.links.linear) ? (
                 <p className="text-xs text-text-muted">
                   No links.{" "}
                   <Link href={`/projects/${project.name}/settings`} className="text-accent hover:underline">
-                    Add in settings →
+                    Add in settings
                   </Link>
                 </p>
               ) : (
@@ -234,7 +240,7 @@ export default async function ProjectOverviewPage({
               </section>
             )}
 
-            {/* Code Index — highlighted */}
+            {/* Code Index */}
             <section className="bg-accent/5 border border-accent/20 rounded-xl p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center shrink-0">
@@ -258,12 +264,10 @@ export default async function ProjectOverviewPage({
                   <div className="text-sm font-bold text-text">{project.lastIndexed.split("T")[0]}</div>
                 </div>
               )}
-              <button className="w-full py-2 bg-accent/10 border border-accent/30 text-accent rounded text-xs font-bold hover:bg-accent/20 transition-colors flex items-center justify-center gap-2">
-                <RefreshCw size={12} />
-                Reindex Project
-              </button>
+              <ProjectActionButtons projectName={project.name} projectPath={project.projectPath} />
             </section>
           </div>
+        </div>
         </div>
       </PageShell>
     </>

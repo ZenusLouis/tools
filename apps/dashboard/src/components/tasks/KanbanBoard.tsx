@@ -1,12 +1,12 @@
 import type { KanbanTask, TaskStatus } from "@/lib/tasks";
-import { TaskCard } from "./TaskCard";
 import { AddTaskForm } from "./AddTaskForm";
+import { TaskCard } from "./TaskCard";
 
-const COLUMNS: { status: TaskStatus; label: string; accentClass: string; dot: string; count?: number }[] = [
-  { status: "pending",     label: "PENDING",     accentClass: "border-t-pending",     dot: "bg-pending" },
+const COLUMNS: { status: TaskStatus; label: string; accentClass: string; dot: string }[] = [
+  { status: "pending", label: "PENDING", accentClass: "border-t-pending", dot: "bg-pending" },
   { status: "in-progress", label: "IN PROGRESS", accentClass: "border-t-in-progress", dot: "bg-in-progress" },
-  { status: "completed",   label: "COMPLETED",   accentClass: "border-t-done",        dot: "bg-done" },
-  { status: "blocked",     label: "BLOCKED",     accentClass: "border-t-blocked",     dot: "bg-blocked" },
+  { status: "completed", label: "COMPLETED", accentClass: "border-t-done", dot: "bg-done" },
+  { status: "blocked", label: "BLOCKED", accentClass: "border-t-blocked", dot: "bg-blocked" },
 ];
 
 export type AddTaskConfig = { projectName: string; moduleId: string };
@@ -33,20 +33,18 @@ function KanbanColumn({
   addTaskConfig?: AddTaskConfig;
 }) {
   return (
-    <div className={`flex flex-col rounded-xl border border-t-2 ${accentClass} bg-card min-h-96`}>
-      {/* Column header */}
-      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border">
-        <span className={`h-2 w-2 rounded-full ${dot} shrink-0`} />
-        <span className="text-[11px] font-bold tracking-widest text-text-muted uppercase">{label}</span>
-        <span className="ml-auto text-xs tabular-nums font-semibold text-text-muted bg-border rounded-full px-1.5 py-0.5 leading-none">
+    <div className={`flex min-h-96 flex-col rounded-xl border border-t-2 bg-card ${accentClass}`}>
+      <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
+        <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} />
+        <span className="text-[11px] font-bold uppercase tracking-widest text-text-muted">{label}</span>
+        <span className="ml-auto rounded-full bg-border px-1.5 py-0.5 text-xs font-semibold leading-none tabular-nums text-text-muted">
           {tasks.length}
         </span>
       </div>
 
-      {/* Tasks */}
-      <div className="flex flex-col gap-2 p-2.5 flex-1">
+      <div className="flex flex-1 flex-col gap-2 p-2.5">
         {tasks.length === 0 && !addTaskConfig && (
-          <p className="text-xs text-text-muted text-center mt-6 opacity-40">—</p>
+          <p className="mt-6 text-center text-xs text-text-muted opacity-40">--</p>
         )}
         {tasks.map((task) => (
           <TaskCard
@@ -80,20 +78,21 @@ export function KanbanBoard({
   onTaskClick?: (task: KanbanTask) => void;
   addTaskConfig?: AddTaskConfig;
 }) {
-  const byStatus = (status: TaskStatus) => tasks.filter((t) => t.status === status);
+  const byStatus = (status: TaskStatus) => tasks.filter((task) => task.status === status);
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-      {COLUMNS.map((col) => (
-        <KanbanColumn
-          key={col.status}
-          {...col}
-          tasks={byStatus(col.status)}
-          completedIds={completedIds}
-          selectedTaskId={selectedTaskId}
-          onTaskClick={onTaskClick}
-          addTaskConfig={addTaskConfig}
-        />
+    <div className="flex gap-4 overflow-x-auto pb-2">
+      {COLUMNS.map((column) => (
+        <div key={column.status} className="min-w-[290px] flex-1">
+          <KanbanColumn
+            {...column}
+            tasks={byStatus(column.status)}
+            completedIds={completedIds}
+            selectedTaskId={selectedTaskId}
+            onTaskClick={onTaskClick}
+            addTaskConfig={addTaskConfig}
+          />
+        </div>
       ))}
     </div>
   );

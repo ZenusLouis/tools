@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Check, Server, Palette, Database, Send, Code2 } from "lucide-react";
+import { Check, Code2, Copy, Database, Palette, Send, Server } from "lucide-react";
 import type { McpServer } from "@/lib/mcp";
 import { buildMcpAddCommand } from "@/lib/mcp-utils";
 
@@ -10,10 +10,10 @@ interface Props {
 }
 
 const SERVER_ICONS: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
-  github:   Code2,
-  figma:    Palette,
+  github: Code2,
+  figma: Palette,
   context7: Database,
-  postman:  Send,
+  postman: Send,
 };
 
 function CopyButton({ text }: { text: string }) {
@@ -27,10 +27,7 @@ function CopyButton({ text }: { text: string }) {
   }
 
   return (
-    <button
-      onClick={handleCopy}
-      className="text-[10px] font-bold text-text-muted border border-border px-3 py-1.5 rounded-lg hover:bg-card-hover hover:text-text transition-all flex items-center gap-2"
-    >
+    <button onClick={handleCopy} className="flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-[10px] font-bold text-text-muted transition-all hover:bg-card-hover hover:text-text">
       {copied ? <Check size={12} className="text-done" /> : <Copy size={12} />}
       Copy claude mcp add
     </button>
@@ -47,7 +44,7 @@ function statusForServer(server: McpServer): { label: string; dot: string; badge
 export function McpServerList({ servers }: Props) {
   if (servers.length === 0) {
     return (
-      <div className="rounded-xl border border-border bg-card px-5 py-6 text-sm text-text-muted text-center">
+      <div className="rounded-xl border border-border bg-card px-5 py-6 text-center text-sm text-text-muted">
         No servers found in <code className="font-mono text-accent">.mcp.json</code>
       </div>
     );
@@ -57,27 +54,25 @@ export function McpServerList({ servers }: Props) {
     <div className="space-y-3">
       {servers.map((server) => {
         const status = statusForServer(server);
-        const IconComp = SERVER_ICONS[server.name.toLowerCase()] ?? Server;
+        const Icon = SERVER_ICONS[server.name.toLowerCase()] ?? Server;
         return (
-          <div key={server.name} className="bg-card p-4 rounded-xl border border-border hover:border-border/80 transition-all group">
-            <div className="flex items-start justify-between">
-              <div className="flex gap-4">
-                <div className="w-10 h-10 rounded-lg bg-card-hover flex items-center justify-center shrink-0">
-                  <IconComp size={18} className="text-text" />
+          <div key={server.name} className="rounded-xl border border-border bg-card p-4 transition-all hover:border-border/80">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex min-w-0 gap-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-card-hover">
+                  <Icon size={18} className="text-text" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <h3 className="font-bold text-text">{server.name}</h3>
-                    <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full ${status.badge} text-[10px] font-bold uppercase tracking-wider`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${status.dot} ${status.pulse ? "animate-pulse" : ""}`} />
+                    <span className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${status.badge}`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${status.dot} ${status.pulse ? "animate-pulse" : ""}`} />
                       {status.label}
                     </span>
                   </div>
-                  <div className="flex items-center gap-3 mt-1 text-xs text-text-muted">
-                    <span className="bg-card-hover px-2 py-0.5 rounded text-[10px] font-mono border border-border">{server.type}</span>
-                    <span className="font-mono opacity-60 truncate max-w-48">
-                      {server.url ?? server.command ?? "—"}
-                    </span>
+                  <div className="mt-1 flex min-w-0 items-center gap-3 text-xs text-text-muted">
+                    <span className="rounded border border-border bg-card-hover px-2 py-0.5 font-mono text-[10px]">{server.type}</span>
+                    <span className="max-w-64 truncate font-mono opacity-70">{server.url ?? server.command ?? "--"}</span>
                   </div>
                 </div>
               </div>
