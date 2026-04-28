@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { readJSON, writeJSON } from "@/lib/fs/json";
 import { resolvePath, getClaudeRoot } from "@/lib/fs/resolve";
 import { ContextJSON } from "@/lib/settings";
+import { db } from "@/lib/db";
 
 type Registry = Record<string, string>;
 
@@ -62,9 +63,16 @@ export async function saveSettings(_prev: unknown, formData: FormData): Promise<
 }
 
 export async function removeProject(projectName: string): Promise<void> {
-  const registryPath = resolvePath("projects", "registry.json");
-  const registry = await readJSON<Registry>(registryPath);
-  delete registry[projectName];
-  await writeJSON(registryPath, registry);
+  // Remove from local registry
+  try {
+    const registryPath = resolvePath("projects", "registry.json");
+    const registry = await readJSON<Registry>(registryPath);
+    delete registry[projectName];
+    await writeJSON(registryPath, registry);
+  } catch { /* registry may not exist in cloud-only setup */ }
+
+  // Remove from DB
+  await db.project.delete({ where: { name: projectName } }).catch(() => null);
+
   redirect("/projects");
 }

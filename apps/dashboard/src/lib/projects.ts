@@ -43,7 +43,10 @@ async function countTasks(projectName: string) {
 }
 
 export async function getActiveProjects(workspaceId?: string): Promise<ProjectSummary[]> {
-  const projects = await db.project.findMany({ where: workspaceId ? { workspaceId } : undefined, orderBy: { updatedAt: "desc" } });
+  const projects = await db.project.findMany({
+    where: workspaceId ? { OR: [{ workspaceId }, { workspaceId: null }] } : undefined,
+    orderBy: { updatedAt: "desc" },
+  });
   return Promise.all(
     projects.map(async (p) => {
       const { total, completed } = await countTasks(p.name);
@@ -70,7 +73,12 @@ export async function getProjectDetail(name: string, workspaceId?: string): Prom
       },
     },
   });
-  if (!project || (workspaceId && project.workspaceId !== workspaceId)) return null;
+  if (!project || (workspaceId && project.workspaceId !== null && project.workspaceId !== workspaceId)) return null;
+
+  // Claim orphaned project (created before workspace was initialised)
+  if (workspaceId && project.workspaceId === null) {
+    await db.project.update({ where: { name }, data: { workspaceId } }).catch(() => null);
+  }
 
   let totalAll = 0;
   let completedAll = 0;
