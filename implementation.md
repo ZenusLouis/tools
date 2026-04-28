@@ -94,6 +94,12 @@
 - `apps/dashboard/src/app/actions/projects.ts`
 - `apps/dashboard/src/components/projects/LocalDevicePathsCard.tsx`
 - `apps/dashboard/src/components/projects/AnalyzeProjectButton.tsx`
+- `apps/dashboard/src/components/projects/ProjectActionButtons.tsx`
+- `apps/dashboard/src/lib/project-analysis.ts`
+- `apps/dashboard/src/lib/project-operations.ts`
+- `apps/dashboard/src/app/api/projects/[name]/analyze/route.ts`
+- `apps/dashboard/src/app/api/projects/[name]/deploy/route.ts`
+- `apps/dashboard/src/app/api/projects/[name]/reindex/route.ts`
 - `apps/dashboard/src/app/(app)/projects/[name]/page.tsx`
 - `apps/dashboard/src/app/(app)/projects/[name]/detail/page.tsx`
 - `apps/dashboard/src/proxy.ts`
@@ -168,6 +174,8 @@
 - Project overview and detail pages now show a Local Device Paths card with per-device folder path, online status, device key, and last sync time.
 - Wired the project Analyze buttons to a real server action instead of a dead detail link.
 - Analyze now generates a starter module/feature/task backlog from the linked BRD/PRD, sets the first analysis task active, records a project activity event, and queues `.gcs/progress.json` sync to local devices.
+- Replaced the client-imported Analyze Server Action with a stable `/api/projects/[name]/analyze` endpoint. The Analyze button now calls the API with `fetch`, avoiding Next's `failed-to-find-server-action` error after deploy/client build mismatches.
+- Moved project Deploy/Reindex UI actions to stable `/api/projects/[name]/deploy` and `/api/projects/[name]/reindex` endpoints for the same reason, so project action buttons no longer import Server Actions in client code.
 - Fixed bridge file sync auth by allowing `/api/bridge/file-actions/*` through the dashboard proxy. Before this, the route returned `401` before bridge-token verification, so local daemon could heartbeat but could not poll/write cloud-to-local file actions.
 - Created a cloud bridge token for this machine, stored it in gitignored `.codex/settings.local.json` under `env.BRIDGE_TOKEN`, restarted the local bridge, manually drained the existing queued OmniBooking file action, wrote `.gcs/context.json`, `.gcs/progress.json`, and `.gcs/code-index.md` to `D:\Code\OmniBooking`, then reported the action as succeeded.
 - Removed bridge-token guidance that suggested Windows environment variables; Chat and Settings now point to `.codex/settings.local.json`.

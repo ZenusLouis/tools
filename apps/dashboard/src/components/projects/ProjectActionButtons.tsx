@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from "react";
 import { Check, ExternalLink, Loader2, Rocket, RotateCw, TerminalSquare } from "lucide-react";
-import { deployProject, reindexProject } from "@/app/actions/projects";
 
 export function ProjectActionButtons({ projectName, projectPath }: { projectName: string; projectPath?: string | null }) {
   const [pending, startTransition] = useTransition();
@@ -11,10 +10,15 @@ export function ProjectActionButtons({ projectName, projectPath }: { projectName
   function run(action: "deploy" | "reindex") {
     setFeedback(null);
     startTransition(async () => {
-      const result = action === "deploy"
-        ? await deployProject(projectName)
-        : await reindexProject(projectName);
-      setFeedback(result.ok ? `${action === "deploy" ? "Deploy" : "Reindex"} event recorded.` : (result.error ?? "Action failed"));
+      try {
+        const response = await fetch(`/api/projects/${encodeURIComponent(projectName)}/${action}`, {
+          method: "POST",
+        });
+        const result = await response.json() as { ok: boolean; error?: string };
+        setFeedback(result.ok ? `${action === "deploy" ? "Deploy" : "Reindex"} event recorded.` : (result.error ?? "Action failed"));
+      } catch {
+        setFeedback("Action failed. Refresh and try again.");
+      }
     });
   }
 

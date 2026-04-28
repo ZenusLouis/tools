@@ -353,9 +353,72 @@ def _safe_local_target(project_path: str, relative_path: str) -> Path:
     return target
 
 
+def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
+    """Run `claude -p` to generate project modules/tasks and POST result to dashboard."""
+    import re
+    import subprocess
+    payload = action.get("payload") if isinstance(action.get("payload"), dict) else {}
+    project_name = str(payload.get("projectName") or "")
+    frameworks = payload.get("frameworks") or []
+    docs = payload.get("docs") or {}
+    callback_path = str(payload.get("callbackPath") or "")
+    action_id = str(action.get("id") or "")
+
+    brd_path = docs.get("brd") or docs.get("prd") or ""
+    brd_filename = Path(brd_path).name if brd_path else "no document"
+    fw = ", ".join(f for f in frameworks if f != "unknown") or "unknown stack"
+
+    prompt = (
+        f"You are a senior BA/Product Analyst. Generate a structured implementation plan.\n\n"
+        f"Project: {project_name}\nTech stack: {fw}\nDocument: {brd_filename}\n\n"
+        f"Generate 3-6 modules with features and tasks. Infer the domain from project name and document filename. "
+        f"Be specific — mention real entities, screens, and actions relevant to this project.\n\n"
+        f"Respond ONLY with valid JSON (no markdown, no explanation):\n"
+        f'{{"modules":[{{"name":"...","features":[{{"name":"...","tasks":["task1","task2"]}}]}}]}}'
+    )
+
+    result = subprocess.run(
+        ["claude", "-p", prompt, "--output-format", "json"],
+        capture_output=True, text=True, timeout=120,
+    )
+    if result.returncode != 0:
+        raise ValueError(f"claude -p failed: {result.stderr[:300]}")
+
+    # claude --output-format json wraps in {"type":"result","result":"...","cost_usd":...}
+    raw = result.stdout.strip()
+    try:
+        outer = json.loads(raw)
+        content = outer.get("result") or outer.get("content") or raw
+    except Exception:
+        content = raw
+
+    json_match = re.search(r'\{[\s\S]*\}', content)
+    if not json_match:
+        raise ValueError(f"No JSON found in claude output: {content[:200]}")
+
+    modules_data = json.loads(json_match.group())
+    modules = modules_data.get("modules", [])
+    if not modules:
+        raise ValueError("Empty modules in claude output")
+
+    # POST result back to dashboard
+    ok, detail = post_json_data(callback_path, {
+        "actionId": action_id,
+        "projectName": project_name,
+        "modules": modules,
+    }, timeout=15)
+    if not ok:
+        raise ValueError(f"Failed to post analysis result: {detail}")
+
+    return {"source": "local-claude", "modules": len(modules)}
+
+
 def execute_file_action(action: dict[str, Any]) -> dict[str, Any]:
     action_type = str(action.get("type") or "")
     payload = action.get("payload") if isinstance(action.get("payload"), dict) else {}
+
+    if action_type == "run_analysis":
+        return execute_analysis_action(action)
 
     if action_type != "sync_project_metadata":
         raise ValueError(f"unsupported file action type: {action_type}")
