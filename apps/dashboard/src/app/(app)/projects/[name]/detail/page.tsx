@@ -5,6 +5,7 @@ import { TopBar } from "@/components/layout/TopBar";
 import { PageShell } from "@/components/layout/PageShell";
 import { ProjectActionButtons } from "@/components/projects/ProjectActionButtons";
 import { ProjectConsoleActions } from "@/components/projects/ProjectConsoleActions";
+import { LocalDevicePathsCard } from "@/components/projects/LocalDevicePathsCard";
 import { getProjectDetail } from "@/lib/projects";
 import { getRecentActivity, timeAgo } from "@/lib/activity";
 import { requireCurrentUser } from "@/lib/auth";
@@ -91,9 +92,10 @@ export default async function ProjectDetailConsolePage({ params }: { params: Pro
                 lines={[
                   project.codeIndexExists ? "Code index available" : "Code index has not been synced",
                   project.lastIndexed ? `Last indexed ${project.lastIndexed.slice(0, 10)}` : "No index timestamp yet",
-                  project.projectPath ? "Local path registered" : "Local path missing",
+                  project.localPaths.length > 0 ? `${project.localPaths.length} device path${project.localPaths.length === 1 ? "" : "s"} registered` : "Local path missing",
                 ]}
               />
+              <LocalDevicePathsCard paths={project.localPaths} />
               <ProjectConsoleActions projectName={project.name} projectPath={project.projectPath} />
               <section className="rounded-xl border border-border bg-card p-6">
                 <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-white">

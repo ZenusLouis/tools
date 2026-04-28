@@ -91,6 +91,10 @@
 - `apps/dashboard/src/components/settings/GeneralSection.tsx`
 - `apps/dashboard/src/components/settings/SettingsForm.tsx`
 - `apps/dashboard/src/app/(app)/projects/[name]/settings/page.tsx`
+- `apps/dashboard/src/app/actions/projects.ts`
+- `apps/dashboard/src/components/projects/LocalDevicePathsCard.tsx`
+- `apps/dashboard/src/app/(app)/projects/[name]/page.tsx`
+- `apps/dashboard/src/app/(app)/projects/[name]/detail/page.tsx`
 
 ## Behavior
 
@@ -148,6 +152,8 @@
 - Project Settings now shows the primary fallback path plus all synced local device paths with device name, key, online status, and last sync time.
 - Project Settings save now queues `.gcs/context.json` updates to all known device-specific paths for that project, falling back to the legacy project path only when no device path exists.
 - Project detail path resolution now prefers the latest device-specific path and falls back to legacy `Project.path`.
+- Project deploy/reindex events now record `cwd` from the latest device-specific path instead of only the legacy project path.
+- Project overview and detail pages now show a Local Device Paths card with per-device folder path, online status, device key, and last sync time.
 
 ## Checks
 

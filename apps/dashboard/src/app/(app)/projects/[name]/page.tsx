@@ -8,6 +8,7 @@ import {
 import { TopBar } from "@/components/layout/TopBar";
 import { PageShell } from "@/components/layout/PageShell";
 import { ProjectActionButtons } from "@/components/projects/ProjectActionButtons";
+import { LocalDevicePathsCard } from "@/components/projects/LocalDevicePathsCard";
 import { getProjectDetail } from "@/lib/projects";
 import { getRecentActivity, timeAgo } from "@/lib/activity";
 import { requireCurrentUser } from "@/lib/auth";
@@ -216,6 +217,8 @@ export default async function ProjectOverviewPage({
                   </div>
                 </section>
               )}
+
+              <LocalDevicePathsCard paths={project.localPaths} />
 
               {/* External Links */}
               <section className="bg-card border border-border rounded-xl p-5">
