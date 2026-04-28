@@ -16,6 +16,7 @@ export type WizardData = {
   linearUrl: string;
   brdPath: string;
   prdPath: string;
+  localSyncQueued: boolean;
 };
 
 const EMPTY: WizardData = {
@@ -28,6 +29,7 @@ const EMPTY: WizardData = {
   linearUrl: "",
   brdPath: "",
   prdPath: "",
+  localSyncQueued: false,
 };
 
 const STEPS = ["Path", "Configure", "Index", "Done"];
@@ -85,9 +87,16 @@ export function WizardShell({ mcpProfiles }: { mcpProfiles: string[] }) {
           />
         )}
         {step === 3 && (
-          <Step3Index data={data} onBack={() => setStep(2)} onDone={() => setStep(4)} />
+          <Step3Index
+            data={data}
+            onBack={() => setStep(2)}
+            onDone={(name, localSyncQueued) => {
+              patch({ ...(name ? { name } : {}), localSyncQueued: Boolean(localSyncQueued) });
+              setStep(4);
+            }}
+          />
         )}
-        {step === 4 && <Step4Done name={data.name} />}
+        {step === 4 && <Step4Done name={data.name} folderPath={data.folderPath} localSyncQueued={data.localSyncQueued} />}
       </div>
     </div>
   );

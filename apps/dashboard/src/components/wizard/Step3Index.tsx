@@ -8,7 +8,7 @@ import type { WizardData } from "./WizardShell";
 interface Props {
   data: WizardData;
   onBack: () => void;
-  onDone: () => void;
+  onDone: (name?: string, localSyncQueued?: boolean) => void;
 }
 
 type Status = "idle" | "running" | "done" | "error";
@@ -58,7 +58,7 @@ export function Step3Index({ data, onBack, onDone }: Props) {
       setError(result.error);
     } else {
       setStatus("done");
-      setTimeout(onDone, 800);
+      setTimeout(() => onDone(result.name, result.localSyncQueued), 800);
     }
   }
 

@@ -6,10 +6,11 @@ function ProjectCard({ project }: { project: ProjectSummary }) {
   const pct = project.progressPercent;
   const isComplete = pct === 100;
   const isActive = Boolean(project.activeTask);
+  const projectHref = `/projects/${encodeURIComponent(project.name)}`;
 
   return (
     <Link
-      href={`/projects/${project.name}`}
+      href={projectHref}
       className="group flex flex-col gap-4 rounded-xl border border-border bg-card p-5 transition-colors hover:border-accent/40 hover:bg-card-hover"
     >
       <div className="flex items-start justify-between gap-3">

@@ -22,10 +22,11 @@ function CircularProgress({ percent }: { percent: number }) {
 export function ProjectCard({ project }: { project: ProjectSummary }) {
   const isActive = Boolean(project.activeTask);
   const isComplete = project.progressPercent === 100;
+  const projectHref = `/projects/${encodeURIComponent(project.name)}`;
 
   return (
     <article className="group flex min-h-56 flex-col overflow-hidden rounded-xl border border-border bg-card transition-all hover:border-accent/40 hover:bg-card-hover">
-      <Link href={`/projects/${project.name}`} className="flex flex-1 flex-col p-6">
+      <Link href={projectHref} className="flex flex-1 flex-col p-6">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className={`h-2 w-2 rounded-full ${isActive ? "bg-done animate-pulse" : isComplete ? "bg-accent" : "bg-in-progress"}`} />
@@ -63,11 +64,11 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
       </Link>
 
       <div className="flex items-center justify-between border-t border-border bg-bg-base/35 px-6 py-3">
-        <Link href={`/projects/${project.name}`} className="inline-flex items-center gap-1.5 text-xs font-bold text-accent transition-colors hover:text-text">
+        <Link href={projectHref} className="inline-flex items-center gap-1.5 text-xs font-bold text-accent transition-colors hover:text-text">
           View details
           <ArrowRight size={13} />
         </Link>
-        <Link href={`/projects/${project.name}/settings`} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold text-text-muted transition-colors hover:bg-card-hover hover:text-text">
+        <Link href={`${projectHref}/settings`} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold text-text-muted transition-colors hover:bg-card-hover hover:text-text">
           <Settings size={13} />
           Settings
         </Link>

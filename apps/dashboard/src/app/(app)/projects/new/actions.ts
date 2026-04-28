@@ -10,6 +10,24 @@ import { db } from "@/lib/db";
 
 type Registry = Record<string, string>;
 
+function slugFromProjectPath(folderPath: string): string {
+  const normalized = folderPath.trim().replace(/\\/g, "/").replace(/\/+$/g, "");
+  const lastSegment = normalized.split("/").filter(Boolean).pop() ?? "";
+  return lastSegment
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function sanitizeProjectName(name: string, folderPath: string): string {
+  const lastNameSegment = name.trim().replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? "";
+  const slug = lastNameSegment
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || slugFromProjectPath(folderPath);
+}
+
 // ── Step 1: Scan folder ──────────────────────────────────────────────────────
 
 export type ScanResult = {
@@ -73,8 +91,8 @@ async function detectFramework(folderPath: string): Promise<string[]> {
 
 export async function scanProject(folderPath: string): Promise<ScanResult> {
   const trimmedPath = folderPath.trim();
-  const fallbackName = path.basename(path.normalize(trimmedPath)).toLowerCase().replace(/\s+/g, "-");
-  if (!trimmedPath || !fallbackName || fallbackName === "." || fallbackName === path.parse(trimmedPath).root.toLowerCase()) {
+  const fallbackName = slugFromProjectPath(trimmedPath);
+  if (!trimmedPath || !fallbackName) {
     return { name: "", framework: [], error: "Enter a project folder path" };
   }
 
@@ -164,9 +182,12 @@ export type CreateProjectInput = {
   tools: { figma?: string; github?: string; linear?: string };
 };
 
-export async function createProject(input: CreateProjectInput): Promise<{ error?: string }> {
+export async function createProject(input: CreateProjectInput): Promise<{ error?: string; name?: string; localSyncQueued?: boolean }> {
   const user = await requireCurrentUser();
-  const { name, folderPath, framework, mcpProfile, docs, tools } = input;
+  const { folderPath, framework, mcpProfile, docs, tools } = input;
+  const name = sanitizeProjectName(input.name, folderPath);
+
+  if (!name) return { error: "Project name could not be detected from the folder path" };
 
   // Check name uniqueness
   const registryPath = resolvePath("projects", "registry.json");
@@ -183,14 +204,14 @@ export async function createProject(input: CreateProjectInput): Promise<{ error?
   const progressPath = resolvePath(projectDir, "progress.json");
   const codeIndexPath = resolvePath(projectDir, "code-index.md");
 
-  // Write context.json
   const filteredDocs = Object.fromEntries(
     Object.entries(docs).filter(([, v]) => v?.trim())
   );
   const filteredTools = Object.fromEntries(
     Object.entries(tools).filter(([, v]) => v?.trim())
   );
-  await writeJSON(ctxPath, {
+
+  const contextPayload = {
     name,
     path: folderPath,
     framework,
@@ -200,10 +221,9 @@ export async function createProject(input: CreateProjectInput): Promise<{ error?
     env: { required: [], envFile: ".env.local" },
     lastIndexed: new Date().toISOString().slice(0, 10),
     activeTask: null,
-  });
+  };
 
-  // Write empty progress.json
-  await writeJSON(progressPath, {
+  const progressPayload = {
     project: name,
     version: "1.0",
     activeTask: null,
@@ -215,7 +235,13 @@ export async function createProject(input: CreateProjectInput): Promise<{ error?
       G3: { status: "pending" },
       G4: { status: "pending" },
     },
-  });
+  };
+
+  // Write context.json
+  await writeJSON(ctxPath, contextPayload);
+
+  // Write empty progress.json
+  await writeJSON(progressPath, progressPayload);
 
   // Build code-index
   const fileMap = new Map<string, string[]>();
@@ -251,5 +277,30 @@ export async function createProject(input: CreateProjectInput): Promise<{ error?
     },
   });
 
-  return {};
+  await db.bridgeFileAction.create({
+    data: {
+      workspaceId: user.workspaceId,
+      type: "sync_project_metadata",
+      payload: {
+        projectName: name,
+        projectPath: folderPath,
+        files: [
+          {
+            relativePath: ".gcs/context.json",
+            content: JSON.stringify(contextPayload, null, 2),
+          },
+          {
+            relativePath: ".gcs/progress.json",
+            content: JSON.stringify(progressPayload, null, 2),
+          },
+          {
+            relativePath: ".gcs/code-index.md",
+            content: indexContent,
+          },
+        ],
+      },
+    },
+  });
+
+  return { name, localSyncQueued: true };
 }

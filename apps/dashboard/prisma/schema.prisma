@@ -146,6 +146,7 @@ model Workspace {
   chatSessions  ChatSession[]
   sessions      Session[]
   toolUsages    ToolUsage[]
+  bridgeFileActions BridgeFileAction[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
@@ -174,9 +175,33 @@ model BridgeDevice {
   metadata       Json     @default("{}")
   workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   tokens         BridgeToken[]
+  fileActions    BridgeFileAction[]
 
   @@unique([workspaceId, deviceKey])
   @@index([workspaceId])
+}
+
+model BridgeFileAction {
+  id          String   @id @default(cuid())
+  workspaceId String
+  deviceId    String?
+  type        String
+  status      String   @default("pending")
+  payload     Json     @default("{}")
+  result      Json?
+  error       String?
+  claimedAt   DateTime?
+  completedAt DateTime?
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  device      BridgeDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workspaceId])
+  @@index([deviceId])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
 }
 
 model BridgeToken {

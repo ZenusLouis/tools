@@ -73,6 +73,15 @@
 - `.codex/settings.json`
 - `agents/BRIDGE.md`
 - `.codex/README.md`
+- `apps/dashboard/src/components/wizard/Step3Index.tsx`
+- `apps/dashboard/src/components/wizard/Step4Done.tsx`
+- `apps/dashboard/src/components/wizard/WizardShell.tsx`
+- `apps/dashboard/src/components/dashboard/ActiveProjectsList.tsx`
+- `apps/dashboard/src/components/projects/ProjectCard.tsx`
+- `apps/dashboard/prisma/schema.prisma`
+- `apps/dashboard/prisma/migrations/20260428160000_bridge_file_actions/migration.sql`
+- `apps/dashboard/src/app/api/bridge/file-actions/pending/route.ts`
+- `apps/dashboard/src/app/api/bridge/file-actions/result/route.ts`
 
 ## Behavior
 
@@ -116,6 +125,12 @@
 - Made bridge state writes atomic to avoid null/corrupt `.gcs_bridge_state.json` files after interruption.
 - Added `hooks/ensure-gcs-bridge.ps1` and wired Codex settings/docs to use it so a single command starts the bridge in the background only when it is not already running.
 - Added Codex daily token baselines using `thread_id + yyyy-mm-dd` state keys, while keeping legacy thread baselines for migration, so long-running Codex threads can be accounted by day.
+- Fixed Windows project path scanning on hosted/Linux runtimes by deriving project slugs from both `\` and `/` separators, so `D:\Code\OmniBooking` becomes `omnibooking` instead of a path-like project name.
+- Sanitized project names server-side during create and returned the final name to the wizard, then URL-encoded project links to avoid route breaks for existing path-like names.
+- Clarified the project-create Done screen: generated files are GCS workspace metadata under `projects/<name>/...`; the source folder is not modified, especially when the dashboard runs on hosted infrastructure.
+- Added cloud-to-local bridge file actions: the dashboard queues `BridgeFileAction` records, local bridge polls pending actions, writes safe relative files under the local project folder, and reports success/failure back to cloud.
+- Project creation now queues local `.gcs/context.json`, `.gcs/progress.json`, and `.gcs/code-index.md` writes for the local bridge.
+- Added bridge file-action APIs at `/api/bridge/file-actions/pending` and `/api/bridge/file-actions/result`.
 
 ## Checks
 
@@ -123,6 +138,8 @@
 - `npm run build`
 - `python -m py_compile hooks/gcs_bridge_daemon.py hooks/token-tracker.py`
 - `powershell -NoProfile -ExecutionPolicy Bypass -File hooks/ensure-gcs-bridge.ps1`
+- `npx prisma generate`
+- `npx prisma migrate deploy`
 
 ## Gaps
 

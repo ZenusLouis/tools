@@ -17,6 +17,7 @@ import time
 import urllib.request
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from gcs_env import ROOT, bridge_user_agent, load_dashboard_env
 
@@ -52,6 +53,19 @@ def post_json(path: str, payload: dict, timeout: int = 8) -> tuple[bool, str]:
             return 200 <= resp.status < 300, body
     except Exception as exc:
         return False, str(exc)
+
+
+def post_json_data(path: str, payload: dict, timeout: int = 8) -> tuple[bool, dict[str, Any] | str]:
+    ok, body = post_json(path, payload, timeout=timeout)
+    if not ok:
+        return False, body
+    try:
+        data = json.loads(body)
+    except Exception:
+        return False, body
+    if not isinstance(data, dict):
+        return False, body
+    return True, data
 
 
 def heartbeat(verbose: bool) -> bool:
@@ -276,6 +290,87 @@ def sync_codex_threads(state: dict[str, int]) -> int:
     return sent
 
 
+def _safe_local_target(project_path: str, relative_path: str) -> Path:
+    if not project_path:
+        raise ValueError("projectPath is required")
+    rel = Path(relative_path)
+    if rel.is_absolute() or ".." in rel.parts:
+        raise ValueError(f"unsafe relativePath: {relative_path}")
+    base = Path(project_path).expanduser().resolve()
+    target = (base / rel).resolve()
+    try:
+        target.relative_to(base)
+    except ValueError as exc:
+        raise ValueError(f"target escapes projectPath: {relative_path}") from exc
+    return target
+
+
+def execute_file_action(action: dict[str, Any]) -> dict[str, Any]:
+    action_type = str(action.get("type") or "")
+    payload = action.get("payload") if isinstance(action.get("payload"), dict) else {}
+
+    if action_type != "sync_project_metadata":
+        raise ValueError(f"unsupported file action type: {action_type}")
+
+    project_path = str(payload.get("projectPath") or "")
+    files = payload.get("files")
+    if not isinstance(files, list):
+        raise ValueError("payload.files must be a list")
+
+    written: list[str] = []
+    for item in files:
+        if not isinstance(item, dict):
+            continue
+        relative_path = str(item.get("relativePath") or "")
+        content = item.get("content")
+        if not relative_path or not isinstance(content, str):
+            continue
+        target = _safe_local_target(project_path, relative_path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
+        written.append(str(target))
+
+    return {"written": written, "count": len(written)}
+
+
+def poll_file_actions() -> int:
+    device_key = os.environ.get("GCS_DEVICE_KEY", socket.gethostname().lower())
+    ok, data = post_json_data("/api/bridge/file-actions/pending", {"deviceKey": device_key, "limit": 5}, timeout=8)
+    if not ok:
+        print(f"[file-actions] poll failed: {str(data)[:160]}", flush=True)
+        return 0
+
+    actions = data.get("actions") if isinstance(data, dict) else []
+    if not isinstance(actions, list) or not actions:
+        return 0
+
+    completed = 0
+    for action in actions:
+        if not isinstance(action, dict) or not action.get("id"):
+            continue
+        action_id = str(action["id"])
+        try:
+            result = execute_file_action(action)
+            ok, detail = post_json_data(
+                "/api/bridge/file-actions/result",
+                {"id": action_id, "status": "succeeded", "result": result},
+                timeout=8,
+            )
+            if ok:
+                completed += 1
+                print(f"[file-actions] completed {action_id}: {result.get('count', 0)} file(s)", flush=True)
+            else:
+                print(f"[file-actions] result failed {action_id}: {str(detail)[:160]}", flush=True)
+        except Exception as exc:
+            post_json_data(
+                "/api/bridge/file-actions/result",
+                {"id": action_id, "status": "failed", "error": str(exc)},
+                timeout=8,
+            )
+            print(f"[file-actions] failed {action_id}: {exc}", flush=True)
+    return completed
+
+
 def sync_logs(state: dict[str, int], from_end: bool) -> int:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     total = 0
@@ -301,6 +396,7 @@ def main() -> int:
     next_heartbeat = 0.0
     next_sync = 0.0
     next_codex_sync = 0.0
+    next_file_action_poll = 0.0
     from_end = not args.from_start
 
     print("GCS bridge daemon started. Press Ctrl+C to stop.", flush=True)
@@ -320,6 +416,9 @@ def main() -> int:
                 sync_codex_threads(state)
                 save_state(state)
                 next_codex_sync = now + 15  # poll Codex SQLite every 15s
+            if now >= next_file_action_poll:
+                poll_file_actions()
+                next_file_action_poll = now + 5
             time.sleep(0.5)
     except KeyboardInterrupt:
         print("\nGCS bridge daemon stopped.", flush=True)
