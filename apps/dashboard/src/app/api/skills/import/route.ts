@@ -28,22 +28,54 @@ function assertSafeRelative(input: string) {
   return normalized;
 }
 
+function githubRawUrl(repoUrl: string, filePath: string): string {
+  // https://github.com/owner/repo → https://raw.githubusercontent.com/owner/repo/HEAD/<path>
+  const match = repoUrl.match(/^https?:\/\/github\.com\/([^/]+\/[^/]+)/);
+  if (!match) throw new Error(`Cannot derive raw URL from: ${repoUrl}`);
+  return `https://raw.githubusercontent.com/${match[1]}/HEAD/${filePath}`;
+}
+
+async function readSkillText(sourceFile: string, repoUrl: string, filePath: string): Promise<string> {
+  try {
+    return await fs.readFile(sourceFile, "utf-8");
+  } catch {
+    // Cache miss — fetch from GitHub
+    const rawUrl = githubRawUrl(repoUrl, filePath);
+    const res = await fetch(rawUrl, { signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) throw new Error(`GitHub fetch failed: ${res.status} ${rawUrl}`);
+    return res.text();
+  }
+}
+
 export async function POST(req: NextRequest) {
   const user = await requireCurrentUser();
   const parsed = ImportSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues }, { status: 400 });
 
-  const inventory = JSON.parse(await fs.readFile(resolvePath("skills", "imported", "github-inventory.json"), "utf-8")) as Inventory;
+  let inventory: Inventory;
+  try {
+    inventory = JSON.parse(await fs.readFile(resolvePath("skills", "imported", "github-inventory.json"), "utf-8")) as Inventory;
+  } catch {
+    return NextResponse.json({ error: "Skill inventory not available" }, { status: 503 });
+  }
+
   const source = inventory.sources?.find((item) => item.name === parsed.data.sourceName);
   const skill = source?.skills?.find((item) => item.name === parsed.data.name && item.path === parsed.data.sourcePath);
-  if (!source || !skill) return NextResponse.json({ error: "Recommended skill not found in inventory" }, { status: 404 });
+  if (!source || !skill) return NextResponse.json({ error: "Skill not found in inventory" }, { status: 404 });
 
   const safeSourcePath = assertSafeRelative(skill.path);
   const sourceFile = resolvePath("skills", ".cache", "github-sources", parsed.data.sourceName, safeSourcePath);
   const targetDir = resolvePath("skills", "imported", "github-sources", parsed.data.name);
   const targetFile = path.join(targetDir, "SKILL.md");
 
-  const text = await fs.readFile(sourceFile, "utf-8");
+  let text: string;
+  try {
+    text = await readSkillText(sourceFile, source.url, safeSourcePath);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: `Could not fetch skill: ${msg}` }, { status: 502 });
+  }
+
   await fs.mkdir(targetDir, { recursive: true });
   await fs.writeFile(targetFile, text, "utf-8");
 

@@ -134,8 +134,9 @@ export default async function ProjectOverviewPage({
               ) : (
                 <div className="space-y-1">
                   {activity.map((item, i) => (
-                    <div
+                    <Link
                       key={i}
+                      href={item.taskId ? `/tasks/${item.taskId}` : `/projects/${project.name}/detail`}
                       className="flex items-start gap-4 p-3 rounded-lg hover:bg-card-hover transition-colors border border-transparent hover:border-border"
                     >
                       <div className={`w-8 h-8 rounded flex items-center justify-center mt-0.5 shrink-0 ${item.commitHash ? "bg-accent/10" : "bg-done/10"}`}>
@@ -146,9 +147,9 @@ export default async function ProjectOverviewPage({
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between">
-                          <Link href={`/tasks/${item.taskId}`} className="text-sm font-bold text-text hover:text-accent transition-colors">
-                            {item.taskId}
-                          </Link>
+                          <span className="text-sm font-bold text-text transition-colors">
+                            {item.taskId ?? "Project event"}
+                          </span>
                           <span className="text-[10px] text-text-muted whitespace-nowrap ml-2">{timeAgo(item.date)}</span>
                         </div>
                         <div className="flex items-center gap-2 mt-0.5">
@@ -160,7 +161,7 @@ export default async function ProjectOverviewPage({
                           )}
                         </div>
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               )}

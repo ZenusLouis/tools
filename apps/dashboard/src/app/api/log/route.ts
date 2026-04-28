@@ -14,6 +14,7 @@ const ToolEntrySchema = z.object({
   provider: z.enum(["claude", "codex", "chatgpt"]).default("claude"),
   role: z.string().optional(),
   model: z.string().optional(),
+  deviceKey: z.string().optional(),
 });
 
 const SessionEntrySchema = z.object({
@@ -24,6 +25,7 @@ const SessionEntrySchema = z.object({
   provider: z.enum(["claude", "codex", "chatgpt"]).default("claude"),
   role: z.string().optional(),
   model: z.string().optional(),
+  deviceKey: z.string().optional(),
   transcriptPath: z.string().optional(),
   cwd: z.string().optional(),
   commitHash: z.string().nullable().optional(),
@@ -66,10 +68,15 @@ export async function POST(req: NextRequest) {
     bridgeCtx = workspace ? { workspaceId: workspace.id, deviceId: null, tokenId: null } : null;
   }
 
+  const workspaceId = bridgeCtx?.workspaceId;
+  const deviceKey = entry.deviceKey;
+
+  const writes: Promise<unknown>[] = [];
+
   if (entry.type === "tool") {
-    await db.toolUsage.create({
+    writes.push(db.toolUsage.create({
       data: {
-        workspaceId: bridgeCtx?.workspaceId,
+        workspaceId,
         deviceId: bridgeCtx?.deviceId,
         provider: entry.provider,
         role: entry.role,
@@ -78,11 +85,11 @@ export async function POST(req: NextRequest) {
         tool: entry.tool,
         tokens: entry.tokens,
       },
-    });
+    }));
   } else {
-    await db.session.create({
+    writes.push(db.session.create({
       data: {
-        workspaceId: bridgeCtx?.workspaceId,
+        workspaceId,
         deviceId: bridgeCtx?.deviceId,
         provider: entry.provider,
         role: entry.role,
@@ -101,8 +108,32 @@ export async function POST(req: NextRequest) {
         risks: entry.risks,
         lessonSaved: entry.lessonSaved ?? null,
       },
-    });
+    }));
   }
+
+  // Auto-heartbeat: upsert BridgeDevice so agent shows "online" without a separate daemon
+  if (workspaceId && deviceKey) {
+    const isClaude = entry.provider === "claude";
+    const isCodex = entry.provider === "codex";
+    writes.push(db.bridgeDevice.upsert({
+      where: { workspaceId_deviceKey: { workspaceId, deviceKey } },
+      create: {
+        workspaceId,
+        deviceKey,
+        name: deviceKey,
+        claudeAvailable: isClaude,
+        codexAvailable: isCodex,
+        lastSeenAt: new Date(),
+      },
+      update: {
+        lastSeenAt: new Date(),
+        ...(isClaude && { claudeAvailable: true }),
+        ...(isCodex && { codexAvailable: true }),
+      },
+    }));
+  }
+
+  await Promise.all(writes);
 
   return NextResponse.json({ ok: true }, { status: 201 });
 }

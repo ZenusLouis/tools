@@ -7,9 +7,11 @@ import { editLessonAction, deleteLessonAction } from "@/app/(app)/knowledge/acti
 
 interface Props {
   lesson: Lesson;
+  isSelected?: boolean;
+  onSelect?: (lesson: Lesson) => void;
 }
 
-export function LessonCard({ lesson }: Props) {
+export function LessonCard({ lesson, isSelected = false, onSelect }: Props) {
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editText, setEditText] = useState(lesson.text);
@@ -47,7 +49,19 @@ export function LessonCard({ lesson }: Props) {
   }
 
   return (
-    <div className={`group rounded-lg border bg-card px-3.5 py-2.5 flex items-start gap-2 transition-opacity ${isPending ? "opacity-50" : ""}`}>
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => {
+        if (!editing && !confirmDelete) onSelect?.(lesson);
+      }}
+      onKeyDown={(event) => {
+        if ((event.key === "Enter" || event.key === " ") && !editing && !confirmDelete) onSelect?.(lesson);
+      }}
+      className={`group flex items-start gap-2 rounded-lg border bg-card px-3.5 py-2.5 transition-all hover:border-border/80 hover:bg-card-hover/40 ${
+        isSelected ? "border-accent/60 ring-1 ring-accent/20" : "border-border"
+      } ${isPending ? "opacity-50" : ""}`}
+    >
       <div className="flex-1 min-w-0">
         {editing ? (
           <input
@@ -77,29 +91,29 @@ export function LessonCard({ lesson }: Props) {
       <div className="flex items-center gap-1 shrink-0">
         {editing ? (
           <>
-            <button onClick={saveEdit} disabled={isPending} className="text-done hover:text-done/80 p-1 rounded transition-colors">
+            <button onClick={(event) => { event.stopPropagation(); saveEdit(); }} disabled={isPending} className="text-done hover:text-done/80 p-1 rounded transition-colors">
               <Check className="h-3.5 w-3.5" />
             </button>
-            <button onClick={cancelEdit} className="text-text-muted hover:text-text p-1 rounded transition-colors">
+            <button onClick={(event) => { event.stopPropagation(); cancelEdit(); }} className="text-text-muted hover:text-text p-1 rounded transition-colors">
               <X className="h-3.5 w-3.5" />
             </button>
           </>
         ) : confirmDelete ? (
           <>
             <span className="text-[10px] text-blocked">Delete?</span>
-            <button onClick={confirmAndDelete} disabled={isPending} className="text-blocked hover:text-blocked/80 p-1 rounded transition-colors">
+            <button onClick={(event) => { event.stopPropagation(); confirmAndDelete(); }} disabled={isPending} className="text-blocked hover:text-blocked/80 p-1 rounded transition-colors">
               <Check className="h-3.5 w-3.5" />
             </button>
-            <button onClick={() => setConfirmDelete(false)} className="text-text-muted hover:text-text p-1 rounded transition-colors">
+            <button onClick={(event) => { event.stopPropagation(); setConfirmDelete(false); }} className="text-text-muted hover:text-text p-1 rounded transition-colors">
               <X className="h-3.5 w-3.5" />
             </button>
           </>
         ) : (
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button onClick={startEdit} className="text-text-muted hover:text-accent p-1 rounded transition-colors">
+            <button onClick={(event) => { event.stopPropagation(); startEdit(); }} className="text-text-muted hover:text-accent p-1 rounded transition-colors">
               <Pencil className="h-3.5 w-3.5" />
             </button>
-            <button onClick={() => setConfirmDelete(true)} className="text-text-muted hover:text-blocked p-1 rounded transition-colors">
+            <button onClick={(event) => { event.stopPropagation(); setConfirmDelete(true); }} className="text-text-muted hover:text-blocked p-1 rounded transition-colors">
               <Trash2 className="h-3.5 w-3.5" />
             </button>
           </div>

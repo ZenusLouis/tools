@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Activity, ArrowLeft, CheckCircle2, Code2, Layers, Settings, ShieldCheck, TerminalSquare } from "lucide-react";
+import { Activity, ArrowLeft, CheckCircle2, Code2, Layers, Settings, ShieldCheck } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { PageShell } from "@/components/layout/PageShell";
 import { ProjectActionButtons } from "@/components/projects/ProjectActionButtons";
+import { ProjectConsoleActions } from "@/components/projects/ProjectConsoleActions";
 import { getProjectDetail } from "@/lib/projects";
 import { getRecentActivity, timeAgo } from "@/lib/activity";
 import { requireCurrentUser } from "@/lib/auth";
@@ -84,8 +85,16 @@ export default async function ProjectDetailConsolePage({ params }: { params: Pro
             </section>
 
             <aside className="space-y-6 lg:col-span-4">
-              <StatusCard title="Runtime Health" icon={ShieldCheck} lines={["Bridge sync ready", "Code index available", "Artifacts tracked"]} />
-              <StatusCard title="Developer Actions" icon={TerminalSquare} lines={["Copy CLI command", "Open local path", "Reindex project"]} />
+              <StatusCard
+                title="Runtime Health"
+                icon={ShieldCheck}
+                lines={[
+                  project.codeIndexExists ? "Code index available" : "Code index has not been synced",
+                  project.lastIndexed ? `Last indexed ${project.lastIndexed.slice(0, 10)}` : "No index timestamp yet",
+                  project.projectPath ? "Local path registered" : "Local path missing",
+                ]}
+              />
+              <ProjectConsoleActions projectName={project.name} projectPath={project.projectPath} />
               <section className="rounded-xl border border-border bg-card p-6">
                 <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-white">
                   <Activity size={17} className="text-text-muted" />

@@ -50,7 +50,7 @@ function ActivityRow({ item }: { item: ActivityItem }) {
                 - <Link href={`/tasks/${item.taskId}`} className="font-mono text-accent hover:underline">{item.taskId}</Link>
               </>
             ) : (
-              <span className="font-mono text-accent">project event</span>
+              <Link href={`/projects/${item.project}/detail`} className="font-mono text-accent hover:underline">project event</Link>
             )}
           </div>
         </div>
@@ -71,9 +71,9 @@ export function RecentActivity({ items }: { items: ActivityItem[] }) {
         <p className="mt-1 text-xs text-text-muted">Live stream of system events</p>
       </div>
       <div className="flex items-center justify-end px-6 pt-4">
-        <button className="text-text-muted transition-colors hover:text-text">
+        <Link href="/" className="text-text-muted transition-colors hover:text-text" aria-label="Refresh dashboard activity">
           <RefreshCw size={15} />
-        </button>
+        </Link>
       </div>
 
       {items.length === 0 ? (

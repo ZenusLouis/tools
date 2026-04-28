@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Layers, Settings2, Paintbrush, Cpu } from "lucide-react";
+import { ChevronDown, ChevronUp, Layers, Settings2, Paintbrush, Cpu, Server } from "lucide-react";
 import type { McpProfile, McpServer } from "@/lib/mcp";
 import { McpProfileForm } from "@/components/mcp/McpForms";
 
@@ -24,6 +24,7 @@ function serverStatus(server: McpServer | undefined): { dot: string } {
 
 export function McpProfileViewer({ profiles, serverMap }: Props) {
   const [expanded, setExpanded] = useState<string | null>(profiles[0]?.profile ?? null);
+  const [selectedServer, setSelectedServer] = useState<string | null>(profiles[0]?.servers[0] ?? null);
 
   if (profiles.length === 0) {
     return (
@@ -45,7 +46,10 @@ export function McpProfileViewer({ profiles, serverMap }: Props) {
             className={`bg-card rounded-xl border overflow-hidden transition-all ${isOpen ? "border-accent/40" : "border-border hover:border-border/80 cursor-pointer"}`}
           >
             <button
-              onClick={() => setExpanded(isOpen ? null : profile.profile)}
+              onClick={() => {
+                setExpanded(isOpen ? null : profile.profile);
+                setSelectedServer(profile.servers[0] ?? null);
+              }}
               className={`w-full p-4 flex items-center justify-between ${isOpen ? "bg-accent/10" : "hover:bg-card-hover"} transition-colors`}
             >
               <div className="flex items-center gap-3">
@@ -63,8 +67,12 @@ export function McpProfileViewer({ profiles, serverMap }: Props) {
 
             {isOpen && (
               <div className="p-4 space-y-3">
-                {profile.description && (
-                  <p className="text-xs text-text-muted">{profile.description}</p>
+                {profile.description && <p className="text-xs text-text-muted">{profile.description}</p>}
+                {profile.use_when && (
+                  <div className="rounded-lg border border-border bg-bg-base p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-accent">Use When</p>
+                    <p className="mt-1 text-xs leading-relaxed text-text-muted">{profile.use_when}</p>
+                  </div>
                 )}
                 <div className="flex flex-wrap gap-2">
                   {profile.servers.map((name) => {
@@ -72,16 +80,41 @@ export function McpProfileViewer({ profiles, serverMap }: Props) {
                     const { dot } = serverStatus(srv);
                     const hasError = !srv || (!srv.url && !srv.command);
                     return (
-                      <span
+                      <button
+                        type="button"
                         key={name}
-                        className={`bg-card-hover text-text text-[10px] px-2 py-1 rounded flex items-center gap-1.5 ${hasError ? "border border-blocked/30" : ""}`}
+                        onClick={() => setSelectedServer(name)}
+                        className={`flex items-center gap-1.5 rounded px-2 py-1 text-[10px] text-text transition-colors hover:bg-accent/10 hover:text-accent ${
+                          selectedServer === name ? "bg-accent/10 text-accent" : "bg-card-hover"
+                        } ${hasError ? "border border-blocked/30" : ""}`}
                       >
                         <span className={`w-1 h-1 rounded-full ${dot}`} />
                         {name}
-                      </span>
+                      </button>
                     );
                   })}
                 </div>
+                {selectedServer && profile.servers.includes(selectedServer) && (
+                  <div className="rounded-lg border border-border bg-bg-base p-3">
+                    <div className="mb-2 flex items-center gap-2">
+                      <Server size={14} className="text-accent" />
+                      <p className="text-xs font-bold text-text">{selectedServer}</p>
+                    </div>
+                    {serverMap[selectedServer] ? (
+                      <div className="space-y-1 text-xs text-text-muted">
+                        <p>
+                          <span className="font-semibold text-text">Transport:</span> {serverMap[selectedServer].type}
+                        </p>
+                        <p className="break-all">
+                          <span className="font-semibold text-text">Endpoint:</span>{" "}
+                          {serverMap[selectedServer].url ?? serverMap[selectedServer].command ?? "Not configured"}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-blocked">This profile references a server that is not registered yet.</p>
+                    )}
+                  </div>
+                )}
                 <div className="pt-2 border-t border-border flex justify-end">
                   <McpProfileForm serverNames={Object.keys(serverMap)} />
                 </div>

@@ -18,7 +18,7 @@ const CONFIG: Record<ConceptKind, {
     eyebrow: "Knowledge graph runtime",
     icon: Braces,
     accent: "text-purple-300",
-    copy: "A concept workspace for linking lessons, project decisions, role memory, and source artifacts into a navigable agent graph.",
+    copy: "A live workspace for linking lessons, project decisions, role memory, and source artifacts into a navigable agent graph.",
   },
   protocol: {
     title: "Void Protocol",
@@ -39,7 +39,7 @@ const CONFIG: Record<ConceptKind, {
     eyebrow: "Workspace plan console",
     icon: CircuitBoard,
     accent: "text-in-progress",
-    copy: "A plan and capability overview for advanced multi-agent features, role libraries, bridge devices, and workspace automation.",
+    copy: "A capability overview for advanced multi-agent features, role libraries, bridge devices, and workspace automation.",
   },
 };
 
@@ -75,8 +75,8 @@ export function ConceptScreen({ kind, metrics }: { kind: ConceptKind; metrics: L
                     <Icon size={30} className={cfg.accent} />
                   </div>
                   <div>
-                    <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-text-muted">Concept Status</p>
-                    <p className="mt-1 text-lg font-bold text-white">Implemented as lab page</p>
+                    <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-text-muted">Runtime Status</p>
+                    <p className="mt-1 text-lg font-bold text-white">Connected to workspace data</p>
                   </div>
                 </div>
                 <div className="space-y-3">

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertTriangle, CheckCircle, Clock, ExternalLink, FileText, GitCommit, Lock, Share2, X } from "lucide-react";
+import { AlertTriangle, CheckCircle, Clock, ExternalLink, GitCommit, Lock, Share2, X } from "lucide-react";
 import { markTaskStatus } from "@/app/actions/tasks";
 import { CommitComposerModal } from "@/components/tasks/CommitComposerModal";
 import type { KanbanTask } from "@/lib/tasks";
@@ -123,21 +123,12 @@ export function TaskDetailPanel({ task, projectName, completedIds, onClose }: Pr
                 <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-accent">Multi-Agent Flow</p>
                 <div className="flex flex-col gap-1 text-xs text-text-muted">
                   <span>Phase: <span className="font-semibold text-text">{task.phase}</span></span>
-                  <span>BA: <span className="font-semibold text-text">{task.baRoleName ?? "Claude BA Analyst"}</span></span>
-                  <span>Dev: <span className="font-semibold text-text">{task.devRoleName ?? "Codex Dev Implementer"}</span></span>
-                  <span>Review: <span className="font-semibold text-text">{task.reviewRoleName ?? "ChatGPT optional"}</span></span>
-                </div>
-              </div>
-
-              <div>
-                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted">Resources</p>
-                <div className="flex flex-col gap-1.5">
-                  {["progress.json", "code-index.md"].map((file) => (
-                    <div key={file} className="flex items-center gap-2 text-xs text-text-muted">
-                      <FileText size={11} className="shrink-0" />
-                      <span className="font-mono">{file}</span>
-                    </div>
-                  ))}
+                  {task.baRoleName && <span>BA: <span className="font-semibold text-text">{task.baRoleName}</span></span>}
+                  {task.devRoleName && <span>Dev: <span className="font-semibold text-text">{task.devRoleName}</span></span>}
+                  {task.reviewRoleName && <span>Review: <span className="font-semibold text-text">{task.reviewRoleName}</span></span>}
+                  {!task.baRoleName && !task.devRoleName && !task.reviewRoleName && (
+                    <span>No role assignment recorded for this task.</span>
+                  )}
                 </div>
               </div>
 
@@ -146,9 +137,13 @@ export function TaskDetailPanel({ task, projectName, completedIds, onClose }: Pr
 
             <div className="space-y-3 border-t border-border px-5 py-4">
               <p className="text-[10px] text-text-muted">
-                Task implementation is done via <code className="font-mono text-accent">claude</code> CLI. Use buttons below to update status only.
+                Open the full detail page for DB-backed logs, artifacts, risks, file changes, and commit actions.
               </p>
               <div className="grid grid-cols-2 gap-2">
+                <Link href={`/tasks/${task.id}`} className="col-span-2 flex items-center justify-center gap-1.5 rounded-xl border border-accent/30 bg-accent/15 py-2.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/25">
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Open Full Detail
+                </Link>
                 <button onClick={() => navigator.clipboard.writeText(`gcs task brief ${projectName} ${task.id}`)} className="rounded-xl border border-accent/30 bg-accent/15 py-2.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/25">Copy BA</button>
                 <button onClick={() => navigator.clipboard.writeText(`gcs task implement ${projectName} ${task.id}`)} className="rounded-xl border border-in-progress/30 bg-in-progress/15 py-2.5 text-xs font-semibold text-in-progress transition-colors hover:bg-in-progress/25">Copy Dev</button>
                 <button onClick={() => setCommitOpen(true)} className="flex items-center justify-center gap-1.5 rounded-xl border border-accent/30 bg-accent/15 py-2.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/25">

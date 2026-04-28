@@ -8,6 +8,7 @@ Sends to dashboard API (primary) + local JSONL fallback.
 import json
 import sys
 import os
+import socket
 import urllib.request
 from datetime import datetime, date
 
@@ -31,6 +32,7 @@ BRIDGE_TOKEN  = os.environ.get("BRIDGE_TOKEN", "")
 GCS_PROVIDER  = os.environ.get("GCS_PROVIDER", "claude")
 GCS_ROLE      = os.environ.get("GCS_ROLE", "")
 GCS_MODEL     = os.environ.get("GCS_MODEL", "")
+GCS_DEVICE_KEY = os.environ.get("GCS_DEVICE_KEY", socket.gethostname().lower())
 
 TOOL_ESTIMATES = {
     "Read":    lambda inp: max(200, len(str(inp.get("content", ""))) // 4 + 100),
@@ -151,6 +153,7 @@ def session_summary():
         "provider": GCS_PROVIDER,
         "role": GCS_ROLE or None,
         "model": GCS_MODEL or None,
+        "deviceKey": GCS_DEVICE_KEY,
         "date": datetime.now().isoformat(),
         "tasksCompleted": [],
         "totalTokens": session_total,
@@ -219,6 +222,7 @@ def main():
         "provider": GCS_PROVIDER,
         "role": GCS_ROLE or None,
         "model": GCS_MODEL or None,
+        "deviceKey": GCS_DEVICE_KEY,
     }
 
     # 1. Send to dashboard API (primary)

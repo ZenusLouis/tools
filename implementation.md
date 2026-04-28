@@ -26,6 +26,14 @@
 - `apps/dashboard/src/components/chat/ChatClient.tsx`
 - `apps/dashboard/src/lib/analytics.ts`
 - `apps/dashboard/src/components/tokens/SessionsTable.tsx`
+- `apps/dashboard/src/components/mcp/McpServerList.tsx`
+- `apps/dashboard/src/components/mcp/McpProfileViewer.tsx`
+- `apps/dashboard/src/components/knowledge/LessonsList.tsx`
+- `apps/dashboard/src/components/knowledge/LessonCard.tsx`
+- `apps/dashboard/src/components/projects/ProjectConsoleActions.tsx`
+- `apps/dashboard/src/app/(app)/projects/[name]/detail/page.tsx`
+- `apps/dashboard/src/components/dashboard/RecentActivity.tsx`
+- `apps/dashboard/src/components/labs/ConceptScreen.tsx`
 
 ## Behavior
 
@@ -43,6 +51,12 @@
 - Added MCP server registration and MCP profile management server actions.
 - Expanded chat to a three-column active session UI with context, files, active tools, and generated artifacts.
 - Enriched token analytics history with provider, role/model, duration, export, and daily usage from both sessions and tool usage.
+- Replaced the Token Analytics placeholder filter with working provider/source filters and clickable session detail cards.
+- Added MCP Monitor server/profile detail views so server cards and profile server chips are inspectable.
+- Added a Knowledge Base master-detail view so lessons can be clicked and reviewed without relying on hover-only controls.
+- Replaced static project detail action text with working copy/open/settings actions and live project health labels.
+- Made dashboard activity project events clickable and replaced the dead refresh icon with a real dashboard refresh link.
+- Renamed lab/premium copy from concept language to workspace/runtime language backed by live metrics.
 
 ## Checks
 

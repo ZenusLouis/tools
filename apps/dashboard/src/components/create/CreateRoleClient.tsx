@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Check, Search, Sparkles } from "lucide-react";
+import { Check, Search, Sparkles, X } from "lucide-react";
 
 type Skill = { id: string; name: string; slug: string; category: string; description: string; isRemote: boolean };
 type Role = {
@@ -25,6 +25,7 @@ export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; s
   const [savedName, setSavedName] = useState("");
   const [skillQuery, setSkillQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
+  const [selectedRole, setSelectedRole] = useState<Role | null>(roleList[0] ?? null);
   const [pending, startTransition] = useTransition();
 
   const categories = useMemo(() => ["all", ...Array.from(new Set(skillList.map((skill) => skill.category))).sort()], [skillList]);
@@ -124,7 +125,14 @@ export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; s
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 2xl:grid-cols-4">
           {roleList.map((role) => (
-            <article key={role.id} className="rounded-2xl border border-border bg-card p-5 transition-colors hover:border-accent/40 hover:bg-card-hover">
+            <button
+              key={role.id}
+              type="button"
+              onClick={() => setSelectedRole(role)}
+              className={`rounded-2xl border p-5 text-left transition-colors hover:border-accent/40 hover:bg-card-hover ${
+                selectedRole?.id === role.id ? "border-accent/50 bg-accent/10" : "border-border bg-card"
+              }`}
+            >
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3 className="text-base font-bold text-text">{role.name}</h3>
@@ -138,9 +146,45 @@ export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; s
                 <span className="rounded bg-bg-base px-2 py-1 text-[10px] text-text-muted">{role.executionModeDefault}</span>
                 <span className="rounded bg-bg-base px-2 py-1 text-[10px] text-text-muted">{role.skills.length} skills</span>
               </div>
-            </article>
+            </button>
           ))}
         </div>
+
+        {selectedRole && (
+          <section className="rounded-2xl border border-accent/30 bg-card p-5">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-accent">Bot Detail</p>
+                <h2 className="mt-1 text-xl font-bold text-text">{selectedRole.name}</h2>
+                <p className="mt-1 text-sm text-text-muted">@{selectedRole.slug}</p>
+              </div>
+              <button type="button" onClick={() => setSelectedRole(null)} className="rounded-lg p-1.5 text-text-muted hover:bg-card-hover hover:text-text">
+                <X size={16} />
+              </button>
+            </div>
+            <p className="text-sm leading-relaxed text-text-muted">{selectedRole.description}</p>
+            <div className="mt-4 grid gap-3 md:grid-cols-4">
+              <Detail label="Provider" value={selectedRole.provider} />
+              <Detail label="Phase" value={selectedRole.phase} />
+              <Detail label="Execution" value={selectedRole.executionModeDefault} />
+              <Detail label="Skills" value={`${selectedRole.skills.length}`} />
+            </div>
+            <div className="mt-4 rounded-lg border border-border bg-bg-base p-3">
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-text-muted">Attached Skills</p>
+              {selectedRole.skills.length === 0 ? (
+                <p className="text-xs text-text-muted">No skills attached.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {selectedRole.skills.map((skill) => (
+                    <span key={skill.id} className="rounded-lg border border-border bg-card px-2 py-1 text-xs text-text-muted">
+                      {skill.name}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        )}
       </div>
     );
   }
@@ -314,5 +358,14 @@ function Select({ name, label, options }: { name: string; label: string; options
         {options.map((option) => <option key={option} value={option}>{option || "none"}</option>)}
       </select>
     </label>
+  );
+}
+
+function Detail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-bg-base p-3">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-text-muted">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-text">{value}</p>
+    </div>
   );
 }

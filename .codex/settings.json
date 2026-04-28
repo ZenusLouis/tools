@@ -25,7 +25,6 @@
     }
   },
   "agent": {
-    "provider": "codex",
     "defaultProject": "dashboard",
     "defaultRole": "dev-implementer",
     "defaultModel": "local"
