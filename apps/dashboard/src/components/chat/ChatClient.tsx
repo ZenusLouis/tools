@@ -120,8 +120,8 @@ export function ChatClient() {
           <div className="mb-4 rounded-lg border border-border bg-bg-base p-3 text-xs text-text-muted">
             <p className="font-semibold text-text">Local bridge</p>
             <p className="mt-1">Create a bridge token in Settings, then run from repo root:</p>
-            <code className="mt-2 block rounded bg-card px-2 py-1 text-[10px] text-accent">$env:BRIDGE_TOKEN=&quot;&lt;token&gt;&quot;</code>
-            <code className="mt-1 block rounded bg-card px-2 py-1 text-[10px] text-accent">python hooks/bridge-heartbeat.py</code>
+            <code className="mt-2 block rounded bg-card px-2 py-1 text-[10px] text-accent">.codex/settings.local.json → env.BRIDGE_TOKEN</code>
+            <code className="mt-1 block rounded bg-card px-2 py-1 text-[10px] text-accent">powershell -NoProfile -ExecutionPolicy Bypass -File hooks/ensure-gcs-bridge.ps1</code>
             <p className="mt-2">For Codex logging, run Codex through:</p>
             <code className="mt-1 block rounded bg-card px-2 py-1 text-[10px] text-accent">powershell -NoProfile -ExecutionPolicy Bypass -File hooks/codex-gcs.ps1 &quot;prompt&quot;</code>
             <p className="mt-2">Claude online: {diagnostics?.local.claude ? "yes" : "no"} - Codex online: {diagnostics?.local.codex ? "yes" : "no"}</p>
@@ -155,8 +155,8 @@ export function ChatClient() {
                   <p className="font-semibold text-text">No active bots yet.</p>
                   <p className="mt-2">For local Claude/Codex, create a bridge token in Settings and run the heartbeat script. For dashboard-run ChatGPT/Claude, add the provider API key in Settings.</p>
                   <div className="mt-3 grid grid-cols-1 gap-2 text-xs">
-                    <code className="rounded bg-card px-2 py-1">$env:BRIDGE_TOKEN=&quot;&lt;token&gt;&quot;</code>
-                    <code className="rounded bg-card px-2 py-1">python hooks/bridge-heartbeat.py</code>
+                    <code className="rounded bg-card px-2 py-1">.codex/settings.local.json → env.BRIDGE_TOKEN</code>
+                    <code className="rounded bg-card px-2 py-1">powershell -NoProfile -ExecutionPolicy Bypass -File hooks/ensure-gcs-bridge.ps1</code>
                     <code className="rounded bg-card px-2 py-1">powershell -NoProfile -ExecutionPolicy Bypass -File hooks/codex-gcs.ps1 &quot;prompt&quot;</code>
                   </div>
                 </div>

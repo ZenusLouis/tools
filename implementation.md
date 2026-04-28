@@ -93,8 +93,10 @@
 - `apps/dashboard/src/app/(app)/projects/[name]/settings/page.tsx`
 - `apps/dashboard/src/app/actions/projects.ts`
 - `apps/dashboard/src/components/projects/LocalDevicePathsCard.tsx`
+- `apps/dashboard/src/components/projects/AnalyzeProjectButton.tsx`
 - `apps/dashboard/src/app/(app)/projects/[name]/page.tsx`
 - `apps/dashboard/src/app/(app)/projects/[name]/detail/page.tsx`
+- `apps/dashboard/src/proxy.ts`
 
 ## Behavior
 
@@ -154,11 +156,17 @@
 - Project detail path resolution now prefers the latest device-specific path and falls back to legacy `Project.path`.
 - Project deploy/reindex events now record `cwd` from the latest device-specific path instead of only the legacy project path.
 - Project overview and detail pages now show a Local Device Paths card with per-device folder path, online status, device key, and last sync time.
+- Wired the project Analyze buttons to a real server action instead of a dead detail link.
+- Analyze now generates a starter module/feature/task backlog from the linked BRD/PRD, sets the first analysis task active, records a project activity event, and queues `.gcs/progress.json` sync to local devices.
+- Fixed bridge file sync auth by allowing `/api/bridge/file-actions/*` through the dashboard proxy. Before this, the route returned `401` before bridge-token verification, so local daemon could heartbeat but could not poll/write cloud-to-local file actions.
+- Created a cloud bridge token for this machine, stored it in gitignored `.codex/settings.local.json` under `env.BRIDGE_TOKEN`, restarted the local bridge, manually drained the existing queued OmniBooking file action, wrote `.gcs/context.json`, `.gcs/progress.json`, and `.gcs/code-index.md` to `D:\Code\OmniBooking`, then reported the action as succeeded.
+- Removed bridge-token guidance that suggested Windows environment variables; Chat and Settings now point to `.codex/settings.local.json`.
 
 ## Checks
 
 - `npm run lint`
 - `npm run build`
+- `npx tsc --noEmit`
 - `python -m py_compile hooks/gcs_bridge_daemon.py hooks/token-tracker.py`
 - `powershell -NoProfile -ExecutionPolicy Bypass -File hooks/ensure-gcs-bridge.ps1`
 - `npx prisma generate`

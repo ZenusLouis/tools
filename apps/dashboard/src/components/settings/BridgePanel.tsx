@@ -52,6 +52,9 @@ export function BridgePanel() {
       {rawToken && (
         <div className="mb-4 rounded-lg border border-in-progress/30 bg-in-progress/10 p-3">
           <p className="text-xs font-semibold text-in-progress">Copy now. This token is shown once.</p>
+          <p className="mt-1 text-xs text-text-muted">
+            Store it in <code>.codex/settings.local.json</code> under <code>env.BRIDGE_TOKEN</code>; do not put it in Windows environment variables or commit it.
+          </p>
           <code className="mt-2 block break-all rounded bg-bg-base px-2 py-1 text-xs text-accent">{rawToken}</code>
         </div>
       )}
@@ -92,4 +95,3 @@ export function BridgePanel() {
     </div>
   );
 }
-

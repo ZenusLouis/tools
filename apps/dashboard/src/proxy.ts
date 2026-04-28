@@ -9,6 +9,7 @@ const PUBLIC_PATHS = [
   "/api/bridge/log",
   "/api/bridge/artifact",
   "/api/bridge/task-event",
+  "/api/bridge/file-actions",
 ];
 
 function isPublicPath(pathname: string): boolean {
@@ -36,4 +37,3 @@ export async function proxy(req: NextRequest) {
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
-

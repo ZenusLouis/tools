@@ -9,6 +9,7 @@ import { TopBar } from "@/components/layout/TopBar";
 import { PageShell } from "@/components/layout/PageShell";
 import { ProjectActionButtons } from "@/components/projects/ProjectActionButtons";
 import { LocalDevicePathsCard } from "@/components/projects/LocalDevicePathsCard";
+import { AnalyzeProjectButton } from "@/components/projects/AnalyzeProjectButton";
 import { getProjectDetail } from "@/lib/projects";
 import { getRecentActivity, timeAgo } from "@/lib/activity";
 import { requireCurrentUser } from "@/lib/auth";
@@ -72,9 +73,7 @@ export default async function ProjectOverviewPage({
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 {hasDocs && (
-                  <Link href={`/projects/${encodedName}/detail`} className="flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white hover:bg-accent/90 transition-colors">
-                    <Sparkles size={13} /> Analyze BRD
-                  </Link>
+                  <AnalyzeProjectButton projectName={project.name} label="Analyze BRD" />
                 )}
                 <Link href={`/projects/${encodedName}/settings`} className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs text-text-muted hover:text-text hover:bg-card-hover transition-colors">
                   <Settings size={13} /> Settings
@@ -156,9 +155,9 @@ export default async function ProjectOverviewPage({
                         : "Link a BRD or PRD in Settings, then analyze it to build your backlog."}
                     </p>
                     {hasDocs && (
-                      <Link href={`/projects/${encodedName}/detail`} className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-accent/10 px-4 py-2 text-xs font-bold text-accent hover:bg-accent/20 transition-colors">
-                        <Sparkles size={13} /> Analyze Document
-                      </Link>
+                      <div className="mt-4">
+                        <AnalyzeProjectButton projectName={project.name} label="Analyze Document" />
+                      </div>
                     )}
                   </div>
                 )}
@@ -242,8 +241,8 @@ export default async function ProjectOverviewPage({
                 <h2 className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-3">Documents</h2>
                 {hasDocs ? (
                   <div className="space-y-2">
-                    {project.docs.brd && <DocRow label="BRD" path={project.docs.brd} analyzeHref={`/projects/${encodedName}/detail`} />}
-                    {project.docs.prd && <DocRow label="PRD" path={project.docs.prd} analyzeHref={`/projects/${encodedName}/detail`} />}
+                    {project.docs.brd && <DocRow projectName={project.name} label="BRD" path={project.docs.brd} canAnalyze />}
+                    {project.docs.prd && <DocRow projectName={project.name} label="PRD" path={project.docs.prd} canAnalyze />}
                     {project.docs.apiSpec && <DocRow label="API Spec" path={project.docs.apiSpec} />}
                   </div>
                 ) : (
@@ -324,7 +323,7 @@ function LinkChip({ href, icon, label }: { href: string; icon: React.ReactNode; 
   );
 }
 
-function DocRow({ label, path, analyzeHref }: { label: string; path: string; analyzeHref?: string }) {
+function DocRow({ projectName, label, path, canAnalyze }: { projectName?: string; label: string; path: string; canAnalyze?: boolean }) {
   return (
     <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-bg-base px-3 py-2">
       <div className="flex items-center gap-2 min-w-0">
@@ -332,11 +331,7 @@ function DocRow({ label, path, analyzeHref }: { label: string; path: string; ana
         <span className="text-[11px] text-text-muted font-bold">{label}</span>
         <span className="text-[11px] text-text truncate font-mono" title={path}>{path.split(/[\\/]/).pop()}</span>
       </div>
-      {analyzeHref && (
-        <Link href={analyzeHref} className="shrink-0 flex items-center gap-1 text-[10px] font-bold text-accent hover:underline">
-          <Sparkles size={10} /> Analyze
-        </Link>
-      )}
+      {canAnalyze && projectName && <AnalyzeProjectButton projectName={projectName} label="Analyze" size="sm" />}
     </div>
   );
 }

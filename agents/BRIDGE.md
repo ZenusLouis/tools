@@ -5,16 +5,19 @@ Local Claude/Codex agents become visible in the dashboard through bridge heartbe
 ## Required Env
 
 Hook scripts auto-load missing values from `.codex/settings.json`, `.codex/settings.local.json`, and `apps/dashboard/.env.local`.
-Set these manually only when running against another dashboard or workspace:
+Store local bridge secrets in `.codex/settings.local.json` because it is gitignored. Do not store bridge tokens in Windows user/machine environment variables.
 
-```text
-DASHBOARD_URL=https://gcs-dashboard.zenus.dev
-BRIDGE_TOKEN=<token from dashboard settings>
-GCS_DEVICE_KEY=<stable-machine-key>
-GCS_DEVICE_NAME=<human-readable-name>
-GCS_PROVIDER=codex
-GCS_ROLE=dev-implementer
-GCS_MODEL=gpt-5.4
+```json
+{
+  "env": {
+    "BRIDGE_TOKEN": "<token from dashboard settings>",
+    "GCS_DEVICE_KEY": "<stable-machine-key>",
+    "GCS_DEVICE_NAME": "<human-readable-name>",
+    "GCS_PROVIDER": "codex",
+    "GCS_ROLE": "dev-implementer",
+    "GCS_MODEL": "gpt-5.4"
+  }
+}
 ```
 
 ## Heartbeat
