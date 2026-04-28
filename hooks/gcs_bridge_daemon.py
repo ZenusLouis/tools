@@ -11,6 +11,7 @@ import json
 import os
 import shutil
 import socket
+import sqlite3
 import sys
 import time
 import urllib.request
@@ -150,6 +151,68 @@ def sync_log_file(path: Path, state: dict[str, int], from_end: bool) -> int:
     return sent
 
 
+CODEX_STATE_DB = Path.home() / ".codex" / "state_5.sqlite"
+CODEX_STATE_KEY = "__codex_last_updated_at_ms__"
+
+
+def _project_from_cwd(cwd: str) -> str:
+    """Extract a short project name from a Codex thread cwd path."""
+    clean = cwd.lstrip("\\\\?\\").replace("\\", "/")
+    return Path(clean).name or "local"
+
+
+def sync_codex_threads(state: dict[str, int]) -> int:
+    if not CODEX_STATE_DB.exists():
+        return 0
+    last_ms = state.get(CODEX_STATE_KEY, 0)
+    try:
+        conn = sqlite3.connect(str(CODEX_STATE_DB), timeout=1, check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """SELECT id, updated_at_ms, model, cwd, title, tokens_used, first_user_message
+               FROM threads
+               WHERE tokens_used > 0 AND updated_at_ms > ?
+               ORDER BY updated_at_ms ASC""",
+            (last_ms,),
+        ).fetchall()
+        conn.close()
+    except Exception as exc:
+        print(f"[codex-sync] sqlite error: {exc}", flush=True)
+        return 0
+
+    sent = 0
+    max_ms = last_ms
+    for row in rows:
+        project = _project_from_cwd(row["cwd"] or "")
+        payload = {
+            "type": "session",
+            "project": project,
+            "provider": "codex",
+            "model": row["model"] or None,
+            "date": datetime.fromtimestamp(row["updated_at_ms"] / 1000).isoformat(),
+            "tasksCompleted": [],
+            "cwd": (row["cwd"] or "").lstrip("\\\\?\\"),
+            "totalTokens": int(row["tokens_used"]),
+            "totalCostUSD": round(int(row["tokens_used"]) * 3.0 / 1_000_000, 6),
+            "sessionNotes": row["title"] or row["first_user_message"] or None,
+            "risks": [],
+        }
+        payload = {k: v for k, v in payload.items() if v is not None}
+        ok, detail = post_json("/api/log", payload, timeout=5)
+        if ok:
+            sent += 1
+            max_ms = max(max_ms, row["updated_at_ms"])
+        else:
+            print(f"[codex-sync] failed thread {row['id'][:8]}: {detail[:120]}", flush=True)
+            break
+
+    if max_ms > last_ms:
+        state[CODEX_STATE_KEY] = max_ms
+    if sent:
+        print(f"[codex-sync] synced {sent} Codex thread(s)", flush=True)
+    return sent
+
+
 def sync_logs(state: dict[str, int], from_end: bool) -> int:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     total = 0
@@ -174,6 +237,7 @@ def main() -> int:
     state = load_state()
     next_heartbeat = 0.0
     next_sync = 0.0
+    next_codex_sync = 0.0
     from_end = not args.from_start
 
     print("GCS bridge daemon started. Press Ctrl+C to stop.", flush=True)
@@ -189,6 +253,10 @@ def main() -> int:
                 sync_logs(state, from_end=from_end)
                 from_end = False
                 next_sync = now + max(1, args.sync_interval)
+            if now >= next_codex_sync:
+                sync_codex_threads(state)
+                save_state(state)
+                next_codex_sync = now + 15  # poll Codex SQLite every 15s
             time.sleep(0.5)
     except KeyboardInterrupt:
         print("\nGCS bridge daemon stopped.", flush=True)
