@@ -173,6 +173,15 @@ def _should_backfill_existing_codex_thread(updated_at_ms: int) -> bool:
     return updated_at.date() == now.date()
 
 
+def _codex_token_keys(thread_id: str, updated_at_ms: int) -> tuple[str, str]:
+    """Return legacy thread key plus a daily key for date-scoped token deltas."""
+    updated_at = datetime.fromtimestamp(updated_at_ms / 1000)
+    day_key = updated_at.strftime("%Y-%m-%d")
+    legacy_key = f"__codex_thread_tokens__:{thread_id}"
+    daily_key = f"__codex_thread_tokens__:{thread_id}:{day_key}"
+    return legacy_key, daily_key
+
+
 def sync_codex_threads(state: dict[str, int]) -> int:
     if not CODEX_STATE_DB.exists():
         return 0
@@ -195,19 +204,27 @@ def sync_codex_threads(state: dict[str, int]) -> int:
     sent = 0
     max_ms = last_ms
     for row in rows:
-        thread_token_key = f"__codex_thread_tokens__:{row['id']}"
-        previous_tokens = state.get(thread_token_key)
+        legacy_token_key, daily_token_key = _codex_token_keys(row["id"], row["updated_at_ms"])
+        previous_tokens = state.get(daily_token_key)
+        legacy_previous_tokens = state.get(legacy_token_key)
         current_tokens = int(row["tokens_used"] or 0)
         if previous_tokens is None:
+            if legacy_previous_tokens is not None:
+                previous_tokens = legacy_previous_tokens
+                state[daily_token_key] = legacy_previous_tokens
+
             if not _should_backfill_existing_codex_thread(row["updated_at_ms"]):
-                state[thread_token_key] = current_tokens
+                state[daily_token_key] = current_tokens
+                state[legacy_token_key] = current_tokens
                 max_ms = max(max_ms, row["updated_at_ms"])
                 continue
-            delta_tokens = current_tokens
+
+            delta_tokens = current_tokens if previous_tokens is None else max(0, current_tokens - previous_tokens)
         else:
             delta_tokens = max(0, current_tokens - previous_tokens)
             if delta_tokens <= 0:
-                state[thread_token_key] = current_tokens
+                state[daily_token_key] = current_tokens
+                state[legacy_token_key] = current_tokens
                 max_ms = max(max_ms, row["updated_at_ms"])
                 continue
 
@@ -244,7 +261,8 @@ def sync_codex_threads(state: dict[str, int]) -> int:
         payload = {k: v for k, v in payload.items() if v is not None}
         ok, detail = post_json("/api/log", payload, timeout=5)
         if ok:
-            state[thread_token_key] = current_tokens
+            state[daily_token_key] = current_tokens
+            state[legacy_token_key] = current_tokens
             max_ms = max(max_ms, row["updated_at_ms"])
             sent += 1
         else:

@@ -115,6 +115,7 @@
 - Changed Codex bridge sync to backfill today's existing Codex thread total on first detection, then continue with deltas so active IDE chats do not appear as only a tiny post-start delta.
 - Made bridge state writes atomic to avoid null/corrupt `.gcs_bridge_state.json` files after interruption.
 - Added `hooks/ensure-gcs-bridge.ps1` and wired Codex settings/docs to use it so a single command starts the bridge in the background only when it is not already running.
+- Added Codex daily token baselines using `thread_id + yyyy-mm-dd` state keys, while keeping legacy thread baselines for migration, so long-running Codex threads can be accounted by day.
 
 ## Checks
 
