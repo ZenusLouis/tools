@@ -48,6 +48,14 @@
 - `apps/dashboard/src/components/layout/Sidebar.tsx`
 - `apps/dashboard/src/components/dashboard/StatCard.tsx`
 - `apps/dashboard/src/components/dashboard/TokenUsageCard.tsx`
+- `hooks/gcs_bridge_daemon.py`
+- `hooks/token-tracker.py`
+- `apps/dashboard/src/lib/analytics.ts`
+- `apps/dashboard/src/app/(app)/tokens/page.tsx`
+- `apps/dashboard/src/components/tokens/DailyBarChart.tsx`
+- `apps/dashboard/src/components/tokens/DateRangeTabs.tsx`
+- `apps/dashboard/src/components/tokens/HeroMetric.tsx`
+- `apps/dashboard/src/components/tokens/ProviderTokenBreakdown.tsx`
 
 ## Behavior
 
@@ -75,11 +83,15 @@
 - Standardized visible app naming to GCS Console and cleaned a Library import loading label.
 - Changed the app shell to a fixed viewport layout: the sidebar stays at `100dvh`, sidebar nav scrolls internally, and page content scrolls independently.
 - Compacted large dashboard token numbers and allowed stat values to wrap without stretching cards.
+- Changed Codex token sync to store per-thread token baselines and send only token deltas into `ToolUsage` as provider `codex`.
+- Added year range support to Token Analytics and grouped year view by month instead of showing a running thread total.
+- Compacted large token totals in token analytics cards while preserving full values in tooltips.
 
 ## Checks
 
 - `npm run lint`
 - `npm run build`
+- `python -m py_compile hooks/gcs_bridge_daemon.py hooks/token-tracker.py`
 
 ## Gaps
 

@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 
-export type DateRange = "today" | "week" | "month";
+export type DateRange = "today" | "week" | "month" | "year";
 export type ToolBreakdown = { tool: string; tokens: number; percent: number };
 export type ProviderBreakdown = {
   provider: "claude" | "codex" | "chatgpt";
@@ -11,7 +11,7 @@ export type ProviderBreakdown = {
   percent: number;
   cost: number;
 };
-export type DailyUsage = { date: string; tokens: number; cost: number };
+export type DailyUsage = { date: string; label: string; tokens: number; cost: number };
 export type SessionRow = { date: string; provider: string; role: string | null; model: string | null; project: string; tasksCompleted: number; tokens: number; cost: number; durationMin: number | null; source: "session" | "tool"; tool?: string };
 export type AnalyticsData = {
   totalTokens: number;
@@ -28,7 +28,20 @@ function rangeStart(range: DateRange): Date {
   const now = new Date();
   if (range === "today") return new Date(now.getFullYear(), now.getMonth(), now.getDate());
   if (range === "week") return new Date(Date.now() - 7 * 86_400_000);
-  return new Date(Date.now() - 30 * 86_400_000);
+  if (range === "month") return new Date(Date.now() - 30 * 86_400_000);
+  return new Date(now.getFullYear(), 0, 1);
+}
+
+function usageBucket(date: Date, range: DateRange): { key: string; label: string } {
+  if (range === "year") {
+    const key = date.toISOString().slice(0, 7);
+    return { key, label: date.toLocaleString("en", { month: "short" }) };
+  }
+  const key = date.toISOString().slice(0, 10);
+  return {
+    key,
+    label: date.toLocaleDateString("en", range === "today" ? { hour: undefined, month: "short", day: "numeric" } : { month: "short", day: "numeric" }),
+  };
 }
 
 export async function getAnalytics(range: DateRange, workspaceId?: string): Promise<AnalyticsData> {
@@ -69,16 +82,19 @@ export async function getAnalytics(range: DateRange, workspaceId?: string): Prom
 
   // Daily usage
   const dayMap = new Map<string, number>();
+  const labelMap = new Map<string, string>();
   for (const s of sessions) {
-    const day = s.date.toISOString().slice(0, 10);
-    dayMap.set(day, (dayMap.get(day) ?? 0) + (s.totalTokens ?? 0));
+    const bucket = usageBucket(s.date, range);
+    dayMap.set(bucket.key, (dayMap.get(bucket.key) ?? 0) + (s.totalTokens ?? 0));
+    labelMap.set(bucket.key, bucket.label);
   }
   for (const usage of toolUsage) {
-    const day = usage.date.toISOString().slice(0, 10);
-    dayMap.set(day, (dayMap.get(day) ?? 0) + usage.tokens);
+    const bucket = usageBucket(usage.date, range);
+    dayMap.set(bucket.key, (dayMap.get(bucket.key) ?? 0) + usage.tokens);
+    labelMap.set(bucket.key, bucket.label);
   }
   const dailyUsage: DailyUsage[] = [...dayMap.entries()]
-    .map(([date, tokens]) => ({ date, tokens, cost: tokens * (COST_PER_MILLION / 1_000_000) }))
+    .map(([date, tokens]) => ({ date, label: labelMap.get(date) ?? date, tokens, cost: tokens * (COST_PER_MILLION / 1_000_000) }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
   // Session rows

@@ -153,6 +153,7 @@ def sync_log_file(path: Path, state: dict[str, int], from_end: bool) -> int:
 
 CODEX_STATE_DB = Path.home() / ".codex" / "state_5.sqlite"
 CODEX_STATE_KEY = "__codex_last_updated_at_ms__"
+CODEX_SYNC_EXISTING = os.environ.get("GCS_CODEX_SYNC_EXISTING", "").lower() in {"1", "true", "yes"}
 
 
 def _project_from_cwd(cwd: str) -> str:
@@ -183,17 +184,49 @@ def sync_codex_threads(state: dict[str, int]) -> int:
     sent = 0
     max_ms = last_ms
     for row in rows:
+        thread_token_key = f"__codex_thread_tokens__:{row['id']}"
+        previous_tokens = state.get(thread_token_key)
+        current_tokens = int(row["tokens_used"] or 0)
+        if previous_tokens is None:
+            state[thread_token_key] = current_tokens
+            max_ms = max(max_ms, row["updated_at_ms"])
+            if not CODEX_SYNC_EXISTING:
+                continue
+            delta_tokens = current_tokens
+        else:
+            delta_tokens = max(0, current_tokens - previous_tokens)
+            state[thread_token_key] = current_tokens
+            max_ms = max(max_ms, row["updated_at_ms"])
+            if delta_tokens <= 0:
+                continue
+
         project = _project_from_cwd(row["cwd"] or "")
+        event_date = datetime.fromtimestamp(row["updated_at_ms"] / 1000).isoformat()
+        tool_payload = {
+            "type": "tool",
+            "ts": event_date,
+            "tool": "CodexIDE",
+            "tokens": delta_tokens,
+            "provider": "codex",
+            "role": os.environ.get("GCS_ROLE") or "dev-implementer",
+            "model": row["model"] or None,
+            "deviceKey": os.environ.get("GCS_DEVICE_KEY", socket.gethostname().lower()),
+        }
+        ok, detail = post_json("/api/log", {k: v for k, v in tool_payload.items() if v is not None}, timeout=5)
+        if not ok:
+            print(f"[codex-sync] failed tool delta {row['id'][:8]}: {detail[:120]}", flush=True)
+            break
+
         payload = {
             "type": "session",
             "project": project,
             "provider": "codex",
             "model": row["model"] or None,
-            "date": datetime.fromtimestamp(row["updated_at_ms"] / 1000).isoformat(),
+            "date": event_date,
             "tasksCompleted": [],
             "cwd": (row["cwd"] or "").lstrip("\\\\?\\"),
-            "totalTokens": int(row["tokens_used"]),
-            "totalCostUSD": round(int(row["tokens_used"]) * 3.0 / 1_000_000, 6),
+            "totalTokens": delta_tokens,
+            "totalCostUSD": round(delta_tokens * 3.0 / 1_000_000, 6),
             "sessionNotes": row["title"] or row["first_user_message"] or None,
             "risks": [],
         }
@@ -201,7 +234,6 @@ def sync_codex_threads(state: dict[str, int]) -> int:
         ok, detail = post_json("/api/log", payload, timeout=5)
         if ok:
             sent += 1
-            max_ms = max(max_ms, row["updated_at_ms"])
         else:
             print(f"[codex-sync] failed thread {row['id'][:8]}: {detail[:120]}", flush=True)
             break

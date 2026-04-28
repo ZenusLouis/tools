@@ -10,11 +10,18 @@ interface Props {
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function getDayLabel(dateStr: string): string {
+  if (/^\d{4}-\d{2}$/.test(dateStr)) {
+    const d = new Date(`${dateStr}-01T00:00:00`);
+    return d.toLocaleString("en", { month: "short" });
+  }
   const d = new Date(dateStr + "T00:00:00");
   return DAY_LABELS[d.getDay() === 0 ? 6 : d.getDay() - 1];
 }
 
 function isToday(dateStr: string): boolean {
+  if (/^\d{4}-\d{2}$/.test(dateStr)) {
+    return dateStr === new Date().toISOString().slice(0, 7);
+  }
   return dateStr === new Date().toISOString().slice(0, 10);
 }
 
@@ -29,7 +36,7 @@ export function DailyBarChart({ dailyUsage }: Props) {
 
   const data = dailyUsage.map((d) => ({
     date: d.date,
-    label: getDayLabel(d.date),
+    label: d.label || getDayLabel(d.date),
     tokens: d.tokens,
     today: isToday(d.date),
   }));
@@ -41,7 +48,7 @@ export function DailyBarChart({ dailyUsage }: Props) {
       <div className="flex justify-between items-start mb-8">
         <h3 className="text-text font-bold flex items-center gap-2">
           <BarChart2 size={16} className="text-accent" />
-          7-day usage history
+          Usage history
         </h3>
         <div className="text-[10px] text-text-muted font-bold uppercase tracking-widest px-2 py-1 bg-bg-base rounded border border-border">
           Tokens/Day

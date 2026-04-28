@@ -7,6 +7,7 @@ const TABS: { value: DateRange; label: string }[] = [
   { value: "today", label: "Today" },
   { value: "week",  label: "7 Days" },
   { value: "month", label: "30 Days" },
+  { value: "year", label: "Year" },
 ];
 
 export function DateRangeTabs({ current }: { current: DateRange }) {

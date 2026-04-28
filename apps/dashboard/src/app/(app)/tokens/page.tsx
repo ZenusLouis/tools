@@ -9,7 +9,7 @@ import { ProviderTokenBreakdown } from "@/components/tokens/ProviderTokenBreakdo
 import { getAnalytics, type DateRange } from "@/lib/analytics";
 import { requireCurrentUser } from "@/lib/auth";
 
-const VALID_RANGES = new Set<DateRange>(["today", "week", "month"]);
+const VALID_RANGES = new Set<DateRange>(["today", "week", "month", "year"]);
 
 interface Props {
   searchParams: Promise<{ range?: string }>;
@@ -30,7 +30,7 @@ export default async function TokensPage({ searchParams }: Props) {
         title="Token Analytics"
         actions={
           <nav className="flex gap-1">
-            {(["today", "week", "month"] as const).map((r) => (
+            {(["today", "week", "month", "year"] as const).map((r) => (
               <Link
                 key={r}
                 href={`/tokens?range=${r}`}
@@ -40,7 +40,7 @@ export default async function TokensPage({ searchParams }: Props) {
                     : "text-text-muted hover:text-text"
                 }`}
               >
-                {r === "today" ? "Today" : r === "week" ? "Week" : "Month"}
+                  {r === "today" ? "Today" : r === "week" ? "Week" : r === "month" ? "Month" : "Year"}
               </Link>
             ))}
           </nav>

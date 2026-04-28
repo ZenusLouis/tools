@@ -128,18 +128,22 @@ def _save_session_tokens(total: int):
 
 _CODEX_DB = Path.home() / ".codex" / "state_5.sqlite"
 _CODEX_STATE_FILE = os.path.join(os.path.dirname(__file__), ".codex_sync_state.json")
+_CODEX_SYNC_EXISTING = os.environ.get("GCS_CODEX_SYNC_EXISTING", "").lower() in {"1", "true", "yes"}
 
 
-def _load_codex_state() -> int:
+def _load_codex_state() -> dict:
     try:
-        return int(json.loads(open(_CODEX_STATE_FILE).read()).get("last_ms", 0))
+        data = json.loads(open(_CODEX_STATE_FILE).read())
+        if isinstance(data, dict):
+            return data
     except Exception:
-        return 0
+        pass
+    return {}
 
 
-def _save_codex_state(last_ms: int) -> None:
+def _save_codex_state(state: dict) -> None:
     try:
-        open(_CODEX_STATE_FILE, "w").write(json.dumps({"last_ms": last_ms}))
+        open(_CODEX_STATE_FILE, "w").write(json.dumps(state, indent=2, sort_keys=True))
     except Exception:
         pass
 
@@ -151,7 +155,8 @@ def _cwd_to_project(cwd: str) -> str:
 def sync_codex_threads() -> int:
     if not _CODEX_DB.exists():
         return 0
-    last_ms = _load_codex_state()
+    state = _load_codex_state()
+    last_ms = int(state.get("last_ms", 0) or 0)
     try:
         conn = sqlite3.connect(str(_CODEX_DB), timeout=1, check_same_thread=False)
         cutoff_ms = max(last_ms, int((datetime.now().timestamp() - 86400) * 1000))
@@ -168,27 +173,58 @@ def sync_codex_threads() -> int:
     max_ms = last_ms
     for row in rows:
         thread_id, upd_ms, model, cwd, title, tokens_used, first_msg = row
+        thread_key = f"thread_tokens:{thread_id}"
+        current_tokens = int(tokens_used or 0)
+        previous_tokens = state.get(thread_key)
+        if previous_tokens is None:
+            state[thread_key] = current_tokens
+            max_ms = max(max_ms, upd_ms)
+            if not _CODEX_SYNC_EXISTING:
+                continue
+            delta_tokens = current_tokens
+        else:
+            delta_tokens = max(0, current_tokens - int(previous_tokens or 0))
+            state[thread_key] = current_tokens
+            max_ms = max(max_ms, upd_ms)
+            if delta_tokens <= 0:
+                continue
+
+        event_date = datetime.fromtimestamp(upd_ms / 1000).isoformat()
+        tool_payload = {
+            "type": "tool",
+            "ts": event_date,
+            "tool": "CodexIDE",
+            "tokens": delta_tokens,
+            "provider": "codex",
+            "role": GCS_ROLE or "dev-implementer",
+            "model": model or None,
+            "deviceKey": GCS_DEVICE_KEY,
+        }
+        tool_payload = {k: v for k, v in tool_payload.items() if v is not None}
+        if not post_to_dashboard(tool_payload):
+            break
+
         payload = {
             "type": "session",
             "project": _cwd_to_project(cwd or ""),
             "provider": "codex",
             "model": model or None,
-            "date": datetime.fromtimestamp(upd_ms / 1000).isoformat(),
+            "date": event_date,
             "tasksCompleted": [],
-            "totalTokens": int(tokens_used),
-            "totalCostUSD": round(int(tokens_used) * 3.0 / 1_000_000, 6),
+            "totalTokens": delta_tokens,
+            "totalCostUSD": round(delta_tokens * 3.0 / 1_000_000, 6),
             "sessionNotes": title or first_msg or None,
             "risks": [],
         }
         payload = {k: v for k, v in payload.items() if v is not None}
         if post_to_dashboard(payload):
             sent += 1
-            max_ms = max(max_ms, upd_ms)
         else:
             break
 
     if max_ms > last_ms:
-        _save_codex_state(max_ms)
+        state["last_ms"] = max_ms
+        _save_codex_state(state)
     return sent
 
 
