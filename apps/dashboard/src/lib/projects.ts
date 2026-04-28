@@ -22,6 +22,14 @@ export type ModuleProgress = {
 export type ProjectDetail = {
   name: string;
   projectPath: string | null;
+  localPaths: Array<{
+    deviceId: string;
+    deviceName: string;
+    deviceKey: string;
+    path: string;
+    lastSyncedAt: string | null;
+    online: boolean;
+  }>;
   frameworks: string[];
   lastIndexed: string | null;
   codeIndexExists: boolean;
@@ -72,6 +80,10 @@ export async function getProjectDetail(name: string, workspaceId?: string): Prom
         include: { features: { include: { tasks: true } } },
         orderBy: { order: "asc" },
       },
+      bridgePaths: {
+        include: { device: true },
+        orderBy: { updatedAt: "desc" },
+      },
     },
   });
   if (!project || (workspaceId && project.workspaceId !== null && project.workspaceId !== workspaceId)) return null;
@@ -102,10 +114,19 @@ export async function getProjectDetail(name: string, workspaceId?: string): Prom
   const hasRealFramework = project.frameworks.length > 0 && !project.frameworks.every((f) => f === "unknown");
   const codeIndexStatus: "healthy" | "empty" | "none" =
     !project.lastIndexed ? "none" : hasRealFramework ? "healthy" : "empty";
+  const localPaths = project.bridgePaths.map((item) => ({
+    deviceId: item.deviceId,
+    deviceName: item.device.name,
+    deviceKey: item.device.deviceKey,
+    path: item.path,
+    lastSyncedAt: item.lastSyncedAt?.toISOString() ?? null,
+    online: item.device.lastSeenAt ? Date.now() - item.device.lastSeenAt.getTime() < 90_000 : false,
+  }));
 
   return {
     name: project.name,
-    projectPath: project.path,
+    projectPath: localPaths[0]?.path ?? project.path,
+    localPaths,
     frameworks: project.frameworks,
     lastIndexed: project.lastIndexed?.toISOString() ?? null,
     codeIndexExists: codeIndexStatus === "healthy",

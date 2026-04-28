@@ -49,6 +49,7 @@ export default async function ProjectSettingsPage({ params }: Props) {
               <SettingsForm
                 projectName={ctx.name}
                 projectPath={ctx.path ?? ""}
+                localPaths={ctx.localPaths}
                 mcpProfile={ctx.mcpProfile ?? ""}
                 profiles={profiles}
                 docs={ctx.docs ?? {}}

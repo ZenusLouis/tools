@@ -20,6 +20,7 @@ model Project {
   workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
   modules     Module[]
   decisions   Decision[]
+  bridgePaths BridgeProjectPath[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -147,6 +148,7 @@ model Workspace {
   sessions      Session[]
   toolUsages    ToolUsage[]
   bridgeFileActions BridgeFileAction[]
+  bridgeProjectPaths BridgeProjectPath[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
@@ -176,9 +178,29 @@ model BridgeDevice {
   workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   tokens         BridgeToken[]
   fileActions    BridgeFileAction[]
+  projectPaths   BridgeProjectPath[]
 
   @@unique([workspaceId, deviceKey])
   @@index([workspaceId])
+}
+
+model BridgeProjectPath {
+  id          String   @id @default(cuid())
+  workspaceId String
+  projectName String
+  deviceId    String
+  path        String
+  lastSyncedAt DateTime?
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project     Project   @relation(fields: [projectName], references: [name], onDelete: Cascade)
+  device      BridgeDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([workspaceId, projectName, deviceId])
+  @@index([workspaceId])
+  @@index([projectName])
+  @@index([deviceId])
 }
 
 model BridgeFileAction {

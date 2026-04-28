@@ -6,10 +6,12 @@ import { DocumentsSection } from "./DocumentsSection";
 import { EnvSection } from "./EnvSection";
 import { GeneralSection } from "./GeneralSection";
 import { ToolsSection } from "./ToolsSection";
+import type { LocalProjectPath } from "@/lib/settings";
 
 interface Props {
   projectName: string;
   projectPath: string;
+  localPaths: LocalProjectPath[];
   mcpProfile: string;
   profiles: string[];
   docs: Record<string, string>;
@@ -21,6 +23,7 @@ interface Props {
 export function SettingsForm({
   projectName,
   projectPath,
+  localPaths,
   mcpProfile,
   profiles,
   docs,
@@ -33,7 +36,7 @@ export function SettingsForm({
   return (
     <form action={action} className="flex w-full flex-col gap-6">
       <input type="hidden" name="projectName" value={projectName} />
-      <GeneralSection name={projectName} projectPath={projectPath} mcpProfile={mcpProfile} profiles={profiles} />
+      <GeneralSection name={projectName} projectPath={projectPath} localPaths={localPaths} mcpProfile={mcpProfile} profiles={profiles} />
       <DocumentsSection docs={docs} />
       <ToolsSection tools={tools} />
       <EnvSection required={envRequired} envFile={envFile} />

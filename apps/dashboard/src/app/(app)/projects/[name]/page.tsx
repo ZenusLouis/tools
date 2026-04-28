@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import {
-  Settings, FileText, CheckCircle2, Zap, GitCommit, Palette,
+  Settings, CheckCircle2, Zap, GitCommit, Palette,
   GitBranch, LayoutGrid, Database, Layers, PanelRightOpen,
   AlertTriangle, BookOpen, Sparkles, ListTodo,
 } from "lucide-react";

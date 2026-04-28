@@ -2,10 +2,12 @@
 
 import path from "path";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { readJSON, writeJSON } from "@/lib/fs/json";
 import { resolvePath, getClaudeRoot } from "@/lib/fs/resolve";
 import { ContextJSON } from "@/lib/settings";
 import { db } from "@/lib/db";
+import { requireCurrentUser } from "@/lib/auth";
 
 type Registry = Record<string, string>;
 
@@ -21,11 +23,35 @@ async function getContextPath(projectName: string): Promise<string | null> {
 }
 
 export async function saveSettings(_prev: unknown, formData: FormData): Promise<{ error?: string; saved?: boolean }> {
+  const user = await requireCurrentUser();
   const projectName = formData.get("projectName") as string;
-  const ctxPath = await getContextPath(projectName);
-  if (!ctxPath) return { error: "Project not found" };
+  const project = await db.project.findFirst({
+    where: { name: projectName, OR: [{ workspaceId: user.workspaceId }, { workspaceId: null }] },
+  });
+  if (!project) return { error: "Project not found" };
+  if (!project.workspaceId) {
+    await db.project.update({ where: { name: projectName }, data: { workspaceId: user.workspaceId } }).catch(() => null);
+  }
 
-  const existing = await readJSON<ContextJSON>(ctxPath);
+  const ctxPath = await getContextPath(projectName);
+  let existing: ContextJSON = {
+    name: project.name,
+    path: project.path ?? undefined,
+    framework: project.frameworks,
+    mcpProfile: project.mcpProfile ?? undefined,
+    docs: (project.docs as Record<string, string>) ?? {},
+    tools: (project.links as Record<string, string>) ?? {},
+    env: { required: [], envFile: ".env.local" },
+    lastIndexed: project.lastIndexed?.toISOString().slice(0, 10),
+    activeTask: project.activeTask,
+  };
+  if (ctxPath) {
+    try {
+      existing = { ...existing, ...(await readJSON<ContextJSON>(ctxPath)) };
+    } catch {
+      // DB remains the source of truth when workspace files are missing in hosted runtime.
+    }
+  }
 
   // Docs
   const docs: Record<string, string> = {};
@@ -53,12 +79,56 @@ export async function saveSettings(_prev: unknown, formData: FormData): Promise<
   const updated: ContextJSON = {
     ...existing,
     mcpProfile: (formData.get("mcpProfile") as string) || existing.mcpProfile,
-    docs: Object.keys(docs).length ? docs : existing.docs,
-    tools: Object.keys(tools).length ? tools : existing.tools,
+    docs,
+    tools,
     env: { ...existing.env, required },
   };
 
-  await writeJSON(ctxPath, updated);
+  if (ctxPath) {
+    await writeJSON(ctxPath, updated);
+  }
+
+  await db.project.update({
+    where: { name: projectName },
+    data: {
+      mcpProfile: updated.mcpProfile ?? null,
+      docs,
+      links: tools,
+    },
+  });
+
+  const devicePaths = await db.bridgeProjectPath.findMany({
+    where: { workspaceId: user.workspaceId, projectName },
+    select: { deviceId: true, path: true },
+  });
+  const syncTargets = devicePaths.length > 0
+    ? devicePaths
+    : project.path
+      ? [{ deviceId: null, path: project.path }]
+      : [];
+
+  for (const target of syncTargets) {
+    await db.bridgeFileAction.create({
+      data: {
+        workspaceId: user.workspaceId,
+        deviceId: target.deviceId,
+        type: "sync_project_metadata",
+        payload: {
+          projectName,
+          projectPath: target.path,
+          files: [
+            {
+              relativePath: ".gcs/context.json",
+              content: JSON.stringify(updated, null, 2),
+            },
+          ],
+        },
+      },
+    });
+  }
+
+  revalidatePath(`/projects/${encodeURIComponent(projectName)}`);
+  revalidatePath(`/projects/${encodeURIComponent(projectName)}/settings`);
   return { saved: true };
 }
 

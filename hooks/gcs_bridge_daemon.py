@@ -353,7 +353,7 @@ def poll_file_actions() -> int:
             result = execute_file_action(action)
             ok, detail = post_json_data(
                 "/api/bridge/file-actions/result",
-                {"id": action_id, "status": "succeeded", "result": result},
+                {"id": action_id, "status": "succeeded", "deviceKey": device_key, "result": result},
                 timeout=8,
             )
             if ok:
@@ -364,7 +364,7 @@ def poll_file_actions() -> int:
         except Exception as exc:
             post_json_data(
                 "/api/bridge/file-actions/result",
-                {"id": action_id, "status": "failed", "error": str(exc)},
+                {"id": action_id, "status": "failed", "deviceKey": device_key, "error": str(exc)},
                 timeout=8,
             )
             print(f"[file-actions] failed {action_id}: {exc}", flush=True)

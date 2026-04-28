@@ -82,6 +82,8 @@
 - `apps/dashboard/prisma/migrations/20260428160000_bridge_file_actions/migration.sql`
 - `apps/dashboard/src/app/api/bridge/file-actions/pending/route.ts`
 - `apps/dashboard/src/app/api/bridge/file-actions/result/route.ts`
+- `apps/dashboard/src/app/(app)/projects/[name]/settings/actions.ts`
+- `apps/dashboard/src/app/(app)/projects/[name]/page.tsx`
 
 ## Behavior
 
@@ -131,6 +133,7 @@
 - Added cloud-to-local bridge file actions: the dashboard queues `BridgeFileAction` records, local bridge polls pending actions, writes safe relative files under the local project folder, and reports success/failure back to cloud.
 - Project creation now queues local `.gcs/context.json`, `.gcs/progress.json`, and `.gcs/code-index.md` writes for the local bridge.
 - Added bridge file-action APIs at `/api/bridge/file-actions/pending` and `/api/bridge/file-actions/result`.
+- Fixed Project Settings save for DB-backed/cloud-created projects: settings no longer require `projects/registry.json`, update the database directly, and queue `.gcs/context.json` sync back to the local machine.
 
 ## Checks
 
