@@ -11,6 +11,10 @@ const HeartbeatSchema = z.object({
   claudeAvailable: z.boolean().default(false),
   codexAvailable: z.boolean().default(false),
   metadata: z.record(z.string(), z.unknown()).default({}),
+  projectPaths: z.array(z.object({
+    projectName: z.string().min(1).max(200),
+    path: z.string().min(1).max(2000),
+  })).max(200).default([]),
 });
 
 export async function POST(req: NextRequest) {
@@ -47,6 +51,51 @@ export async function POST(req: NextRequest) {
       lastSeenAt: new Date(),
     },
   });
+
+  if (parsed.data.projectPaths.length > 0) {
+    const projectNames = [...new Set(parsed.data.projectPaths.map((item) => item.projectName))];
+    const projects = await db.project.findMany({
+      where: {
+        name: { in: projectNames },
+        OR: [{ workspaceId: ctx.workspaceId }, { workspaceId: null }],
+      },
+      select: { name: true, workspaceId: true },
+    });
+    const validProjectNames = new Set(projects.map((project) => project.name));
+    await Promise.all(
+      parsed.data.projectPaths
+        .filter((item) => validProjectNames.has(item.projectName))
+        .map((item) =>
+          db.bridgeProjectPath.upsert({
+            where: {
+              workspaceId_projectName_deviceId: {
+                workspaceId: ctx.workspaceId,
+                projectName: item.projectName,
+                deviceId: device.id,
+              },
+            },
+            create: {
+              workspaceId: ctx.workspaceId,
+              projectName: item.projectName,
+              deviceId: device.id,
+              path: item.path,
+              lastSyncedAt: new Date(),
+            },
+            update: {
+              path: item.path,
+              lastSyncedAt: new Date(),
+            },
+          })
+        )
+    );
+    const orphanedNames = projects.filter((project) => project.workspaceId === null).map((project) => project.name);
+    if (orphanedNames.length > 0) {
+      await db.project.updateMany({
+        where: { name: { in: orphanedNames }, workspaceId: null },
+        data: { workspaceId: ctx.workspaceId },
+      });
+    }
+  }
 
   return NextResponse.json({ ok: true, deviceId: device.id });
 }

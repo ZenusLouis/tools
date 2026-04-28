@@ -82,8 +82,15 @@
 - `apps/dashboard/prisma/migrations/20260428160000_bridge_file_actions/migration.sql`
 - `apps/dashboard/src/app/api/bridge/file-actions/pending/route.ts`
 - `apps/dashboard/src/app/api/bridge/file-actions/result/route.ts`
+- `apps/dashboard/src/app/api/bridge/heartbeat/route.ts`
 - `apps/dashboard/src/app/(app)/projects/[name]/settings/actions.ts`
 - `apps/dashboard/src/app/(app)/projects/[name]/page.tsx`
+- `apps/dashboard/prisma/migrations/20260428163000_bridge_project_paths/migration.sql`
+- `apps/dashboard/src/lib/settings.ts`
+- `apps/dashboard/src/lib/projects.ts`
+- `apps/dashboard/src/components/settings/GeneralSection.tsx`
+- `apps/dashboard/src/components/settings/SettingsForm.tsx`
+- `apps/dashboard/src/app/(app)/projects/[name]/settings/page.tsx`
 
 ## Behavior
 
@@ -134,6 +141,13 @@
 - Project creation now queues local `.gcs/context.json`, `.gcs/progress.json`, and `.gcs/code-index.md` writes for the local bridge.
 - Added bridge file-action APIs at `/api/bridge/file-actions/pending` and `/api/bridge/file-actions/result`.
 - Fixed Project Settings save for DB-backed/cloud-created projects: settings no longer require `projects/registry.json`, update the database directly, and queue `.gcs/context.json` sync back to the local machine.
+- Added `BridgeProjectPath` as the canonical per-device local path mapping. Each bridge device can now store a different folder path for the same project.
+- Bridge file-action results now resolve `deviceKey`, persist the action device, and upsert the synced project path for that device.
+- The local bridge now includes `deviceKey` when reporting file-action success/failure, so cloud can map writes back to the correct machine.
+- Bridge heartbeat now reports local project paths discovered from `projects/*/context.json`, and the server upserts those paths by device so existing projects do not need a manual resync action.
+- Project Settings now shows the primary fallback path plus all synced local device paths with device name, key, online status, and last sync time.
+- Project Settings save now queues `.gcs/context.json` updates to all known device-specific paths for that project, falling back to the legacy project path only when no device path exists.
+- Project detail path resolution now prefers the latest device-specific path and falls back to legacy `Project.path`.
 
 ## Checks
 
@@ -143,6 +157,7 @@
 - `powershell -NoProfile -ExecutionPolicy Bypass -File hooks/ensure-gcs-bridge.ps1`
 - `npx prisma generate`
 - `npx prisma migrate deploy`
+- `python -m py_compile hooks/gcs_bridge_daemon.py`
 
 ## Gaps
 

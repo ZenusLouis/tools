@@ -29,6 +29,7 @@ BRIDGE_TOKEN = os.environ.get("BRIDGE_TOKEN", "")
 HOOK_SECRET = os.environ.get("HOOK_SECRET", "")
 LOG_DIR = ROOT / "logs"
 STATE_PATH = ROOT / "hooks" / ".gcs_bridge_state.json"
+PROJECTS_DIR = ROOT / "projects"
 
 
 def headers() -> dict[str, str]:
@@ -68,6 +69,25 @@ def post_json_data(path: str, payload: dict, timeout: int = 8) -> tuple[bool, di
     return True, data
 
 
+def collect_project_paths() -> list[dict[str, str]]:
+    """Read local GCS project contexts and report source folders known to this device."""
+    if not PROJECTS_DIR.exists():
+        return []
+    result: list[dict[str, str]] = []
+    for context_path in PROJECTS_DIR.glob("*/context.json"):
+        try:
+            data = json.loads(context_path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if not isinstance(data, dict):
+            continue
+        project_name = str(data.get("name") or context_path.parent.name).strip()
+        project_path = str(data.get("path") or "").strip()
+        if project_name and project_path:
+            result.append({"projectName": project_name, "path": project_path})
+    return result
+
+
 def heartbeat(verbose: bool) -> bool:
     if not BRIDGE_TOKEN and not HOOK_SECRET:
         print("BRIDGE_TOKEN or HOOK_SECRET is not set; bridge cannot authenticate.", flush=True)
@@ -82,6 +102,7 @@ def heartbeat(verbose: bool) -> bool:
             "name": device_name,
             "claudeAvailable": shutil.which("claude") is not None,
             "codexAvailable": shutil.which("codex") is not None,
+            "projectPaths": collect_project_paths(),
             "metadata": {
                 "cwd": os.getcwd(),
                 "runner": "hooks/gcs_bridge_daemon.py",
