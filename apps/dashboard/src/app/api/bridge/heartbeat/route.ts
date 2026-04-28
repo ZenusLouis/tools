@@ -65,8 +65,8 @@ export async function POST(req: NextRequest) {
     await Promise.all(
       parsed.data.projectPaths
         .filter((item) => validProjectNames.has(item.projectName))
-        .map((item) =>
-          db.bridgeProjectPath.upsert({
+        .map(async (item) => {
+          await db.bridgeProjectPath.upsert({
             where: {
               workspaceId_projectName_deviceId: {
                 workspaceId: ctx.workspaceId,
@@ -85,8 +85,16 @@ export async function POST(req: NextRequest) {
               path: item.path,
               lastSyncedAt: new Date(),
             },
-          })
-        )
+          });
+          await db.bridgeProjectPath.deleteMany({
+            where: {
+              workspaceId: ctx.workspaceId,
+              projectName: item.projectName,
+              path: item.path,
+              deviceId: { not: device.id },
+            },
+          });
+        })
     );
     const orphanedNames = projects.filter((project) => project.workspaceId === null).map((project) => project.name);
     if (orphanedNames.length > 0) {

@@ -59,7 +59,7 @@ export async function getProjectContext(projectName: string): Promise<ProjectCon
     path: item.path,
     lastSyncedAt: item.lastSyncedAt?.toISOString() ?? null,
     online: item.device.lastSeenAt ? Date.now() - item.device.lastSeenAt.getTime() < 90_000 : false,
-  }));
+  })).sort((left, right) => Number(right.online) - Number(left.online));
   return {
     name: p.name,
     path: localPaths[0]?.path ?? p.path,

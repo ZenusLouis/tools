@@ -80,6 +80,14 @@ export async function POST(req: NextRequest) {
             lastSyncedAt: new Date(),
           },
         });
+        await db.bridgeProjectPath.deleteMany({
+          where: {
+            workspaceId: ctx.workspaceId,
+            projectName,
+            path: projectPath,
+            deviceId: { not: deviceId },
+          },
+        });
       }
     }
   }

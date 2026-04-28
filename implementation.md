@@ -174,6 +174,7 @@
 - Removed manual machine-specific bridge variables (`GCS_DEVICE_KEY`, `GCS_DEVICE_NAME`) from settings/docs/examples. Local scripts now auto-generate a per-account/per-machine identity in gitignored `hooks/.gcs_device.json` using the bridge token as account/workspace scope.
 - Added a gitignored `hooks/.gcs_project_paths.json` local registry so each machine remembers the project folders it owns after file-action sync and can report those paths on heartbeat without global machine variables.
 - Added cloud-only project creation: users can create dashboard projects with no local source folder, use documents/API keys/chat/analysis in cloud, and attach a local bridge later only when they need local file sync/actions.
+- Fixed stale project-path ownership after device identity changes: heartbeat and file-action result now remove duplicate path mappings for the same workspace/project/path on older devices, and project/settings path cards sort online devices first.
 
 ## Checks
 
