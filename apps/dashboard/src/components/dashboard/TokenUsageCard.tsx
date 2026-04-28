@@ -17,6 +17,13 @@ const PROVIDER_UI: Record<ProviderBreakdown["provider"], { label: string; color:
   chatgpt: { label: "ChatGPT", color: "text-emerald-300", bar: "bg-emerald-400" },
 };
 
+function compactNumber(value: number) {
+  return new Intl.NumberFormat("en", {
+    notation: "compact",
+    maximumFractionDigits: value >= 1_000_000 ? 1 : 0,
+  }).format(value);
+}
+
 export function TokenUsageCard({
   total,
   rangeLabel,
@@ -43,7 +50,9 @@ export function TokenUsageCard({
         <span className="text-[10px] font-bold text-in-progress">{topLabel}</span>
       </div>
 
-      <p className="text-4xl font-black tracking-tight text-white">{total.toLocaleString()}</p>
+      <p className="text-3xl font-black tracking-tight text-white sm:text-4xl" title={total.toLocaleString()}>
+        {compactNumber(total)}
+      </p>
       <p className="mt-1 text-xs font-medium text-text-muted">Tokens {rangeLabel}</p>
 
       <div className="mt-4">
@@ -68,7 +77,7 @@ export function TokenUsageCard({
               <div className="h-1.5 overflow-hidden rounded-full bg-bg-base">
                 <div className={`h-full rounded-full ${ui.bar}`} style={{ width: `${item.percent}%` }} />
               </div>
-              <span className="tabular-nums text-text-muted">{item.tokens.toLocaleString()}</span>
+              <span className="tabular-nums text-text-muted" title={item.tokens.toLocaleString()}>{compactNumber(item.tokens)}</span>
             </div>
           );
         })}

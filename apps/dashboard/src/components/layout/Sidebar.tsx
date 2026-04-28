@@ -28,7 +28,7 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="flex w-60 min-h-screen shrink-0 flex-col border-r border-border bg-[#080d1b]">
+    <aside className="flex h-dvh w-60 shrink-0 flex-col overflow-hidden border-r border-border bg-[#080d1b]">
       {/* Brand */}
       <div className="px-6 py-7">
         <div className="flex items-center gap-3">
@@ -43,7 +43,7 @@ export function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex flex-col gap-0.5 flex-1 px-2">
+      <nav className="min-h-0 flex-1 overflow-y-auto px-2">
         {navItems.map((item) => {
           const Icon = icons[item.icon as keyof typeof icons];
           const active = item.href === "/"
@@ -68,7 +68,7 @@ export function Sidebar() {
       </nav>
 
       {/* Footer user */}
-      <div className="mt-auto border-t border-border p-4">
+      <div className="shrink-0 border-t border-border p-4">
         <div className="mb-3 space-y-1">
           <Link href="/knowledge" className="flex items-center gap-3 px-4 py-2 text-xs font-semibold text-text-muted transition-colors hover:text-text">
             <BookOpen size={16} />

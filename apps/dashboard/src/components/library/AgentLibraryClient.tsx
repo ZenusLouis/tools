@@ -253,7 +253,7 @@ export function AgentLibraryClient({ roles, skills, sourceSummary }: { roles: Ro
                         disabled={importingSkill === result.name}
                         className="rounded border border-border px-2 py-0.5 text-[10px] font-semibold text-accent hover:bg-accent/10 disabled:opacity-50"
                       >
-                        {importingSkill === result.name ? "Adding…" : "Add"}
+                        {importingSkill === result.name ? "Adding..." : "Add"}
                       </button>
                     )}
                   </div>
@@ -285,7 +285,7 @@ export function AgentLibraryClient({ roles, skills, sourceSummary }: { roles: Ro
                         disabled={importingSkill === skill.name}
                         className="rounded border border-border px-2 py-0.5 text-[10px] font-semibold text-accent hover:bg-accent/10 disabled:opacity-50"
                       >
-                        {importingSkill === skill.name ? "Adding…" : "Add"}
+                        {importingSkill === skill.name ? "Adding..." : "Add"}
                       </button>
                     )}
                   </div>

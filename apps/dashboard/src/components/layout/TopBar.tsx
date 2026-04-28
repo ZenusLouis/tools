@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { TopBarControls } from "./TopBarControls";
+import { PageDocumentTitle } from "./PageDocumentTitle";
 
 export type TopBarRange = "today" | "week" | "month";
 
@@ -22,6 +23,7 @@ export function TopBar({
 
   return (
     <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between border-b border-border bg-bg-base/85 px-8 backdrop-blur-md">
+      <PageDocumentTitle title={title} />
       <div className="flex h-full items-center gap-8">
         <h1 className="text-xl font-bold text-white">{title}</h1>
         {range && rangeBasePath && (

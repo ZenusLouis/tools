@@ -128,7 +128,7 @@ export function TopBarControls() {
                 <UserRound size={17} />
               </div>
               <div>
-                <p className="text-sm font-bold text-white">GlobalClaudeSkills</p>
+                <p className="text-sm font-bold text-white">GCS Console</p>
                 <p className="text-xs text-text-muted">Admin workspace</p>
               </div>
             </div>

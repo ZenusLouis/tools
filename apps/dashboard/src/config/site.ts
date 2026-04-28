@@ -1,5 +1,5 @@
 export const siteConfig = {
-  name: "GlobalClaudeSkills",
+  name: "GCS Console",
   description: "AI development management hub",
 };
 

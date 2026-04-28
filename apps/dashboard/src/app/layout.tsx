@@ -4,8 +4,12 @@ import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "GlobalClaudeSkills Dashboard",
-  description: "AI development management hub",
+  title: {
+    default: "GCS Console",
+    template: "%s | GCS Console",
+  },
+  description: "Multi-agent development console for Claude, Codex, and ChatGPT workflows.",
+  applicationName: "GCS Console",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

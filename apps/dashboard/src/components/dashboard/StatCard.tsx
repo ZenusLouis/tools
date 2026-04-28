@@ -45,7 +45,7 @@ export function StatCard({ label, value, sub, progress, variant = "default", bad
         )}
       </div>
 
-      <p className="text-4xl font-black tracking-tight text-white">{value}</p>
+      <p className="min-w-0 break-words text-3xl font-black leading-tight tracking-tight text-white sm:text-4xl">{value}</p>
       <p className="mt-1 text-xs font-medium text-text-muted">{label}</p>
 
       {progress !== undefined && (

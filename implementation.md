@@ -34,6 +34,20 @@
 - `apps/dashboard/src/app/(app)/projects/[name]/detail/page.tsx`
 - `apps/dashboard/src/components/dashboard/RecentActivity.tsx`
 - `apps/dashboard/src/components/labs/ConceptScreen.tsx`
+- `apps/dashboard/src/app/layout.tsx`
+- `apps/dashboard/src/app/icon.tsx`
+- `apps/dashboard/src/components/layout/PageDocumentTitle.tsx`
+- `apps/dashboard/src/components/layout/TopBar.tsx`
+- `apps/dashboard/src/components/layout/TopBarControls.tsx`
+- `apps/dashboard/src/config/site.ts`
+- `apps/dashboard/src/app/login/page.tsx`
+- `apps/dashboard/src/components/library/AgentLibraryClient.tsx`
+- `apps/dashboard/src/app/(app)/layout.tsx`
+- `apps/dashboard/src/components/layout/PageTransition.tsx`
+- `apps/dashboard/src/components/layout/PageShell.tsx`
+- `apps/dashboard/src/components/layout/Sidebar.tsx`
+- `apps/dashboard/src/components/dashboard/StatCard.tsx`
+- `apps/dashboard/src/components/dashboard/TokenUsageCard.tsx`
 
 ## Behavior
 
@@ -57,6 +71,10 @@
 - Replaced static project detail action text with working copy/open/settings actions and live project health labels.
 - Made dashboard activity project events clickable and replaced the dead refresh icon with a real dashboard refresh link.
 - Renamed lab/premium copy from concept language to workspace/runtime language backed by live metrics.
+- Updated app metadata, generated favicon, and per-page browser titles so tabs display as `Library | GCS Console` instead of the old GlobalClaudeSkills Dashboard title.
+- Standardized visible app naming to GCS Console and cleaned a Library import loading label.
+- Changed the app shell to a fixed viewport layout: the sidebar stays at `100dvh`, sidebar nav scrolls internally, and page content scrolls independently.
+- Compacted large dashboard token numbers and allowed stat values to wrap without stretching cards.
 
 ## Checks
 

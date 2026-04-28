@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen bg-bg-base">
+    <div className="flex h-dvh overflow-hidden bg-bg-base">
       <Sidebar />
       <PageTransition>{children}</PageTransition>
     </div>
