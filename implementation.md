@@ -56,6 +56,13 @@
 - `apps/dashboard/src/components/tokens/DateRangeTabs.tsx`
 - `apps/dashboard/src/components/tokens/HeroMetric.tsx`
 - `apps/dashboard/src/components/tokens/ProviderTokenBreakdown.tsx`
+- `apps/dashboard/src/lib/format.ts`
+- `apps/dashboard/src/components/tasks/KanbanBoard.tsx`
+- `apps/dashboard/src/components/tokens/SessionsTable.tsx`
+- `apps/dashboard/src/app/(app)/page.tsx`
+- `apps/dashboard/scripts/repair-codex-token-totals.ts`
+- `apps/dashboard/package.json`
+- `apps/dashboard/src/lib/stats.ts`
 
 ## Behavior
 
@@ -86,6 +93,10 @@
 - Changed Codex token sync to store per-thread token baselines and send only token deltas into `ToolUsage` as provider `codex`.
 - Added year range support to Token Analytics and grouped year view by month instead of showing a running thread total.
 - Compacted large token totals in token analytics cards while preserving full values in tooltips.
+- Added shared number/currency format helpers and standardized cost display, so values like `$356.8792` render as `$356.88`.
+- Added per-column Task Board paging with `Load more`, `Show all`, and `Collapse`, plus viewport-height column scroll.
+- Added a dry-run-first Codex token repair script for removing old inflated Codex token/session rows after switching to delta-based sync.
+- Made dashboard stats and token analytics ignore Codex `Session.totalTokens`; Codex token totals now come only from delta-based `ToolUsage`, so old long-running thread totals cannot inflate Today/Week/Month views.
 
 ## Checks
 

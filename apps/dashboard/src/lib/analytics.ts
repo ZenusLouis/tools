@@ -55,12 +55,12 @@ export async function getAnalytics(range: DateRange, workspaceId?: string): Prom
   const providers = ["claude", "codex", "chatgpt"] as const;
   const rawProviderBreakdown = providers.map((provider) => {
     const sessionTokens = sessions
-      .filter((session) => session.provider === provider)
+      .filter((session) => session.provider === provider && provider !== "codex")
       .reduce((sum, session) => sum + (session.totalTokens ?? 0), 0);
     const toolTokens = toolUsage
       .filter((usage) => usage.provider === provider)
       .reduce((sum, usage) => sum + usage.tokens, 0);
-    return { provider, sessionTokens, toolTokens, tokens: Math.max(sessionTokens, toolTokens) };
+    return { provider, sessionTokens, toolTokens, tokens: provider === "codex" ? toolTokens : Math.max(sessionTokens, toolTokens) };
   });
   const totalTokens = rawProviderBreakdown.reduce((sum, row) => sum + row.tokens, 0);
   const totalCost = totalTokens * (COST_PER_MILLION / 1_000_000);
@@ -83,7 +83,7 @@ export async function getAnalytics(range: DateRange, workspaceId?: string): Prom
   // Daily usage
   const dayMap = new Map<string, number>();
   const labelMap = new Map<string, string>();
-  for (const s of sessions) {
+  for (const s of sessions.filter((session) => session.provider !== "codex")) {
     const bucket = usageBucket(s.date, range);
     dayMap.set(bucket.key, (dayMap.get(bucket.key) ?? 0) + (s.totalTokens ?? 0));
     labelMap.set(bucket.key, bucket.label);
@@ -100,7 +100,7 @@ export async function getAnalytics(range: DateRange, workspaceId?: string): Prom
   // Session rows
   const sessionRows: SessionRow[] = [
     ...sessions
-      .filter((s) => (s.totalTokens ?? 0) > 0)
+      .filter((s) => s.provider !== "codex" && (s.totalTokens ?? 0) > 0)
       .map((s) => ({
         date: s.date.toISOString().slice(0, 10),
         provider: s.provider,

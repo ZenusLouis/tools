@@ -1,15 +1,12 @@
 import { Bot, Cpu, MessageSquare } from "lucide-react";
 import type { ProviderBreakdown } from "@/lib/analytics";
+import { formatCompactNumber, formatCurrency } from "@/lib/format";
 
 const PROVIDER_META = {
   claude: { label: "Claude", icon: Bot, color: "bg-done", text: "text-done" },
   codex: { label: "Codex", icon: Cpu, color: "bg-accent", text: "text-accent" },
   chatgpt: { label: "ChatGPT", icon: MessageSquare, color: "bg-in-progress", text: "text-in-progress" },
 } satisfies Record<ProviderBreakdown["provider"], { label: string; icon: typeof Bot; color: string; text: string }>;
-
-function compactNumber(value: number) {
-  return new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(value);
-}
 
 export function ProviderTokenBreakdown({ breakdown }: { breakdown: ProviderBreakdown[] }) {
   return (
@@ -36,8 +33,8 @@ export function ProviderTokenBreakdown({ breakdown }: { breakdown: ProviderBreak
 
             <div className="mt-5 flex items-end justify-between gap-4">
               <div>
-                <p className="text-3xl font-black tabular-nums text-text" title={item.tokens.toLocaleString()}>{compactNumber(item.tokens)}</p>
-                <p className="mt-1 text-xs text-text-muted">${item.cost.toFixed(4)} estimated</p>
+                <p className="text-3xl font-black tabular-nums text-text" title={item.tokens.toLocaleString()}>{formatCompactNumber(item.tokens)}</p>
+                <p className="mt-1 text-xs text-text-muted">{formatCurrency(item.cost)} estimated</p>
               </div>
               <div className="text-right text-[11px] text-text-muted">
                 <p>session {item.sessionTokens.toLocaleString()}</p>

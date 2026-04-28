@@ -1,6 +1,7 @@
 import type { KanbanTask, TaskStatus } from "@/lib/tasks";
 import { AddTaskForm } from "./AddTaskForm";
 import { TaskCard } from "./TaskCard";
+import { useState } from "react";
 
 const COLUMNS: { status: TaskStatus; label: string; accentClass: string; dot: string }[] = [
   { status: "pending", label: "PENDING", accentClass: "border-t-pending", dot: "bg-pending" },
@@ -8,6 +9,8 @@ const COLUMNS: { status: TaskStatus; label: string; accentClass: string; dot: st
   { status: "completed", label: "COMPLETED", accentClass: "border-t-done", dot: "bg-done" },
   { status: "blocked", label: "BLOCKED", accentClass: "border-t-blocked", dot: "bg-blocked" },
 ];
+const INITIAL_VISIBLE = 6;
+const PAGE_SIZE = 6;
 
 export type AddTaskConfig = { projectName: string; moduleId: string };
 
@@ -32,8 +35,13 @@ function KanbanColumn({
   onTaskClick?: (task: KanbanTask) => void;
   addTaskConfig?: AddTaskConfig;
 }) {
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
+  const [showAll, setShowAll] = useState(false);
+  const visibleTasks = showAll ? tasks : tasks.slice(0, visibleCount);
+  const hasHidden = visibleTasks.length < tasks.length;
+
   return (
-    <div className={`flex min-h-96 flex-col rounded-xl border border-t-2 bg-card ${accentClass}`}>
+    <div className={`flex min-h-96 max-h-[calc(100dvh-18rem)] flex-col rounded-xl border border-t-2 bg-card ${accentClass}`}>
       <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
         <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} />
         <span className="text-[11px] font-bold uppercase tracking-widest text-text-muted">{label}</span>
@@ -42,19 +50,54 @@ function KanbanColumn({
         </span>
       </div>
 
-      <div className="flex flex-1 flex-col gap-2 p-2.5">
+      <div className="min-h-0 flex-1 overflow-y-auto p-2.5">
         {tasks.length === 0 && !addTaskConfig && (
           <p className="mt-6 text-center text-xs text-text-muted opacity-40">--</p>
         )}
-        {tasks.map((task) => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            completedIds={completedIds}
-            isSelected={selectedTaskId === task.id}
-            onClick={() => onTaskClick?.(task)}
-          />
-        ))}
+        <div className="flex flex-col gap-2">
+          {visibleTasks.map((task) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              completedIds={completedIds}
+              isSelected={selectedTaskId === task.id}
+              onClick={() => onTaskClick?.(task)}
+            />
+          ))}
+        </div>
+        {tasks.length > INITIAL_VISIBLE && (
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            {hasHidden ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setVisibleCount((count) => Math.min(count + PAGE_SIZE, tasks.length))}
+                  className="rounded-lg border border-border bg-bg-base px-3 py-2 text-xs font-semibold text-text-muted transition-colors hover:bg-card-hover hover:text-text"
+                >
+                  Load more
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAll(true)}
+                  className="rounded-lg border border-accent/30 bg-accent/10 px-3 py-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
+                >
+                  Show all
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAll(false);
+                  setVisibleCount(INITIAL_VISIBLE);
+                }}
+                className="col-span-2 rounded-lg border border-border bg-bg-base px-3 py-2 text-xs font-semibold text-text-muted transition-colors hover:bg-card-hover hover:text-text"
+              >
+                Collapse to {INITIAL_VISIBLE}
+              </button>
+            )}
+          </div>
+        )}
         {status === "pending" && addTaskConfig && (
           <div className="mt-auto pt-2">
             <AddTaskForm projectName={addTaskConfig.projectName} moduleId={addTaskConfig.moduleId} />

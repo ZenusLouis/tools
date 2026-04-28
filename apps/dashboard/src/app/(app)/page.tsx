@@ -15,6 +15,7 @@ import { getRecentActivity } from "@/lib/activity";
 import { getRandomLessons } from "@/lib/lessons";
 import { requireCurrentUser } from "@/lib/auth";
 import type { DashboardRange } from "@/lib/stats";
+import { formatCurrency, formatNumber } from "@/lib/format";
 
 export const revalidate = 30;
 
@@ -82,7 +83,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                     {projects.length} active projects
                   </span>
                   <span className="text-border">/</span>
-                  <span>{stats.tokenCount.toLocaleString()} tokens used {copy}</span>
+                  <span>{formatNumber(stats.tokenCount)} tokens used {copy}</span>
                 </p>
                 <p className="mt-3 max-w-2xl text-sm leading-relaxed text-text-muted">
                   {projects.length > 0
@@ -119,7 +120,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               rangeLabel={label}
               breakdown={stats.tokenBreakdown}
             />
-            <StatCard label="Session Cost" value={`$${stats.sessionCost.toFixed(4)}`} variant="cost" badge={label.toLowerCase()} />
+            <StatCard label="Session Cost" value={formatCurrency(stats.sessionCost)} variant="cost" badge={label.toLowerCase()} />
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

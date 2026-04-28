@@ -43,7 +43,7 @@ export async function getDashboardStats(workspaceId?: string, range: DashboardRa
   const providers = ["claude", "codex", "chatgpt"] as const;
   const tokenBreakdown = providers.map((provider) => {
     const sessionTokens = sessions
-      .filter((session) => session.provider === provider)
+      .filter((session) => session.provider === provider && provider !== "codex")
       .reduce((sum, session) => sum + (session.totalTokens ?? 0), 0);
     const toolTokens = toolUsage
       .filter((usage) => usage.provider === provider)
@@ -52,10 +52,12 @@ export async function getDashboardStats(workspaceId?: string, range: DashboardRa
       provider,
       sessionTokens,
       toolTokens,
+      // Codex exposes thread-level totals in its local SQLite. The bridge
+      // converts that to ToolUsage deltas; session totals are metadata only.
       // Claude can stream tool usage before Stop emits a session summary.
       // Taking the max keeps today's dashboard live without double-counting
       // when both tool rows and session summaries exist for the same work.
-      tokens: Math.max(sessionTokens, toolTokens),
+      tokens: provider === "codex" ? toolTokens : Math.max(sessionTokens, toolTokens),
       percent: 0,
     };
   });

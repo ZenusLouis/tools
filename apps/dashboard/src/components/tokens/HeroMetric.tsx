@@ -1,10 +1,8 @@
+import { formatCompactNumber, formatCurrency } from "@/lib/format";
+
 interface Props {
   totalTokens: number;
   totalCost: number;
-}
-
-function compactNumber(value: number) {
-  return new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(value);
 }
 
 export function HeroMetric({ totalTokens, totalCost }: Props) {
@@ -14,9 +12,9 @@ export function HeroMetric({ totalTokens, totalCost }: Props) {
         <div>
           <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-accent">Token Analytics</p>
           <h2 className="break-words text-4xl font-black tracking-tight text-text md:text-5xl" title={totalTokens.toLocaleString()}>
-            {compactNumber(totalTokens)} <span className="text-2xl font-bold text-accent">tokens</span>
+            {formatCompactNumber(totalTokens)} <span className="text-2xl font-bold text-accent">tokens</span>
           </h2>
-          <p className="mt-2 text-sm font-medium text-text-muted">${totalCost.toFixed(4)} estimated cost across connected agents</p>
+          <p className="mt-2 text-sm font-medium text-text-muted">{formatCurrency(totalCost)} estimated cost across connected agents</p>
         </div>
 
         <div className="rounded-xl border border-border bg-bg-base px-5 py-4 text-right">

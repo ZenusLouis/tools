@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { Zap } from "lucide-react";
+import { formatCompactNumber } from "@/lib/format";
 
 type ProviderBreakdown = {
   provider: "claude" | "codex" | "chatgpt";
@@ -16,13 +17,6 @@ const PROVIDER_UI: Record<ProviderBreakdown["provider"], { label: string; color:
   codex: { label: "Codex", color: "text-sky-300", bar: "bg-sky-400" },
   chatgpt: { label: "ChatGPT", color: "text-emerald-300", bar: "bg-emerald-400" },
 };
-
-function compactNumber(value: number) {
-  return new Intl.NumberFormat("en", {
-    notation: "compact",
-    maximumFractionDigits: value >= 1_000_000 ? 1 : 0,
-  }).format(value);
-}
 
 export function TokenUsageCard({
   total,
@@ -51,7 +45,7 @@ export function TokenUsageCard({
       </div>
 
       <p className="text-3xl font-black tracking-tight text-white sm:text-4xl" title={total.toLocaleString()}>
-        {compactNumber(total)}
+        {formatCompactNumber(total)}
       </p>
       <p className="mt-1 text-xs font-medium text-text-muted">Tokens {rangeLabel}</p>
 
@@ -77,7 +71,7 @@ export function TokenUsageCard({
               <div className="h-1.5 overflow-hidden rounded-full bg-bg-base">
                 <div className={`h-full rounded-full ${ui.bar}`} style={{ width: `${item.percent}%` }} />
               </div>
-              <span className="tabular-nums text-text-muted" title={item.tokens.toLocaleString()}>{compactNumber(item.tokens)}</span>
+              <span className="tabular-nums text-text-muted" title={item.tokens.toLocaleString()}>{formatCompactNumber(item.tokens)}</span>
             </div>
           );
         })}

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Download, Filter, History, X } from "lucide-react";
 import type { SessionRow } from "@/lib/analytics";
+import { formatCurrency, formatNumber } from "@/lib/format";
 
 export function SessionsTable({ sessions }: { sessions: SessionRow[] }) {
   const [provider, setProvider] = useState("all");
@@ -107,8 +108,8 @@ export function SessionsTable({ sessions }: { sessions: SessionRow[] }) {
                       <span className="text-xs text-text-muted">--</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 font-bold text-accent">{session.tokens.toLocaleString()}</td>
-                  <td className="px-6 py-4 text-right text-sm text-text-muted">${session.cost.toFixed(4)}</td>
+                  <td className="px-6 py-4 font-bold text-accent">{formatNumber(session.tokens)}</td>
+                  <td className="px-6 py-4 text-right text-sm text-text-muted">{formatCurrency(session.cost)}</td>
                   <td className="px-6 py-4 text-right text-sm text-text-muted">{session.durationMin != null ? `${session.durationMin}m` : "--"}</td>
                 </tr>
               ))}
@@ -142,11 +143,11 @@ export function SessionsTable({ sessions }: { sessions: SessionRow[] }) {
             <div className="grid gap-3 md:grid-cols-4">
               <div className="rounded-lg border border-border bg-bg-base p-3">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Tokens</p>
-                <p className="mt-2 text-2xl font-bold text-text">{selected.tokens.toLocaleString()}</p>
+                <p className="mt-2 text-2xl font-bold text-text">{formatNumber(selected.tokens)}</p>
               </div>
               <div className="rounded-lg border border-border bg-bg-base p-3">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Cost</p>
-                <p className="mt-2 text-2xl font-bold text-text">${selected.cost.toFixed(4)}</p>
+                <p className="mt-2 text-2xl font-bold text-text">{formatCurrency(selected.cost)}</p>
               </div>
               <div className="rounded-lg border border-border bg-bg-base p-3">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Source</p>
