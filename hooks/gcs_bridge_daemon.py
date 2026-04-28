@@ -362,30 +362,81 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
     frameworks = payload.get("frameworks") or []
     docs = payload.get("docs") or {}
     callback_path = str(payload.get("callbackPath") or "")
-    action_id = str(action.get("id") or "")
 
     brd_path = docs.get("brd") or docs.get("prd") or ""
     brd_filename = Path(brd_path).name if brd_path else "no document"
     fw = ", ".join(f for f in frameworks if f != "unknown") or "unknown stack"
 
+    # Load skill summaries from local SKILL.md files
+    skill_slugs = payload.get("skillSlugs") or []
+    skill_block = ""
+    if skill_slugs:
+        skill_lines = []
+        for slug in skill_slugs[:6]:  # max 6 skills to limit tokens
+            for skill_path in [
+                ROOT / "skills" / "analysis" / slug / "SKILL.md",
+                ROOT / "skills" / "workflow" / slug / "SKILL.md",
+                ROOT / "skills" / "frameworks" / slug / "SKILL.md",
+                ROOT / "skills" / "imported" / "github-sources" / slug / "SKILL.md",
+            ]:
+                if skill_path.exists():
+                    try:
+                        raw = skill_path.read_text(encoding="utf-8", errors="replace")
+                        # Strip frontmatter, take first 300 chars
+                        # Load full SKILL.md — local claude -p caches within same session
+                        content = re.sub(r'^---[\s\S]*?---\n', '', raw).strip()
+                        skill_lines.append(f"### {slug}\n{content}")
+                    except Exception:
+                        pass
+                    break
+        if skill_lines:
+            skill_block = "\n\n## Skill Guidance\n" + "\n\n".join(skill_lines)
+
     prompt = (
         f"You are a senior BA/Product Analyst. Generate a structured implementation plan.\n\n"
-        f"Project: {project_name}\nTech stack: {fw}\nDocument: {brd_filename}\n\n"
-        f"Generate 3-6 modules with features and tasks. Infer the domain from project name and document filename. "
-        f"Be specific — mention real entities, screens, and actions relevant to this project.\n\n"
-        f"Respond ONLY with valid JSON (no markdown, no explanation):\n"
+        f"## Project Context\n"
+        f"- Name: {project_name}\n- Stack: {fw}\n- Document: {brd_filename}"
+        f"{skill_block}\n\n"
+        f"## Output Requirements\n"
+        f"Generate 3-6 modules, each with 1-4 features, each 2-5 atomic tasks.\n"
+        f"Infer domain from project name + document. Tasks must be specific and actionable.\n"
+        f"Apply MoSCoW: must-have tasks first. Flag high-risk: payments, real-time, auth.\n\n"
+        f"Respond ONLY with valid JSON:\n"
         f'{{"modules":[{{"name":"...","features":[{{"name":"...","tasks":["task1","task2"]}}]}}]}}'
     )
 
-    result = subprocess.run(
+    action_id = str(action.get("id") or "")
+    process = subprocess.Popen(
         ["claude", "-p", prompt, "--output-format", "json"],
-        capture_output=True, text=True, timeout=120,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
     )
-    if result.returncode != 0:
-        raise ValueError(f"claude -p failed: {result.stderr[:300]}")
 
-    # claude --output-format json wraps in {"type":"result","result":"...","cost_usd":...}
-    raw = result.stdout.strip()
+    # Stream stdout and forward chunks to dashboard so UI can show live output
+    raw_chunks: list[str] = []
+    pending_lines: list[str] = []
+    flush_every = 3  # send every N lines
+
+    assert process.stdout is not None
+    for line in process.stdout:
+        raw_chunks.append(line)
+        display = line.rstrip()
+        if display:
+            pending_lines.append(display)
+        if len(pending_lines) >= flush_every:
+            post_json(f"/api/bridge/file-actions/{action_id}/progress",
+                      {"lines": pending_lines}, timeout=4)
+            pending_lines = []
+
+    if pending_lines:
+        post_json(f"/api/bridge/file-actions/{action_id}/progress",
+                  {"lines": pending_lines}, timeout=4)
+
+    process.wait(timeout=10)
+    if process.returncode != 0:
+        stderr = (process.stderr.read() if process.stderr else "")[:300]
+        raise ValueError(f"claude -p failed (rc={process.returncode}): {stderr}")
+
+    raw = "".join(raw_chunks).strip()
     try:
         outer = json.loads(raw)
         content = outer.get("result") or outer.get("content") or raw

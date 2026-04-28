@@ -1,6 +1,8 @@
+import fs from "fs/promises";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { getApiKeyByService } from "@/lib/api-keys";
+import { resolvePath } from "@/lib/fs/resolve";
 
 type ProjectWithLatestPath = {
   name: string;
@@ -19,21 +21,72 @@ type AiModule = {
   }>;
 };
 
+// ── Skill loader ─────────────────────────────────────────────────────────────
+
+type SkillSummary = { slug: string; description: string; guidance: string };
+
+async function loadSkillSummaries(skillSlugs: string[]): Promise<SkillSummary[]> {
+  if (skillSlugs.length === 0) return [];
+
+  const skills = await db.skillDefinition.findMany({
+    where: { slug: { in: skillSlugs } },
+    select: { slug: true, description: true, sourcePath: true },
+  });
+
+  return Promise.all(skills.map(async (skill) => {
+    let guidance = "";
+    if (skill.sourcePath) {
+      try {
+        const raw = await fs.readFile(resolvePath(skill.sourcePath), "utf-8");
+        // Strip frontmatter, load FULL content — Anthropic caches it after first use
+        guidance = raw.replace(/^---[\s\S]*?---\n/, "").trim();
+      } catch { /* cloud can't access local file — fall back to description */ }
+    }
+    return { slug: skill.slug, description: skill.description, guidance };
+  }));
+}
+
+function buildSkillBlock(skills: SkillSummary[]): string {
+  if (skills.length === 0) return "";
+  const lines = skills
+    .filter((s) => s.guidance || s.description)
+    .map((s) => `### ${s.slug}\n${s.guidance || s.description}`)
+    .join("\n\n");
+  return lines ? `\n\n## Attached Skills (apply all patterns below)\n${lines}` : "";
+}
+
 // ── AI callers ────────────────────────────────────────────────────────────────
 
-async function callAnthropic(apiKey: string, model: string, prompt: string): Promise<string> {
+async function callAnthropic(
+  apiKey: string,
+  model: string,
+  skillBlock: string,   // stable — will be cached
+  projectBlock: string, // dynamic — not cached
+): Promise<string> {
+  // Split into two user message blocks so Anthropic caches the skill content separately
+  const messages: unknown[] = skillBlock
+    ? [
+        {
+          role: "user",
+          content: [
+            // Stable skill content → mark for caching
+            { type: "text", text: skillBlock, cache_control: { type: "ephemeral" } },
+            // Dynamic project-specific prompt
+            { type: "text", text: projectBlock },
+          ],
+        },
+      ]
+    : [{ role: "user", content: projectBlock }];
+
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "x-api-key": apiKey,
       "anthropic-version": "2023-06-01",
+      "anthropic-beta": "prompt-caching-2024-07-31",
     },
-    body: JSON.stringify({
-      model,
-      max_tokens: 4096,
-      messages: [{ role: "user", content: prompt }],
-    }),
+    body: JSON.stringify({ model, max_tokens: 4096, messages }),
   });
   const body = await res.json() as { content?: Array<{ text?: string }>; error?: { message?: string } };
   if (!res.ok) throw new Error(body?.error?.message ?? "Anthropic error");
@@ -61,9 +114,10 @@ async function generateModulesWithAI(
   projectName: string,
   frameworks: string[],
   docs: Record<string, string>,
-  role: { provider: string; defaultModel: string | null; credentialService: string; rulesMarkdown: string | null },
+  role: { provider: string; defaultModel: string | null; credentialService: string; rulesMarkdown: string | null; skillSlugs: string[] },
   workspaceId: string,
 ): Promise<AiModule[] | null> {
+  const skillSummaries = await loadSkillSummaries(role.skillSlugs);
   const brdHint = docs.brd
     ? `BRD file: ${docs.brd.split(/[\\/]/).pop()}`
     : docs.prd
@@ -72,45 +126,42 @@ async function generateModulesWithAI(
 
   const fw = frameworks.filter((f) => f !== "unknown").join(", ") || "unknown stack";
 
-  const prompt = `You are a senior BA/Product Analyst. Analyze this project and generate a structured implementation plan.
+  const skillBlock = buildSkillBlock(skillSummaries);
 
-Project name: ${projectName}
-Tech stack: ${fw}
-${brdHint}
-${role.rulesMarkdown ? `\nRole context:\n${role.rulesMarkdown.slice(0, 800)}` : ""}
+  // Stable block (cached after first call): role rules + skills
+  const stableBlock = [
+    "You are a senior BA/Product Analyst.",
+    role.rulesMarkdown ? `\n## Role Rules\n${role.rulesMarkdown}` : "",
+    skillBlock,
+  ].filter(Boolean).join("\n");
 
-Based on the project name and document hints, generate a realistic breakdown of:
-- 3 to 6 modules (major areas of work)
-- Each module: 1 to 4 features
-- Each feature: 2 to 5 concrete, atomic implementation tasks (specific enough to code)
+  // Dynamic block (changes per project): project context + output format
+  const projectBlock = `## Project Context
+- Name: ${projectName}
+- Stack: ${fw}
+- ${brdHint}
 
-IMPORTANT: Infer the domain from the project name and document filename. Be specific — mention real entities, screens, and actions relevant to this project.
+## Output Requirements
+Generate 3–6 modules, each with 1–4 features, each feature with 2–5 atomic tasks.
+- Infer domain from project name + document filename
+- Tasks must be specific and actionable (real entity names, screens, actions)
+- Apply MoSCoW: must-have tasks first per feature
+- Flag high-risk: payments, real-time, auth, file upload
 
-Respond ONLY with valid JSON in exactly this format (no markdown, no explanation):
-{
-  "modules": [
-    {
-      "name": "Module Name",
-      "features": [
-        {
-          "name": "Feature Name",
-          "tasks": ["Specific task 1", "Specific task 2", "Specific task 3"]
-        }
-      ]
-    }
-  ]
-}`;
+Respond ONLY with valid JSON — no markdown, no explanation:
+{"modules":[{"name":"...","features":[{"name":"...","tasks":["task1","task2"]}]}]}`;
 
   let raw = "";
   try {
     if (role.credentialService === "anthropic") {
       const key = await getApiKeyByService("anthropic", workspaceId);
       if (!key) throw new Error("Anthropic API key not configured");
-      raw = await callAnthropic(key, role.defaultModel ?? "claude-sonnet-4-6", prompt);
+      raw = await callAnthropic(key, role.defaultModel ?? "claude-sonnet-4-6", stableBlock, projectBlock);
     } else if (role.credentialService === "openai") {
       const key = await getApiKeyByService("openai", workspaceId);
       if (!key) throw new Error("OpenAI API key not configured");
-      raw = await callOpenAI(key, role.defaultModel ?? "gpt-4o-mini", prompt);
+      // OpenAI doesn't have explicit cache_control but caches automatically for identical prefixes
+      raw = await callOpenAI(key, role.defaultModel ?? "gpt-4o-mini", stableBlock + "\n\n" + projectBlock);
     } else {
       return null;
     }
@@ -226,7 +277,7 @@ export async function analyzeProjectForWorkspace(
       credentialService: { in: ["anthropic", "openai"] },
     },
     orderBy: [{ credentialService: "asc" }, { createdAt: "asc" }],
-    select: { id: true, provider: true, defaultModel: true, credentialService: true, rulesMarkdown: true },
+    select: { id: true, provider: true, defaultModel: true, credentialService: true, rulesMarkdown: true, skills: { select: { slug: true } } },
   });
 
   // Try AI generation via direct API
@@ -234,7 +285,7 @@ export async function analyzeProjectForWorkspace(
   let source: "ai" | "bridge" | "fallback" = "fallback";
 
   if (analysisRole) {
-    modules = await generateModulesWithAI(projectName, project.frameworks, docs, analysisRole, workspaceId);
+    modules = await generateModulesWithAI(projectName, project.frameworks, docs, { ...analysisRole, skillSlugs: analysisRole.skills.map((s) => s.slug) }, workspaceId);
     if (modules) source = "ai";
   }
 
@@ -254,6 +305,10 @@ export async function analyzeProjectForWorkspace(
             projectName,
             frameworks: project.frameworks,
             docs,
+            skillSlugs: (await db.agentRole.findFirst({
+              where: { workspaceId, phase: "analysis" },
+              select: { skills: { select: { slug: true } } },
+            }))?.skills.map((s) => s.slug) ?? [],
             callbackPath: `/api/projects/${encodeURIComponent(projectName)}/analyze/result`,
           },
         },
