@@ -175,6 +175,7 @@
 - Added a gitignored `hooks/.gcs_project_paths.json` local registry so each machine remembers the project folders it owns after file-action sync and can report those paths on heartbeat without global machine variables.
 - Added cloud-only project creation: users can create dashboard projects with no local source folder, use documents/API keys/chat/analysis in cloud, and attach a local bridge later only when they need local file sync/actions.
 - Fixed stale project-path ownership after device identity changes: heartbeat and file-action result now remove duplicate path mappings for the same workspace/project/path on older devices, and project/settings path cards sort online devices first.
+- Standardized local device/settings timestamps through `formatDateTime()` with default timezone `Asia/Ho_Chi_Minh` (`NEXT_PUBLIC_APP_TIME_ZONE` override), so device path sync times render in ICT instead of browser/host-default ambiguous time.
 
 ## Checks
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { formatDateTime } from "@/lib/utils/format";
 
 type Device = { id: string; name: string; deviceKey: string; claudeAvailable: boolean; codexAvailable: boolean; lastSeenAt: string | null };
 type Token = { id: string; name: string; lastUsedAt: string | null; revokedAt: string | null; createdAt: string };
@@ -67,7 +68,7 @@ export function BridgePanel() {
               <div key={device.id} className="rounded-lg border border-border bg-bg-base p-3 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="font-semibold text-text">{device.name}</span>
-                  <span className="text-text-muted">{device.lastSeenAt ? new Date(device.lastSeenAt).toLocaleString() : "never"}</span>
+                  <span className="text-text-muted">{formatDateTime(device.lastSeenAt)}</span>
                 </div>
                 <div className="mt-2 flex gap-2">
                   <span className={`rounded px-1.5 py-0.5 ${device.claudeAvailable ? "bg-done/15 text-done" : "bg-border text-text-muted"}`}>Claude</span>
@@ -86,7 +87,7 @@ export function BridgePanel() {
                   <span className="font-semibold text-text">{token.name}</span>
                   <span className={token.revokedAt ? "text-blocked" : "text-done"}>{token.revokedAt ? "revoked" : "active"}</span>
                 </div>
-                <p className="mt-1 text-text-muted">Last used: {token.lastUsedAt ? new Date(token.lastUsedAt).toLocaleString() : "never"}</p>
+                <p className="mt-1 text-text-muted">Last used: {formatDateTime(token.lastUsedAt)}</p>
               </div>
             ))}
           </div>

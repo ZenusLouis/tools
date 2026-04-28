@@ -1,5 +1,6 @@
-import { HardDrive, MonitorCheck } from "lucide-react";
+﻿import { HardDrive, MonitorCheck } from "lucide-react";
 import type { ProjectDetail } from "@/lib/projects";
+import { formatDateTime } from "@/lib/utils/format";
 
 type LocalPath = ProjectDetail["localPaths"][number];
 
@@ -32,7 +33,7 @@ export function LocalDevicePathsCard({ paths }: { paths: LocalPath[] }) {
               </div>
               <p className="break-all font-mono text-[11px] text-text">{item.path}</p>
               <p className="mt-1 font-mono text-[10px] text-text-muted">
-                {item.deviceKey} · {item.lastSyncedAt ? new Date(item.lastSyncedAt).toLocaleString() : "never synced"}
+                {item.deviceKey} · {item.lastSyncedAt ? formatDateTime(item.lastSyncedAt) : "never synced"}
               </p>
             </div>
           ))}
@@ -41,3 +42,6 @@ export function LocalDevicePathsCard({ paths }: { paths: LocalPath[] }) {
     </section>
   );
 }
+
+
+

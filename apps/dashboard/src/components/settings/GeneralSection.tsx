@@ -1,4 +1,5 @@
 import type { LocalProjectPath } from "@/lib/settings";
+import { formatDateTime } from "@/lib/utils/format";
 
 interface Props {
   name: string;
@@ -57,7 +58,7 @@ export function GeneralSection({ name, projectPath, localPaths, mcpProfile, prof
                 </div>
                 <p className="break-all font-mono text-xs text-text">{item.path}</p>
                 <p className="mt-1 text-[11px] text-text-muted">
-                  Last synced: {item.lastSyncedAt ? new Date(item.lastSyncedAt).toLocaleString() : "never"}
+                  Last synced: {formatDateTime(item.lastSyncedAt)}
                 </p>
               </div>
             ))}
