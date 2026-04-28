@@ -154,10 +154,11 @@ def sync_codex_threads() -> int:
     last_ms = _load_codex_state()
     try:
         conn = sqlite3.connect(str(_CODEX_DB), timeout=1, check_same_thread=False)
+        cutoff_ms = max(last_ms, int((datetime.now().timestamp() - 86400) * 1000))
         rows = conn.execute(
             "SELECT id, updated_at_ms, model, cwd, title, tokens_used, first_user_message "
             "FROM threads WHERE tokens_used > 0 AND updated_at_ms > ? ORDER BY updated_at_ms ASC",
-            (last_ms,),
+            (cutoff_ms,),
         ).fetchall()
         conn.close()
     except Exception:
