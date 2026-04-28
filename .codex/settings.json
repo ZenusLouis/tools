@@ -17,9 +17,9 @@
         "-ExecutionPolicy",
         "Bypass",
         "-File",
-        "hooks/start-gcs-bridge.ps1"
+        "hooks/ensure-gcs-bridge.ps1"
       ],
-      "displayCommand": "powershell -NoProfile -ExecutionPolicy Bypass -File hooks/start-gcs-bridge.ps1",
+      "displayCommand": "powershell -NoProfile -ExecutionPolicy Bypass -File hooks/ensure-gcs-bridge.ps1",
       "heartbeatIntervalSeconds": 30,
       "syncIntervalSeconds": 5
     }

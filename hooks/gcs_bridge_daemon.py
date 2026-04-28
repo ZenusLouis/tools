@@ -93,7 +93,10 @@ def load_state() -> dict[str, int]:
 
 
 def save_state(state: dict[str, int]) -> None:
-    STATE_PATH.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
+    STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = STATE_PATH.with_suffix(f"{STATE_PATH.suffix}.tmp")
+    tmp_path.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
+    tmp_path.replace(STATE_PATH)
 
 
 def normalize_log_entry(entry: dict) -> dict | None:
@@ -162,6 +165,14 @@ def _project_from_cwd(cwd: str) -> str:
     return Path(clean).name or "local"
 
 
+def _should_backfill_existing_codex_thread(updated_at_ms: int) -> bool:
+    if CODEX_SYNC_EXISTING:
+        return True
+    updated_at = datetime.fromtimestamp(updated_at_ms / 1000)
+    now = datetime.now()
+    return updated_at.date() == now.date()
+
+
 def sync_codex_threads(state: dict[str, int]) -> int:
     if not CODEX_STATE_DB.exists():
         return 0
@@ -188,16 +199,16 @@ def sync_codex_threads(state: dict[str, int]) -> int:
         previous_tokens = state.get(thread_token_key)
         current_tokens = int(row["tokens_used"] or 0)
         if previous_tokens is None:
-            state[thread_token_key] = current_tokens
-            max_ms = max(max_ms, row["updated_at_ms"])
-            if not CODEX_SYNC_EXISTING:
+            if not _should_backfill_existing_codex_thread(row["updated_at_ms"]):
+                state[thread_token_key] = current_tokens
+                max_ms = max(max_ms, row["updated_at_ms"])
                 continue
             delta_tokens = current_tokens
         else:
             delta_tokens = max(0, current_tokens - previous_tokens)
-            state[thread_token_key] = current_tokens
-            max_ms = max(max_ms, row["updated_at_ms"])
             if delta_tokens <= 0:
+                state[thread_token_key] = current_tokens
+                max_ms = max(max_ms, row["updated_at_ms"])
                 continue
 
         project = _project_from_cwd(row["cwd"] or "")
@@ -233,6 +244,8 @@ def sync_codex_threads(state: dict[str, int]) -> int:
         payload = {k: v for k, v in payload.items() if v is not None}
         ok, detail = post_json("/api/log", payload, timeout=5)
         if ok:
+            state[thread_token_key] = current_tokens
+            max_ms = max(max_ms, row["updated_at_ms"])
             sent += 1
         else:
             print(f"[codex-sync] failed thread {row['id'][:8]}: {detail[:120]}", flush=True)

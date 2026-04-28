@@ -4,16 +4,17 @@ import { useState, useMemo } from "react";
 import { KanbanBoard, type AddTaskConfig } from "./KanbanBoard";
 import { TaskDetailPanel } from "./TaskDetailPanel";
 import { FilterBar } from "./FilterBar";
-import type { KanbanTask, TaskStatus } from "@/lib/tasks";
+import type { KanbanTask, TaskPagination, TaskStatus } from "@/lib/tasks";
 
 interface Props {
   tasks: KanbanTask[];
   completedIdList: string[];
   projectName: string;
   moduleId: string;
+  pagination?: TaskPagination;
 }
 
-export function TaskBoardClient({ tasks, completedIdList, projectName, moduleId }: Props) {
+export function TaskBoardClient({ tasks, completedIdList, projectName, moduleId, pagination }: Props) {
   const [selectedTask, setSelectedTask] = useState<KanbanTask | null>(null);
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "all">("all");
   const [featureFilter, setFeatureFilter] = useState<string>("all");
@@ -50,6 +51,7 @@ export function TaskBoardClient({ tasks, completedIdList, projectName, moduleId 
         selectedTaskId={selectedTask?.id ?? null}
         onTaskClick={setSelectedTask}
         addTaskConfig={addTaskConfig}
+        pagination={pagination}
       />
       <TaskDetailPanel
         task={selectedTask}

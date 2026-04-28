@@ -1,26 +1,43 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Download, Filter, History, X } from "lucide-react";
-import type { SessionRow } from "@/lib/analytics";
+import type { SessionPagination, SessionRow } from "@/lib/analytics";
 import { formatCurrency, formatNumber } from "@/lib/format";
 
-export function SessionsTable({ sessions }: { sessions: SessionRow[] }) {
-  const [provider, setProvider] = useState("all");
-  const [source, setSource] = useState("all");
+export function SessionsTable({
+  sessions,
+  pagination,
+  provider,
+  source,
+}: {
+  sessions: SessionRow[];
+  pagination: SessionPagination;
+  provider: string;
+  source: string;
+}) {
   const [selected, setSelected] = useState<SessionRow | null>(sessions[0] ?? null);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const providers = useMemo(() => {
-    return Array.from(new Set(sessions.map((session) => session.provider))).sort();
+    return Array.from(new Set(["claude", "codex", "chatgpt", ...sessions.map((session) => session.provider)])).sort();
   }, [sessions]);
 
-  const filteredSessions = useMemo(() => {
-    return sessions.filter((session) => {
-      const providerMatches = provider === "all" || session.provider === provider;
-      const sourceMatches = source === "all" || session.source === source;
-      return providerMatches && sourceMatches;
-    });
-  }, [provider, sessions, source]);
+  function setParam(key: string, value: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set(key, value);
+    params.set("page", "1");
+    router.push(`${pathname}?${params.toString()}`);
+  }
+
+  function setPage(nextPage: number) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("page", String(nextPage));
+    router.push(`${pathname}?${params.toString()}`);
+  }
 
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xl">
@@ -34,7 +51,7 @@ export function SessionsTable({ sessions }: { sessions: SessionRow[] }) {
             <Filter size={12} />
             <select
               value={provider}
-              onChange={(event) => setProvider(event.target.value)}
+              onChange={(event) => setParam("provider", event.target.value)}
               className="bg-transparent text-xs font-semibold text-text outline-none"
               aria-label="Filter token sessions by provider"
             >
@@ -48,7 +65,7 @@ export function SessionsTable({ sessions }: { sessions: SessionRow[] }) {
           </div>
           <select
             value={source}
-            onChange={(event) => setSource(event.target.value)}
+            onChange={(event) => setParam("source", event.target.value)}
             className="rounded-lg border border-border bg-bg-base px-3 py-1.5 text-xs font-semibold text-text outline-none"
             aria-label="Filter token sessions by source"
           >
@@ -63,14 +80,14 @@ export function SessionsTable({ sessions }: { sessions: SessionRow[] }) {
         </div>
       </div>
 
-      {filteredSessions.length === 0 ? (
+      {sessions.length === 0 ? (
         <p className="py-8 text-center text-sm text-text-muted">No sessions in this range.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
               <tr className="bg-bg-base/30 text-[10px] font-bold uppercase tracking-widest text-text-muted">
-                <th className="px-6 py-4">Date</th>
+                <th className="px-6 py-4">Date / Time</th>
                 <th className="px-6 py-4">Provider</th>
                 <th className="px-6 py-4">Project</th>
                 <th className="px-6 py-4">Tasks</th>
@@ -80,13 +97,18 @@ export function SessionsTable({ sessions }: { sessions: SessionRow[] }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/30">
-              {filteredSessions.map((session, index) => (
+              {sessions.map((session, index) => (
                 <tr
-                  key={`${session.date}-${session.project}-${session.source}-${session.tool ?? "session"}-${index}`}
+                  key={`${session.timestamp}-${session.project}-${session.source}-${session.tool ?? "session"}-${(pagination.page - 1) * pagination.pageSize + index}`}
                   onClick={() => setSelected(session)}
                   className={`cursor-pointer transition-colors hover:bg-card-hover/40 ${selected === session ? "bg-card-hover/50" : ""}`}
                 >
-                  <td className="px-6 py-4 text-sm text-text-muted">{session.date}</td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-text-muted">{session.date}</span>
+                      <span className="font-mono text-[10px] text-text-muted/80">{session.time}</span>
+                    </div>
+                  </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-col">
                       <span className="text-xs font-bold uppercase text-accent">{session.provider}</span>
@@ -125,10 +147,10 @@ export function SessionsTable({ sessions }: { sessions: SessionRow[] }) {
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-accent">Session Detail</p>
                 <h4 className="mt-1 text-lg font-bold text-text">
-                  {selected.provider.toUpperCase()} · {selected.source === "tool" ? selected.tool ?? "tool usage" : selected.project}
+                  {selected.provider.toUpperCase()} / {selected.source === "tool" ? selected.tool ?? "tool usage" : selected.project}
                 </h4>
                 <p className="mt-1 text-sm text-text-muted">
-                  {selected.date} · {selected.role ?? selected.model ?? "No role/model metadata"}
+                  {selected.date} {selected.time} / {selected.role ?? selected.model ?? "No role/model metadata"}
                 </p>
               </div>
               <button
@@ -162,7 +184,31 @@ export function SessionsTable({ sessions }: { sessions: SessionRow[] }) {
         </div>
       )}
 
-      <div className="border-t border-border/50 bg-bg-base/20 p-4 text-center">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/50 bg-bg-base/20 p-4">
+        <p className="text-xs text-text-muted">
+          Showing {pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.pageSize + 1}-{Math.min(pagination.page * pagination.pageSize, pagination.total)} of {formatNumber(pagination.total)}
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setPage(Math.max(1, pagination.page - 1))}
+            disabled={pagination.page <= 1}
+            className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-text-muted transition-colors hover:bg-card-hover hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Prev
+          </button>
+          <span className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-text">
+            {pagination.page}/{pagination.totalPages}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPage(Math.min(pagination.totalPages, pagination.page + 1))}
+            disabled={pagination.page >= pagination.totalPages}
+            className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-text-muted transition-colors hover:bg-card-hover hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Next
+          </button>
+        </div>
         <a href="/api/activity/export" className="text-xs font-bold uppercase tracking-widest text-accent transition-colors hover:text-text">
           View all history
         </a>

@@ -12,7 +12,8 @@ export type ProviderBreakdown = {
   cost: number;
 };
 export type DailyUsage = { date: string; label: string; tokens: number; cost: number };
-export type SessionRow = { date: string; provider: string; role: string | null; model: string | null; project: string; tasksCompleted: number; tokens: number; cost: number; durationMin: number | null; source: "session" | "tool"; tool?: string };
+export type SessionRow = { date: string; time: string; timestamp: string; provider: string; role: string | null; model: string | null; project: string; tasksCompleted: number; tokens: number; cost: number; durationMin: number | null; source: "session" | "tool"; tool?: string };
+export type SessionPagination = { page: number; pageSize: number; total: number; totalPages: number };
 export type AnalyticsData = {
   totalTokens: number;
   totalCost: number;
@@ -20,6 +21,7 @@ export type AnalyticsData = {
   toolBreakdown: ToolBreakdown[];
   dailyUsage: DailyUsage[];
   sessions: SessionRow[];
+  sessionPagination: SessionPagination;
 };
 
 const COST_PER_MILLION = 3.0;
@@ -44,7 +46,15 @@ function usageBucket(date: Date, range: DateRange): { key: string; label: string
   };
 }
 
-export async function getAnalytics(range: DateRange, workspaceId?: string): Promise<AnalyticsData> {
+function sessionTime(date: Date): string {
+  return date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+}
+
+export async function getAnalytics(
+  range: DateRange,
+  workspaceId?: string,
+  options?: { sessionPage?: number; sessionPageSize?: number; sessionProvider?: string; sessionSource?: string },
+): Promise<AnalyticsData> {
   const since = rangeStart(range);
 
   const [sessions, toolUsage] = await Promise.all([
@@ -98,11 +108,13 @@ export async function getAnalytics(range: DateRange, workspaceId?: string): Prom
     .sort((a, b) => a.date.localeCompare(b.date));
 
   // Session rows
-  const sessionRows: SessionRow[] = [
+  const allSessionRows: SessionRow[] = [
     ...sessions
       .filter((s) => s.provider !== "codex" && (s.totalTokens ?? 0) > 0)
       .map((s) => ({
         date: s.date.toISOString().slice(0, 10),
+        time: sessionTime(s.date),
+        timestamp: s.date.toISOString(),
         provider: s.provider,
         role: s.role,
         model: s.model,
@@ -115,6 +127,8 @@ export async function getAnalytics(range: DateRange, workspaceId?: string): Prom
       })),
     ...toolUsage.map((usage) => ({
       date: usage.date.toISOString().slice(0, 10),
+      time: sessionTime(usage.date),
+      timestamp: usage.date.toISOString(),
       provider: usage.provider,
       role: usage.role,
       model: usage.model,
@@ -126,7 +140,17 @@ export async function getAnalytics(range: DateRange, workspaceId?: string): Prom
       source: "tool" as const,
       tool: usage.tool,
     })),
-  ].sort((a, b) => b.date.localeCompare(a.date));
+  ].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  const filteredSessionRows = allSessionRows.filter((row) => {
+    const providerMatches = !options?.sessionProvider || options.sessionProvider === "all" || row.provider === options.sessionProvider;
+    const sourceMatches = !options?.sessionSource || options.sessionSource === "all" || row.source === options.sessionSource;
+    return providerMatches && sourceMatches;
+  });
+  const pageSize = Math.min(Math.max(options?.sessionPageSize ?? 12, 1), 100);
+  const totalPages = Math.max(1, Math.ceil(filteredSessionRows.length / pageSize));
+  const page = Math.min(Math.max(options?.sessionPage ?? 1, 1), totalPages);
+  const sessionsPage = filteredSessionRows.slice((page - 1) * pageSize, page * pageSize);
+  const sessionPagination = { page, pageSize, total: filteredSessionRows.length, totalPages };
 
-  return { totalTokens, totalCost, providerBreakdown, toolBreakdown, dailyUsage, sessions: sessionRows };
+  return { totalTokens, totalCost, providerBreakdown, toolBreakdown, dailyUsage, sessions: sessionsPage, sessionPagination };
 }

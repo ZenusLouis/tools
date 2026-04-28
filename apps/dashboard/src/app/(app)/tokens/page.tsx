@@ -12,17 +12,25 @@ import { requireCurrentUser } from "@/lib/auth";
 const VALID_RANGES = new Set<DateRange>(["today", "week", "month", "year"]);
 
 interface Props {
-  searchParams: Promise<{ range?: string }>;
+  searchParams: Promise<{ range?: string; page?: string; provider?: string; source?: string }>;
 }
 
 export default async function TokensPage({ searchParams }: Props) {
-  const { range } = await searchParams;
+  const { range, page, provider, source } = await searchParams;
   const dateRange: DateRange = VALID_RANGES.has(range as DateRange)
     ? (range as DateRange)
     : "today";
+  const sessionPage = Math.max(1, Number(page ?? "1") || 1);
+  const sessionProvider = provider ?? "all";
+  const sessionSource = source ?? "all";
 
   const user = await requireCurrentUser();
-  const analytics = await getAnalytics(dateRange, user.workspaceId);
+  const analytics = await getAnalytics(dateRange, user.workspaceId, {
+    sessionPage,
+    sessionPageSize: 12,
+    sessionProvider,
+    sessionSource,
+  });
 
   return (
     <>
@@ -60,7 +68,12 @@ export default async function TokensPage({ searchParams }: Props) {
             <DailyBarChart dailyUsage={analytics.dailyUsage} />
           </section>
 
-          <SessionsTable sessions={analytics.sessions} />
+          <SessionsTable
+            sessions={analytics.sessions}
+            pagination={analytics.sessionPagination}
+            provider={sessionProvider}
+            source={sessionSource}
+          />
         </div>
       </PageShell>
     </>

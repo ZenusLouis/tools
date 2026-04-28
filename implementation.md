@@ -63,6 +63,16 @@
 - `apps/dashboard/scripts/repair-codex-token-totals.ts`
 - `apps/dashboard/package.json`
 - `apps/dashboard/src/lib/stats.ts`
+- `apps/dashboard/src/components/tasks/TaskBoardSelectors.tsx`
+- `apps/dashboard/src/lib/tasks.ts`
+- `apps/dashboard/src/app/(app)/tasks/page.tsx`
+- `apps/dashboard/src/components/wizard/Step1Path.tsx`
+- `apps/dashboard/src/app/(app)/projects/new/actions.ts`
+- `hooks/gcs_bridge_daemon.py`
+- `hooks/ensure-gcs-bridge.ps1`
+- `.codex/settings.json`
+- `agents/BRIDGE.md`
+- `.codex/README.md`
 
 ## Behavior
 
@@ -94,15 +104,24 @@
 - Added year range support to Token Analytics and grouped year view by month instead of showing a running thread total.
 - Compacted large token totals in token analytics cards while preserving full values in tooltips.
 - Added shared number/currency format helpers and standardized cost display, so values like `$356.8792` render as `$356.88`.
-- Added per-column Task Board paging with `Load more`, `Show all`, and `Collapse`, plus viewport-height column scroll.
+- Added backend-driven per-column Task Board paging via URL query params, with `Prev`, `Next`, `Show all`, and `Back to pages`, plus viewport-height column scroll.
 - Added a dry-run-first Codex token repair script for removing old inflated Codex token/session rows after switching to delta-based sync.
 - Made dashboard stats and token analytics ignore Codex `Session.totalTokens`; Codex token totals now come only from delta-based `ToolUsage`, so old long-running thread totals cannot inflate Today/Week/Month views.
+- Added backend-driven Token Analytics table pagination with 12 rows per page and filter-aware page reset.
+- Added Task Board `All Modules` selector backed by project-wide task/progress queries.
+- Reset Task Board pagination automatically when project/module filters change, so server queries do not reuse stale page params.
+- Added per-row time display to Token Analytics sessions and sorted recent sessions by full timestamp instead of date-only.
+- Changed project folder scan so inaccessible local paths no longer block project creation; the wizard now shows a warning and allows creating an empty index for folders only visible to the local bridge machine.
+- Changed Codex bridge sync to backfill today's existing Codex thread total on first detection, then continue with deltas so active IDE chats do not appear as only a tiny post-start delta.
+- Made bridge state writes atomic to avoid null/corrupt `.gcs_bridge_state.json` files after interruption.
+- Added `hooks/ensure-gcs-bridge.ps1` and wired Codex settings/docs to use it so a single command starts the bridge in the background only when it is not already running.
 
 ## Checks
 
 - `npm run lint`
 - `npm run build`
 - `python -m py_compile hooks/gcs_bridge_daemon.py hooks/token-tracker.py`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File hooks/ensure-gcs-bridge.ps1`
 
 ## Gaps
 

@@ -56,7 +56,7 @@ Codex token usage is recorded as an estimate because Codex CLI/IDE does not expo
 To keep this local machine online on the dashboard and sync new `logs/global-*.jsonl` entries until the terminal is closed:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File hooks/start-gcs-bridge.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File hooks/ensure-gcs-bridge.ps1
 ```
 
 Successful heartbeats are quiet by default; the daemon prints startup, errors, and sync events. Add `--verbose` if you want every heartbeat response.

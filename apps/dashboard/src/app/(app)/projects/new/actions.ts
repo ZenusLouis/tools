@@ -16,6 +16,7 @@ export type ScanResult = {
   name: string;
   framework: string[];
   error?: string;
+  warning?: string;
 };
 
 async function detectFramework(folderPath: string): Promise<string[]> {
@@ -71,15 +72,24 @@ async function detectFramework(folderPath: string): Promise<string[]> {
 }
 
 export async function scanProject(folderPath: string): Promise<ScanResult> {
+  const trimmedPath = folderPath.trim();
+  const fallbackName = path.basename(path.normalize(trimmedPath)).toLowerCase().replace(/\s+/g, "-");
+  if (!trimmedPath || !fallbackName || fallbackName === "." || fallbackName === path.parse(trimmedPath).root.toLowerCase()) {
+    return { name: "", framework: [], error: "Enter a project folder path" };
+  }
+
   try {
-    const stat = await fs.stat(folderPath);
+    const stat = await fs.stat(trimmedPath);
     if (!stat.isDirectory()) return { name: "", framework: [], error: "Path is not a directory" };
 
-    const framework = await detectFramework(folderPath);
-    const name = path.basename(folderPath).toLowerCase().replace(/\s+/g, "-");
-    return { name, framework };
+    const framework = await detectFramework(trimmedPath);
+    return { name: fallbackName, framework };
   } catch {
-    return { name: "", framework: [], error: "Folder not found or inaccessible" };
+    return {
+      name: fallbackName,
+      framework: ["unknown"],
+      warning: "Folder is not accessible from this dashboard runtime. The project can still be created with an empty index; run the local bridge on the machine that owns this path to sync files later.",
+    };
   }
 }
 

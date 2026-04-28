@@ -12,7 +12,7 @@ interface Props {
 export function Step1Path({ initial, onNext }: Props) {
   const [folderPath, setFolderPath] = useState(initial);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ name: string; framework: string[] } | null>(null);
+  const [result, setResult] = useState<{ name: string; framework: string[]; warning?: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function handleScan() {
@@ -22,7 +22,7 @@ export function Step1Path({ initial, onNext }: Props) {
     startTransition(async () => {
       const res = await scanProject(folderPath.trim());
       if (res.error) setError(res.error);
-      else setResult({ name: res.name, framework: res.framework });
+      else setResult({ name: res.name, framework: res.framework, warning: res.warning });
     });
   }
 
@@ -60,6 +60,7 @@ export function Step1Path({ initial, onNext }: Props) {
       {result && (
         <div className="flex flex-col gap-2 rounded-lg border border-done/30 bg-done/5 px-4 py-3">
           <p className="text-xs font-medium text-done">Project detected</p>
+          {result.warning && <p className="rounded border border-in-progress/30 bg-in-progress/10 px-3 py-2 text-xs text-in-progress">{result.warning}</p>}
           <div className="flex items-center gap-3 text-sm">
             <span className="text-xs text-text-muted">Name:</span>
             <span className="font-mono font-medium text-text">{result.name}</span>

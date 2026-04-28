@@ -5,6 +5,17 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import type { ProjectOption, ModuleOption } from "@/lib/tasks";
 
+const TASK_PAGINATION_PARAMS = [
+  "pendingPage",
+  "pendingShow",
+  "inProgressPage",
+  "inProgressShow",
+  "completedPage",
+  "completedShow",
+  "blockedPage",
+  "blockedShow",
+];
+
 interface Props {
   projects: ProjectOption[];
   modules: ModuleOption[];
@@ -23,10 +34,12 @@ export function TaskBoardSelectors({ projects, modules, selectedProject, selecte
     const params = new URLSearchParams(searchParams.toString());
     params.set(key, value);
     if (key === "project") params.delete("module");
+    TASK_PAGINATION_PARAMS.forEach((param) => params.delete(param));
     router.push(`${pathname}?${params.toString()}`);
   }
 
   const selectedModuleLabel = modules.find((module) => module.id === selectedModule);
+  const moduleOptions = [{ value: "all", label: "All Modules" }, ...modules.map((module) => ({ value: module.id, label: `${module.id} - ${module.name}` }))];
 
   return (
     <div className="flex flex-wrap items-stretch rounded-xl border bg-card shadow-sm shadow-black/10">
@@ -44,11 +57,11 @@ export function TaskBoardSelectors({ projects, modules, selectedProject, selecte
 
       <Picker
         label="Module"
-        value={selectedModuleLabel ? `${selectedModuleLabel.id} - ${selectedModuleLabel.name}` : "No modules"}
+        value={selectedModule === "all" ? "All Modules" : selectedModuleLabel ? `${selectedModuleLabel.id} - ${selectedModuleLabel.name}` : "No modules"}
         open={openMenu === "module"}
         disabled={modules.length === 0}
         onToggle={() => setOpenMenu(openMenu === "module" ? null : "module")}
-        options={modules.map((module) => ({ value: module.id, label: `${module.id} - ${module.name}` }))}
+        options={moduleOptions}
         onSelect={(value) => {
           setParam("module", value);
           setOpenMenu(null);

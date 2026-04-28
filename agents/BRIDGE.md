@@ -30,7 +30,7 @@ The request uses `User-Agent: GCS-Local-Bridge/1.0` so Cloudflare can allow brid
 Run this when you want the local machine to stay visible and sync new local JSONL logs until the terminal is closed:
 
 ```text
-powershell -NoProfile -ExecutionPolicy Bypass -File hooks/start-gcs-bridge.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File hooks/ensure-gcs-bridge.ps1
 ```
 
 Default behavior:
