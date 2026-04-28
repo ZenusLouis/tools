@@ -11,6 +11,7 @@ interface Props {
 
 export function Step1Path({ initial, onNext }: Props) {
   const [folderPath, setFolderPath] = useState(initial);
+  const [cloudName, setCloudName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ name: string; framework: string[]; warning?: string } | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -31,7 +32,7 @@ export function Step1Path({ initial, onNext }: Props) {
       <div>
         <p className="text-[10px] font-bold uppercase tracking-widest text-accent">Step 1</p>
         <h2 className="mt-1 text-base font-semibold text-text">Project Folder</h2>
-        <p className="mt-1 text-xs text-text-muted">Enter the absolute path to your project folder.</p>
+        <p className="mt-1 text-xs text-text-muted">Enter a local folder path when this project has source on this machine, or create a cloud-only project below.</p>
       </div>
 
       <div className="flex flex-col gap-2">
@@ -55,6 +56,28 @@ export function Step1Path({ initial, onNext }: Props) {
           </button>
         </div>
         {error && <p className="text-xs text-blocked">{error}</p>}
+      </div>
+
+      <div className="rounded-lg border border-border bg-bg-base p-4">
+        <p className="text-xs font-semibold text-text">Cloud-only project</p>
+        <p className="mt-1 text-xs text-text-muted">Use this when the account only has documents/API keys in the dashboard and no local source folder on this machine.</p>
+        <div className="mt-3 flex gap-2">
+          <input
+            type="text"
+            value={cloudName}
+            onChange={(event) => setCloudName(event.target.value)}
+            placeholder="Project name, e.g. omnibooking"
+            className="flex-1 rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+          <button
+            type="button"
+            onClick={() => onNext("", cloudName.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, ""), ["cloud-only"])}
+            disabled={!cloudName.trim()}
+            className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-text-muted transition-colors hover:bg-card-hover hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Continue cloud-only
+          </button>
+        </div>
       </div>
 
       {result && (

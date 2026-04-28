@@ -21,6 +21,8 @@ apps/dashboard/.env.*.local
 # Logs
 logs/*.jsonl
 hooks/.gcs_bridge_state.json
+hooks/.gcs_device.json
+hooks/.gcs_project_paths.json
 hooks/__pycache__/
 
 # External skill source cache

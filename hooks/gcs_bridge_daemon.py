@@ -10,7 +10,6 @@ import argparse
 import json
 import os
 import shutil
-import socket
 import sqlite3
 import sys
 import time
@@ -19,7 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from gcs_env import ROOT, bridge_user_agent, load_dashboard_env
+from gcs_env import ROOT, bridge_user_agent, load_dashboard_env, local_device_identity
 
 
 load_dashboard_env()
@@ -30,6 +29,7 @@ HOOK_SECRET = os.environ.get("HOOK_SECRET", "")
 LOG_DIR = ROOT / "logs"
 STATE_PATH = ROOT / "hooks" / ".gcs_bridge_state.json"
 PROJECTS_DIR = ROOT / "projects"
+LOCAL_PROJECT_PATHS = ROOT / "hooks" / ".gcs_project_paths.json"
 
 
 def headers() -> dict[str, str]:
@@ -71,9 +71,19 @@ def post_json_data(path: str, payload: dict, timeout: int = 8) -> tuple[bool, di
 
 def collect_project_paths() -> list[dict[str, str]]:
     """Read local GCS project contexts and report source folders known to this device."""
+    by_name: dict[str, str] = {}
+    try:
+        data = json.loads(LOCAL_PROJECT_PATHS.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            for project_name, project_path in data.items():
+                if isinstance(project_name, str) and isinstance(project_path, str) and project_name and project_path:
+                    by_name[project_name] = project_path
+    except Exception:
+        pass
+
     if not PROJECTS_DIR.exists():
-        return []
-    result: list[dict[str, str]] = []
+        return [{"projectName": name, "path": path} for name, path in sorted(by_name.items())]
+
     for context_path in PROJECTS_DIR.glob("*/context.json"):
         try:
             data = json.loads(context_path.read_text(encoding="utf-8"))
@@ -84,8 +94,24 @@ def collect_project_paths() -> list[dict[str, str]]:
         project_name = str(data.get("name") or context_path.parent.name).strip()
         project_path = str(data.get("path") or "").strip()
         if project_name and project_path:
-            result.append({"projectName": project_name, "path": project_path})
-    return result
+            by_name[project_name] = project_path
+    return [{"projectName": name, "path": path} for name, path in sorted(by_name.items())]
+
+
+def remember_project_path(project_name: str, project_path: str) -> None:
+    if not project_name or not project_path:
+        return
+    try:
+        data = json.loads(LOCAL_PROJECT_PATHS.read_text(encoding="utf-8")) if LOCAL_PROJECT_PATHS.exists() else {}
+        if not isinstance(data, dict):
+            data = {}
+    except Exception:
+        data = {}
+    data[project_name] = project_path
+    LOCAL_PROJECT_PATHS.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = LOCAL_PROJECT_PATHS.with_suffix(f"{LOCAL_PROJECT_PATHS.suffix}.tmp")
+    tmp_path.write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")
+    tmp_path.replace(LOCAL_PROJECT_PATHS)
 
 
 def heartbeat(verbose: bool) -> bool:
@@ -93,8 +119,9 @@ def heartbeat(verbose: bool) -> bool:
         print("BRIDGE_TOKEN or HOOK_SECRET is not set; bridge cannot authenticate.", flush=True)
         return False
 
-    device_key = os.environ.get("GCS_DEVICE_KEY", socket.gethostname().lower())
-    device_name = os.environ.get("GCS_DEVICE_NAME", socket.gethostname())
+    identity = local_device_identity()
+    device_key = identity["deviceKey"]
+    device_name = identity["deviceName"]
     ok, detail = post_json(
         "/api/bridge/heartbeat",
         {
@@ -273,7 +300,7 @@ def sync_codex_threads(state: dict[str, int]) -> int:
             "provider": "codex",
             "role": os.environ.get("GCS_ROLE") or "dev-implementer",
             "model": row["model"] or None,
-            "deviceKey": os.environ.get("GCS_DEVICE_KEY", socket.gethostname().lower()),
+            "deviceKey": local_device_identity()["deviceKey"],
         }
         ok, detail = post_json("/api/log", {k: v for k, v in tool_payload.items() if v is not None}, timeout=5)
         if not ok:
@@ -334,6 +361,7 @@ def execute_file_action(action: dict[str, Any]) -> dict[str, Any]:
         raise ValueError(f"unsupported file action type: {action_type}")
 
     project_path = str(payload.get("projectPath") or "")
+    project_name = str(payload.get("projectName") or "")
     files = payload.get("files")
     if not isinstance(files, list):
         raise ValueError("payload.files must be a list")
@@ -351,11 +379,12 @@ def execute_file_action(action: dict[str, Any]) -> dict[str, Any]:
         target.write_text(content, encoding="utf-8")
         written.append(str(target))
 
+    remember_project_path(project_name, project_path)
     return {"written": written, "count": len(written)}
 
 
 def poll_file_actions() -> int:
-    device_key = os.environ.get("GCS_DEVICE_KEY", socket.gethostname().lower())
+    device_key = local_device_identity()["deviceKey"]
     ok, data = post_json_data("/api/bridge/file-actions/pending", {"deviceKey": device_key, "limit": 5}, timeout=8)
     if not ok:
         print(f"[file-actions] poll failed: {str(data)[:160]}", flush=True)

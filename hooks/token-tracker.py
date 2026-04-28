@@ -8,13 +8,12 @@ Sends to dashboard API (primary) + local JSONL fallback.
 import json
 import sys
 import os
-import socket
 import sqlite3
 import urllib.request
 from datetime import datetime, date
 from pathlib import Path
 
-from gcs_env import bridge_user_agent, load_dashboard_env
+from gcs_env import bridge_user_agent, load_dashboard_env, local_device_identity
 
 load_dashboard_env()
 
@@ -34,7 +33,7 @@ BRIDGE_TOKEN  = os.environ.get("BRIDGE_TOKEN", "")
 GCS_PROVIDER  = os.environ.get("GCS_PROVIDER", "claude")
 GCS_ROLE      = os.environ.get("GCS_ROLE", "")
 GCS_MODEL     = os.environ.get("GCS_MODEL", "")
-GCS_DEVICE_KEY = os.environ.get("GCS_DEVICE_KEY", socket.gethostname().lower())
+GCS_DEVICE_KEY = local_device_identity()["deviceKey"]
 
 TOOL_ESTIMATES = {
     "Read":    lambda inp: max(200, len(str(inp.get("content", ""))) // 4 + 100),

@@ -45,7 +45,9 @@ export function Step4Done({
         <p className="mt-1 text-in-progress/90">
           {localSyncQueued
             ? <>The local bridge will write metadata into <span className="font-mono">{folderPath}\.gcs</span> when it picks up the queued cloud action.</>
-            : <>GCS creates metadata in its workspace, not inside <span className="font-mono">{folderPath}</span>. If the dashboard is hosted, it also cannot write directly to your local drive; use the local bridge for local file sync/actions.</>}
+            : folderPath
+              ? <>GCS creates metadata in its workspace, not inside <span className="font-mono">{folderPath}</span>. If the dashboard is hosted, it also cannot write directly to your local drive; use the local bridge for local file sync/actions.</>
+              : <>This is a cloud-only project. It can use dashboard data, documents, API keys, chat, and analysis without any local source folder. Connect a local bridge later if you want file sync/actions on a machine.</>}
         </p>
       </div>
 

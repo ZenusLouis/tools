@@ -7,8 +7,7 @@
     ]
   },
   "bridge": {
-    "deviceKeyEnv": "COMPUTERNAME",
-    "deviceNameEnv": "COMPUTERNAME",
+    "deviceIdentity": "auto-local-per-bridge-token",
     "userAgent": "GCS-Local-Bridge/1.0",
     "daemon": {
       "command": "powershell",

@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import os
 import json
+import socket
+import uuid
+from hashlib import sha256
 from pathlib import Path
 
 
@@ -12,6 +15,7 @@ DEFAULT_SETTINGS_FILES = (
     ROOT / ".codex" / "settings.json",
     ROOT / ".codex" / "settings.local.json",
 )
+DEVICE_IDENTITY_PATH = ROOT / "hooks" / ".gcs_device.json"
 
 
 def _clean(value: str) -> str:
@@ -49,6 +53,45 @@ def bridge_user_agent() -> str:
     settings = load_codex_settings()
     value = settings.get("bridge", {}).get("userAgent")
     return str(value) if value else "GCS-Local-Bridge/1.0"
+
+
+def bridge_token_hash() -> str:
+    token = os.environ.get("BRIDGE_TOKEN", "")
+    return sha256(token.encode("utf-8")).hexdigest() if token else "anonymous"
+
+
+def local_device_identity() -> dict[str, str]:
+    """Return a stable per-account local device identity without machine env vars.
+
+    The bridge token scopes the device to the logged-in account/workspace.
+    The generated device key is local-only and gitignored, so different machines
+    using the same account still register as separate devices.
+    """
+    token_hash = bridge_token_hash()
+    try:
+        if DEVICE_IDENTITY_PATH.exists():
+            data = json.loads(DEVICE_IDENTITY_PATH.read_text(encoding="utf-8"))
+            if isinstance(data, dict) and data.get("tokenHash") == token_hash:
+                device_key = str(data.get("deviceKey") or "")
+                device_name = str(data.get("deviceName") or "")
+                if device_key and device_name:
+                    return {"deviceKey": device_key, "deviceName": device_name}
+    except Exception:
+        pass
+
+    suffix = uuid.uuid4().hex[:10]
+    host_hint = socket.gethostname() or "local"
+    identity = {
+        "deviceKey": f"gcs-local-{token_hash[:10]}-{suffix}",
+        "deviceName": f"Local Bridge {host_hint}",
+        "tokenHash": token_hash,
+    }
+    try:
+        DEVICE_IDENTITY_PATH.parent.mkdir(parents=True, exist_ok=True)
+        DEVICE_IDENTITY_PATH.write_text(json.dumps(identity, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+    return {"deviceKey": identity["deviceKey"], "deviceName": identity["deviceName"]}
 
 
 def _env_files(settings: dict) -> list[Path]:

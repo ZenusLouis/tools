@@ -4,10 +4,9 @@
 import json
 import os
 import shutil
-import socket
 import urllib.request
 
-from gcs_env import bridge_user_agent, load_dashboard_env
+from gcs_env import bridge_user_agent, load_dashboard_env, local_device_identity
 
 load_dashboard_env()
 
@@ -21,9 +20,10 @@ def main():
         print("BRIDGE_TOKEN or HOOK_SECRET is not set")
         return
 
+    identity = local_device_identity()
     payload = {
-        "deviceKey": os.environ.get("GCS_DEVICE_KEY", socket.gethostname().lower()),
-        "name": os.environ.get("GCS_DEVICE_NAME", socket.gethostname()),
+        "deviceKey": identity["deviceKey"],
+        "name": identity["deviceName"],
         "claudeAvailable": shutil.which("claude") is not None,
         "codexAvailable": shutil.which("codex") is not None,
         "metadata": {

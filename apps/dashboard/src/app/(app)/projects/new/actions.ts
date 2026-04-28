@@ -185,7 +185,8 @@ export type CreateProjectInput = {
 export async function createProject(input: CreateProjectInput): Promise<{ error?: string; name?: string; localSyncQueued?: boolean }> {
   const user = await requireCurrentUser();
   const { folderPath, framework, mcpProfile, docs, tools } = input;
-  const name = sanitizeProjectName(input.name, folderPath);
+  const trimmedFolderPath = folderPath.trim();
+  const name = sanitizeProjectName(input.name, trimmedFolderPath);
 
   if (!name) return { error: "Project name could not be detected from the folder path" };
 
@@ -213,7 +214,7 @@ export async function createProject(input: CreateProjectInput): Promise<{ error?
 
   const contextPayload = {
     name,
-    path: folderPath,
+    ...(trimmedFolderPath ? { path: trimmedFolderPath } : {}),
     framework,
     mcpProfile: mcpProfile || undefined,
     docs: Object.keys(filteredDocs).length ? filteredDocs : undefined,
@@ -243,10 +244,19 @@ export async function createProject(input: CreateProjectInput): Promise<{ error?
   // Write empty progress.json
   await writeJSON(progressPath, progressPayload);
 
-  // Build code-index
+  // Build code-index when the dashboard runtime can access a local folder.
   const fileMap = new Map<string, string[]>();
-  await scanDir(folderPath, folderPath, 0, fileMap);
-  const indexContent = buildCodeIndex(name, fileMap);
+  if (trimmedFolderPath) {
+    await scanDir(trimmedFolderPath, trimmedFolderPath, 0, fileMap);
+  }
+  const indexContent = trimmedFolderPath
+    ? buildCodeIndex(name, fileMap)
+    : [
+        `# Code Index: ${name} [cloud-only]`,
+        "No local source folder is attached to this account yet.",
+        "Connect a local bridge later to sync source-aware metadata.",
+        "",
+      ].join("\n");
   await fs.writeFile(codeIndexPath, indexContent, "utf-8");
 
   // Register
@@ -258,49 +268,51 @@ export async function createProject(input: CreateProjectInput): Promise<{ error?
     create: {
       name,
       workspaceId: user.workspaceId,
-      path: folderPath,
+      path: trimmedFolderPath || null,
       frameworks: framework,
       mcpProfile: mcpProfile || null,
       docs: filteredDocs,
       links: filteredTools,
-      lastIndexed: new Date(),
+      lastIndexed: trimmedFolderPath ? new Date() : null,
       activeTask: null,
     },
     update: {
       workspaceId: user.workspaceId,
-      path: folderPath,
+      path: trimmedFolderPath || null,
       frameworks: framework,
       mcpProfile: mcpProfile || null,
       docs: filteredDocs,
       links: filteredTools,
-      lastIndexed: new Date(),
+      lastIndexed: trimmedFolderPath ? new Date() : null,
     },
   });
 
-  await db.bridgeFileAction.create({
-    data: {
-      workspaceId: user.workspaceId,
-      type: "sync_project_metadata",
-      payload: {
-        projectName: name,
-        projectPath: folderPath,
-        files: [
-          {
-            relativePath: ".gcs/context.json",
-            content: JSON.stringify(contextPayload, null, 2),
-          },
-          {
-            relativePath: ".gcs/progress.json",
-            content: JSON.stringify(progressPayload, null, 2),
-          },
-          {
-            relativePath: ".gcs/code-index.md",
-            content: indexContent,
-          },
-        ],
+  if (trimmedFolderPath) {
+    await db.bridgeFileAction.create({
+      data: {
+        workspaceId: user.workspaceId,
+        type: "sync_project_metadata",
+        payload: {
+          projectName: name,
+          projectPath: trimmedFolderPath,
+          files: [
+            {
+              relativePath: ".gcs/context.json",
+              content: JSON.stringify(contextPayload, null, 2),
+            },
+            {
+              relativePath: ".gcs/progress.json",
+              content: JSON.stringify(progressPayload, null, 2),
+            },
+            {
+              relativePath: ".gcs/code-index.md",
+              content: indexContent,
+            },
+          ],
+        },
       },
-    },
-  });
+    });
+  }
 
-  return { name, localSyncQueued: true };
+  return { name, localSyncQueued: Boolean(trimmedFolderPath) };
 }

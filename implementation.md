@@ -97,6 +97,16 @@
 - `apps/dashboard/src/app/(app)/projects/[name]/page.tsx`
 - `apps/dashboard/src/app/(app)/projects/[name]/detail/page.tsx`
 - `apps/dashboard/src/proxy.ts`
+- `.codex/settings.json`
+- `.codex/settings.local.json.example`
+- `.gitignore`
+- `hooks/gcs_env.py`
+- `hooks/bridge-heartbeat.py`
+- `hooks/token-tracker.py`
+- `hooks/run-codex.py`
+- `apps/dashboard/src/app/(app)/projects/new/actions.ts`
+- `apps/dashboard/src/components/wizard/Step1Path.tsx`
+- `apps/dashboard/src/components/wizard/Step4Done.tsx`
 
 ## Behavior
 
@@ -161,6 +171,9 @@
 - Fixed bridge file sync auth by allowing `/api/bridge/file-actions/*` through the dashboard proxy. Before this, the route returned `401` before bridge-token verification, so local daemon could heartbeat but could not poll/write cloud-to-local file actions.
 - Created a cloud bridge token for this machine, stored it in gitignored `.codex/settings.local.json` under `env.BRIDGE_TOKEN`, restarted the local bridge, manually drained the existing queued OmniBooking file action, wrote `.gcs/context.json`, `.gcs/progress.json`, and `.gcs/code-index.md` to `D:\Code\OmniBooking`, then reported the action as succeeded.
 - Removed bridge-token guidance that suggested Windows environment variables; Chat and Settings now point to `.codex/settings.local.json`.
+- Removed manual machine-specific bridge variables (`GCS_DEVICE_KEY`, `GCS_DEVICE_NAME`) from settings/docs/examples. Local scripts now auto-generate a per-account/per-machine identity in gitignored `hooks/.gcs_device.json` using the bridge token as account/workspace scope.
+- Added a gitignored `hooks/.gcs_project_paths.json` local registry so each machine remembers the project folders it owns after file-action sync and can report those paths on heartbeat without global machine variables.
+- Added cloud-only project creation: users can create dashboard projects with no local source folder, use documents/API keys/chat/analysis in cloud, and attach a local bridge later only when they need local file sync/actions.
 
 ## Checks
 

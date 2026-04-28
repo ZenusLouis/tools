@@ -10,7 +10,7 @@ import time
 import urllib.request
 from datetime import datetime
 
-from gcs_env import bridge_user_agent, load_dashboard_env
+from gcs_env import bridge_user_agent, load_dashboard_env, local_device_identity
 
 load_dashboard_env()
 
@@ -66,11 +66,12 @@ def post_json(path: str, payload: dict) -> bool:
 def send_heartbeat() -> None:
     if not BRIDGE_TOKEN and not HOOK_SECRET:
         return
+    identity = local_device_identity()
     post_json(
         "/api/bridge/heartbeat",
         {
-            "deviceKey": os.environ.get("GCS_DEVICE_KEY", os.environ.get("COMPUTERNAME", "local").lower()),
-            "name": os.environ.get("GCS_DEVICE_NAME", os.environ.get("COMPUTERNAME", "Local Codex")),
+            "deviceKey": identity["deviceKey"],
+            "name": identity["deviceName"],
             "claudeAvailable": shutil.which("claude") is not None,
             "codexAvailable": shutil.which("codex") is not None,
             "metadata": {"cwd": os.getcwd(), "runner": "hooks/run-codex.py"},

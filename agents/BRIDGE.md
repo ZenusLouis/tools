@@ -6,13 +6,12 @@ Local Claude/Codex agents become visible in the dashboard through bridge heartbe
 
 Hook scripts auto-load missing values from `.codex/settings.json`, `.codex/settings.local.json`, and `apps/dashboard/.env.local`.
 Store local bridge secrets in `.codex/settings.local.json` because it is gitignored. Do not store bridge tokens in Windows user/machine environment variables.
+Device identity is generated automatically per bridge token and stored in `hooks/.gcs_device.json` (also gitignored), so each machine registers separately without manual machine-specific variables.
 
 ```json
 {
   "env": {
     "BRIDGE_TOKEN": "<token from dashboard settings>",
-    "GCS_DEVICE_KEY": "<stable-machine-key>",
-    "GCS_DEVICE_NAME": "<human-readable-name>",
     "GCS_PROVIDER": "codex",
     "GCS_ROLE": "dev-implementer",
     "GCS_MODEL": "gpt-5.4"
