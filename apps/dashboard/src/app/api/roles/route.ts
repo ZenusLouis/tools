@@ -91,6 +91,14 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(role, { status: 201 });
 }
 
+export async function DELETE(req: NextRequest) {
+  const user = await requireCurrentUser();
+  const { slug } = await req.json().catch(() => ({}));
+  if (!slug) return NextResponse.json({ error: "slug required" }, { status: 400 });
+  await db.agentRole.deleteMany({ where: { workspaceId: user.workspaceId, slug } });
+  return NextResponse.json({ ok: true });
+}
+
 async function writeGeneratedRoleFiles(slug: string, data: Record<string, unknown>) {
   const header = "# Managed by GCS Dashboard. Regenerate from /create.\n\n";
   const sharedPath = resolvePath("agents", "roles", `${slug}.json`);

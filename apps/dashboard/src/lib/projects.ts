@@ -25,6 +25,7 @@ export type ProjectDetail = {
   frameworks: string[];
   lastIndexed: string | null;
   codeIndexExists: boolean;
+  codeIndexStatus: "healthy" | "empty" | "none";
   activeTask: string | null;
   completedTasks: number;
   totalTasks: number;
@@ -98,12 +99,17 @@ export async function getProjectDetail(name: string, workspaceId?: string): Prom
     };
   });
 
+  const hasRealFramework = project.frameworks.length > 0 && !project.frameworks.every((f) => f === "unknown");
+  const codeIndexStatus: "healthy" | "empty" | "none" =
+    !project.lastIndexed ? "none" : hasRealFramework ? "healthy" : "empty";
+
   return {
     name: project.name,
     projectPath: project.path,
     frameworks: project.frameworks,
     lastIndexed: project.lastIndexed?.toISOString() ?? null,
-    codeIndexExists: !!project.lastIndexed,
+    codeIndexExists: codeIndexStatus === "healthy",
+    codeIndexStatus,
     activeTask: project.activeTask,
     completedTasks: completedAll,
     totalTasks: totalAll,

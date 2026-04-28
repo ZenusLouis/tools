@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Check, Search, Sparkles, X } from "lucide-react";
+import { Check, Edit2, Search, Sparkles, Trash2, X } from "lucide-react";
 
 type Skill = { id: string; name: string; slug: string; category: string; description: string; isRemote: boolean };
 type Role = {
@@ -16,7 +16,7 @@ type Role = {
 };
 
 export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; skills: Skill[]; profiles: string[] }) {
-  const [mode, setMode] = useState<"list" | "create">("list");
+  const [mode, setMode] = useState<"list" | "create" | "edit">("list");
   const [roleList, setRoleList] = useState(roles);
   const [skillList] = useState(skills);
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
@@ -26,6 +26,8 @@ export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; s
   const [skillQuery, setSkillQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
   const [selectedRole, setSelectedRole] = useState<Role | null>(roleList[0] ?? null);
+  const [editingRole, setEditingRole] = useState<Role | null>(null);
+  const [deletingSlug, setDeletingSlug] = useState("");
   const [pending, startTransition] = useTransition();
 
   const categories = useMemo(() => ["all", ...Array.from(new Set(skillList.map((skill) => skill.category))).sort()], [skillList]);
@@ -48,6 +50,23 @@ export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; s
 
   function toggleSkill(id: string) {
     setSelectedSkillIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  }
+
+  function startEdit(role: Role) {
+    setEditingRole(role);
+    setSelectedSkillIds(role.skills.map((s) => s.id));
+    setRulesDraft("");
+    setMode("edit");
+  }
+
+  function deleteRole(slug: string) {
+    setDeletingSlug(slug);
+    startTransition(async () => {
+      await fetch("/api/roles", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug }) });
+      setRoleList((prev) => prev.filter((r) => r.slug !== slug));
+      if (selectedRole?.slug === slug) setSelectedRole(null);
+      setDeletingSlug("");
+    });
   }
 
   function research(formData: FormData) {
@@ -96,6 +115,8 @@ export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; s
       }
     });
   }
+
+  const isEditing = mode === "edit" && editingRole;
 
   if (mode === "list") {
     return (
@@ -158,9 +179,31 @@ export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; s
                 <h2 className="mt-1 text-xl font-bold text-text">{selectedRole.name}</h2>
                 <p className="mt-1 text-sm text-text-muted">@{selectedRole.slug}</p>
               </div>
-              <button type="button" onClick={() => setSelectedRole(null)} className="rounded-lg p-1.5 text-text-muted hover:bg-card-hover hover:text-text">
-                <X size={16} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => startEdit(selectedRole)}
+                  className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-accent hover:bg-accent/10 transition-colors"
+                >
+                  <Edit2 size={13} /> Edit
+                </button>
+                {deletingSlug === selectedRole.slug ? (
+                  <span className="text-xs text-text-muted">Deleting...</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm(`Delete "${selectedRole.name}"? This cannot be undone.`)) deleteRole(selectedRole.slug);
+                    }}
+                    className="flex items-center gap-1.5 rounded-lg border border-blocked/40 px-3 py-1.5 text-xs font-semibold text-blocked hover:bg-blocked/10 transition-colors"
+                  >
+                    <Trash2 size={13} /> Delete
+                  </button>
+                )}
+                <button type="button" onClick={() => setSelectedRole(null)} className="rounded-lg p-1.5 text-text-muted hover:bg-card-hover hover:text-text">
+                  <X size={16} />
+                </button>
+              </div>
             </div>
             <p className="text-sm leading-relaxed text-text-muted">{selectedRole.description}</p>
             <div className="mt-4 grid gap-3 md:grid-cols-4">
@@ -194,13 +237,13 @@ export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; s
       <form action={createRole} className="rounded-xl border border-border bg-card p-5">
         <div className="flex items-start justify-between gap-4 mb-5">
           <div>
-            <h2 className="text-base font-bold text-text">Custom AI Builder</h2>
-            <p className="text-xs text-text-muted">Create a role, assign a provider, attach skills, and generate local artifacts.</p>
+            <h2 className="text-base font-bold text-text">{isEditing ? `Edit: ${editingRole.name}` : "Custom AI Builder"}</h2>
+            <p className="text-xs text-text-muted">{isEditing ? "Update role configuration and skills." : "Create a role, assign a provider, attach skills, and generate local artifacts."}</p>
           </div>
           <div className="flex items-center gap-2">
-            <button type="button" onClick={() => setMode("list")} className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text-muted hover:bg-card-hover">Cancel</button>
+            <button type="button" onClick={() => { setMode("list"); setEditingRole(null); }} className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text-muted hover:bg-card-hover">Cancel</button>
             <button disabled={pending} className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
-              {pending ? "Creating..." : "Create Role"}
+              {pending ? "Saving..." : isEditing ? "Save Changes" : "Create Role"}
             </button>
           </div>
         </div>
@@ -212,13 +255,13 @@ export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; s
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Input name="name" label="Name" placeholder="Backend Reviewer" />
-          <Input name="slug" label="Slug" placeholder="backend-reviewer" />
-          <Input name="description" label="Description" placeholder="Reviews backend API and DB changes" />
+          <Input name="name" label="Name" placeholder="Backend Reviewer" defaultValue={editingRole?.name} />
+          <Input name="slug" label="Slug" placeholder="backend-reviewer" defaultValue={editingRole?.slug} readOnly={!!editingRole} />
+          <Input name="description" label="Description" placeholder="Reviews backend API and DB changes" defaultValue={editingRole?.description} />
           <Input name="defaultModel" label="Model / version" placeholder="optional" />
-          <Select name="provider" label="Provider" options={["claude", "codex", "chatgpt"]} />
-          <Select name="phase" label="Phase" options={["analysis", "implementation", "review", "research", "design", "custom"]} />
-          <Select name="executionModeDefault" label="Execution mode" options={["local", "dashboard"]} />
+          <Select name="provider" label="Provider" options={["claude", "codex", "chatgpt"]} defaultValue={editingRole?.provider} />
+          <Select name="phase" label="Phase" options={["analysis", "implementation", "review", "research", "design", "custom"]} defaultValue={editingRole?.phase} />
+          <Select name="executionModeDefault" label="Execution mode" options={["local", "dashboard"]} defaultValue={editingRole?.executionModeDefault} />
           <Select name="credentialService" label="Credential" options={["none", "openai", "anthropic"]} />
           <Select name="roleType" label="Role type" options={["ba", "dev", "reviewer", "qa", "design", "researcher", "custom"]} />
           <Select name="mcpProfile" label="MCP profile" options={["", ...profiles]} />
@@ -341,20 +384,26 @@ export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; s
   );
 }
 
-function Input({ name, label, placeholder }: { name: string; label: string; placeholder?: string }) {
+function Input({ name, label, placeholder, defaultValue, readOnly }: { name: string; label: string; placeholder?: string; defaultValue?: string; readOnly?: boolean }) {
   return (
     <label className="flex flex-col gap-1.5">
       <span className="text-xs font-bold uppercase tracking-wide text-text-muted">{label}</span>
-      <input name={name} placeholder={placeholder} className="rounded-lg border border-border bg-bg-base px-3 py-2 text-sm text-text outline-none focus:border-accent" />
+      <input
+        name={name}
+        placeholder={placeholder}
+        defaultValue={defaultValue}
+        readOnly={readOnly}
+        className={`rounded-lg border border-border bg-bg-base px-3 py-2 text-sm text-text outline-none focus:border-accent ${readOnly ? "opacity-60 cursor-not-allowed" : ""}`}
+      />
     </label>
   );
 }
 
-function Select({ name, label, options }: { name: string; label: string; options: string[] }) {
+function Select({ name, label, options, defaultValue }: { name: string; label: string; options: string[]; defaultValue?: string }) {
   return (
     <label className="flex flex-col gap-1.5">
       <span className="text-xs font-bold uppercase tracking-wide text-text-muted">{label}</span>
-      <select name={name} className="rounded-lg border border-border bg-bg-base px-3 py-2 text-sm text-text outline-none focus:border-accent">
+      <select name={name} defaultValue={defaultValue} className="rounded-lg border border-border bg-bg-base px-3 py-2 text-sm text-text outline-none focus:border-accent">
         {options.map((option) => <option key={option} value={option}>{option || "none"}</option>)}
       </select>
     </label>
