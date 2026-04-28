@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { bridgeTokenFromHeaders, verifyBridgeRequest } from "@/lib/bridge-auth";
+import { getCurrentUser } from "@/lib/auth";
 
 const HeartbeatSchema = z.object({
   deviceKey: z.string().min(1).max(120),
@@ -13,7 +14,14 @@ const HeartbeatSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const ctx = await verifyBridgeRequest(bridgeTokenFromHeaders(req.headers));
+  let ctx = await verifyBridgeRequest(bridgeTokenFromHeaders(req.headers));
+
+  // Fallback: allow session-authenticated browser heartbeats
+  if (!ctx) {
+    const user = await getCurrentUser();
+    if (user) ctx = { workspaceId: user.workspaceId, deviceId: null, tokenId: null };
+  }
+
   if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const parsed = HeartbeatSchema.safeParse(await req.json().catch(() => null));
