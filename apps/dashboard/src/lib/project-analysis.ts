@@ -209,8 +209,14 @@ export async function analyzeProjectForWorkspace(
   const docs = docRecord(project);
   if (!docs.brd && !docs.prd) return { ok: false, error: "Add a BRD or PRD before analysis." };
 
+  // Clear existing tasks/features/modules before re-generating
   const existingTasks = await db.task.count({ where: { feature: { module: { projectName } }, workspaceId } });
-  if (existingTasks > 0) return { ok: false, error: "This project already has generated tasks." };
+  if (existingTasks > 0) {
+    await db.task.deleteMany({ where: { feature: { module: { projectName } }, workspaceId } });
+    await db.feature.deleteMany({ where: { module: { projectName } } });
+    await db.module.deleteMany({ where: { projectName } });
+    await db.project.update({ where: { name: projectName }, data: { activeTask: null } });
+  }
 
   // Find best dashboard-run analysis role (prefer anthropic > openai)
   const analysisRole = await db.agentRole.findFirst({

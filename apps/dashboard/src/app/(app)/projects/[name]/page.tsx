@@ -10,6 +10,7 @@ import { PageShell } from "@/components/layout/PageShell";
 import { ProjectActionButtons } from "@/components/projects/ProjectActionButtons";
 import { LocalDevicePathsCard } from "@/components/projects/LocalDevicePathsCard";
 import { AnalyzeProjectButton } from "@/components/projects/AnalyzeProjectButton";
+import { ResetTasksButton } from "@/components/projects/ResetTasksButton";
 import { getProjectDetail } from "@/lib/projects";
 import { getRecentActivity, timeAgo } from "@/lib/activity";
 import { requireCurrentUser } from "@/lib/auth";
@@ -118,10 +119,18 @@ export default async function ProjectOverviewPage({
 
               {/* Module Progress */}
               <section className="bg-card border border-border rounded-xl p-6">
-                <h2 className="text-sm font-bold text-text flex items-center gap-2 mb-5">
-                  <Layers size={16} className="text-accent" />
-                  Module Progress
-                </h2>
+                <div className="flex items-center justify-between mb-5">
+                  <h2 className="text-sm font-bold text-text flex items-center gap-2">
+                    <Layers size={16} className="text-accent" />
+                    Module Progress
+                  </h2>
+                  {project.modules.length > 0 && hasDocs && (
+                    <div className="flex items-center gap-2">
+                      <AnalyzeProjectButton projectName={project.name} label="Regenerate" size="sm" />
+                      <ResetTasksButton projectName={project.name} />
+                    </div>
+                  )}
+                </div>
                 {project.modules.length > 0 ? (
                   <div className="space-y-5">
                     {project.modules.map((mod) => {
