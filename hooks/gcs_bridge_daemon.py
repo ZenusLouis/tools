@@ -480,6 +480,7 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
         raise ValueError(f"claude -p failed (rc={process.returncode}): {detail}")
 
     raw = "".join(raw_chunks).strip()
+    outer: dict[str, Any] = {}
     try:
         outer = json.loads(raw)
         content = outer.get("result") or outer.get("content") or raw
@@ -506,12 +507,33 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
         "Modules: " + ", ".join(module_names[:8]),
         "Posting generated backlog to dashboard...",
     ])
+    transcript = {
+        "provider": "claude",
+        "runner": "local-claude",
+        "projectName": project_name,
+        "documentPath": str(brd_path or ""),
+        "documentContext": document_context,
+        "frameworks": fw,
+        "skillSlugs": skill_slugs,
+        "prompt": prompt,
+        "responseText": str(content),
+        "rawOutput": raw[-20000:],
+        "durationMs": outer.get("duration_ms"),
+        "durationApiMs": outer.get("duration_api_ms"),
+        "sessionId": outer.get("session_id"),
+        "totalCostUsd": outer.get("total_cost_usd"),
+        "usage": outer.get("usage"),
+        "modelUsage": outer.get("modelUsage"),
+        "permissionDenials": outer.get("permission_denials") or [],
+        "terminalReason": outer.get("terminal_reason"),
+    }
 
     # POST result back to dashboard
     ok, detail = post_json_data(callback_path, {
         "actionId": action_id,
         "projectName": project_name,
         "modules": modules,
+        "analysisTranscript": transcript,
     }, timeout=15)
     if not ok:
         raise ValueError(f"Failed to post analysis result: {detail}")
@@ -522,6 +544,7 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
         "modules": len(modules),
         "features": total_features,
         "tasks": total_tasks,
+        "analysisTranscript": transcript,
         "summary": {
             "modules": [
                 {

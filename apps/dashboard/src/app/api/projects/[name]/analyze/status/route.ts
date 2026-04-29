@@ -25,7 +25,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ name
     });
     status = action?.status ?? null;
     updatedAt = action?.updatedAt?.toISOString() ?? null;
-    const result = action?.result as { log?: string[]; summary?: unknown } | null;
+    const result = action?.result as { log?: string[]; summary?: unknown; analysisTranscript?: unknown } | null;
     log = result?.log ?? [];
     summary = result?.summary ?? null;
     if ((action?.status === "running" || action?.status === "claimed") && log.length === 0) {
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ name
       failed = true;
       errorMsg = action.error ?? "Bridge action failed";
     }
-    return NextResponse.json({ actionId: action?.id ?? actionId, ready: count > 0, created: count, log, failed, error: errorMsg, status, updatedAt, summary });
+    return NextResponse.json({ actionId: action?.id ?? actionId, ready: count > 0, created: count, log, failed, error: errorMsg, status, updatedAt, summary, analysisTranscript: result?.analysisTranscript ?? null });
   } else {
     const action = await db.bridgeFileAction.findFirst({
       where: {
@@ -48,7 +48,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ name
     });
     status = action?.status ?? null;
     updatedAt = action?.updatedAt?.toISOString() ?? null;
-    const result = action?.result as { log?: string[]; summary?: unknown; runnerLabel?: string } | null;
+    const result = action?.result as { log?: string[]; summary?: unknown; runnerLabel?: string; analysisTranscript?: unknown } | null;
     log = result?.log ?? [];
     summary = result?.summary ?? null;
     if ((action?.status === "running" || action?.status === "claimed" || action?.status === "pending") && log.length === 0) {
@@ -58,6 +58,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ name
       failed = true;
       errorMsg = action.error ?? "Bridge action failed";
     }
-    return NextResponse.json({ actionId: action?.id ?? null, ready: count > 0, created: count, log, failed, error: errorMsg, status, updatedAt, summary, runnerLabel: result?.runnerLabel ?? "Claude" });
+    return NextResponse.json({ actionId: action?.id ?? null, ready: count > 0, created: count, log, failed, error: errorMsg, status, updatedAt, summary, runnerLabel: result?.runnerLabel ?? "Claude", analysisTranscript: result?.analysisTranscript ?? null });
   }
 }

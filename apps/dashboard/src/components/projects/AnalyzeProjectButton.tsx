@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { Check, Loader2, Sparkles, Terminal } from "lucide-react";
+import { Check, Loader2, Sparkles, Terminal, X } from "lucide-react";
 
 type AnalyzeResult = {
   ok: boolean;
@@ -23,6 +23,25 @@ type AnalyzeSummary = {
   }>;
 };
 
+type AnalysisTranscript = {
+  provider?: string;
+  runner?: string;
+  projectName?: string;
+  documentPath?: string;
+  frameworks?: string;
+  prompt?: string;
+  responseText?: string;
+  rawOutput?: string;
+  durationMs?: number;
+  durationApiMs?: number;
+  sessionId?: string;
+  totalCostUsd?: number;
+  usage?: unknown;
+  modelUsage?: unknown;
+  permissionDenials?: unknown[];
+  terminalReason?: string;
+};
+
 export function AnalyzeProjectButton({
   projectName,
   label = "Analyze BRD",
@@ -40,6 +59,8 @@ export function AnalyzeProjectButton({
   const [runnerLabel, setRunnerLabel] = useState("Claude");
   const [log, setLog] = useState<string[]>([]);
   const [summary, setSummary] = useState<AnalyzeSummary | null>(null);
+  const [transcript, setTranscript] = useState<AnalysisTranscript | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const logRef = useRef<HTMLPreElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -65,10 +86,11 @@ export function AnalyzeProjectButton({
       try {
         const res = await fetch(`/api/projects/${projectEnc}/analyze/status?actionId=${actionId}`);
         if (res.ok) {
-          const data = await res.json() as { ready: boolean; created?: number; log?: string[]; failed?: boolean; error?: string; summary?: AnalyzeSummary; status?: string | null };
+          const data = await res.json() as { ready: boolean; created?: number; log?: string[]; failed?: boolean; error?: string; summary?: AnalyzeSummary; status?: string | null; analysisTranscript?: AnalysisTranscript | null };
           lastStatus = data.status ?? lastStatus;
           if (data.log && data.log.length > 0) setLog(data.log);
           if (data.summary) setSummary(data.summary);
+          if (data.analysisTranscript) setTranscript(data.analysisTranscript);
           if (data.failed) {
             clearInterval(pollRef.current!);
             setPolling(false);
@@ -122,6 +144,7 @@ export function AnalyzeProjectButton({
           summary?: AnalyzeSummary;
           status?: string | null;
           runnerLabel?: string;
+          analysisTranscript?: AnalysisTranscript | null;
         };
         const hasRecentAction = !!data.actionId && !!data.status;
         if (!hasRecentAction) return;
@@ -134,6 +157,7 @@ export function AnalyzeProjectButton({
         setRunnerLabel(labelForRunner);
         if (data.log && data.log.length > 0) setLog(data.log);
         if (data.summary) setSummary(data.summary);
+        if (data.analysisTranscript) setTranscript(data.analysisTranscript);
         if (data.failed) {
           setFeedback(`Failed: ${data.error}`);
           return;
@@ -160,6 +184,8 @@ export function AnalyzeProjectButton({
     setOk(false);
     setLog([]);
     setSummary(null);
+    setTranscript(null);
+    setDetailsOpen(false);
 
     startTransition(async () => {
       try {
@@ -208,6 +234,15 @@ export function AnalyzeProjectButton({
           <div className="flex items-center gap-2 border-b border-border bg-card px-3 py-1.5">
             <Terminal size={11} className="text-text-muted" />
             <span className="font-mono text-[10px] text-text-muted">local {runnerLabel.toLowerCase()} output</span>
+            {transcript && (
+              <button
+                type="button"
+                onClick={() => setDetailsOpen(true)}
+                className="ml-auto rounded border border-border px-2 py-0.5 text-[10px] font-semibold text-accent transition-colors hover:bg-accent/10"
+              >
+                Details
+              </button>
+            )}
             {polling && <span className="ml-auto inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />}
           </div>
           <pre
@@ -216,6 +251,41 @@ export function AnalyzeProjectButton({
           >
             {log.join("\n")}
           </pre>
+        </div>
+      )}
+
+      {detailsOpen && transcript && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm" role="dialog" aria-modal="true">
+          <div className="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+            <div className="flex items-center gap-3 border-b border-border px-5 py-4">
+              <Terminal size={16} className="text-accent" />
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-bold text-text">Analysis Transcript</h3>
+                <p className="truncate text-xs text-text-muted">
+                  {transcript.runner ?? runnerLabel} - {transcript.projectName ?? projectName} - {transcript.sessionId ?? "local session"}
+                </p>
+              </div>
+              <button type="button" onClick={() => setDetailsOpen(false)} className="rounded-lg p-1.5 text-text-muted transition-colors hover:bg-card-hover hover:text-text">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-5 lg:grid-cols-2">
+              <TranscriptBlock title="Prompt / Context" value={transcript.prompt} />
+              <TranscriptBlock title="Claude Response" value={transcript.responseText} />
+              <TranscriptBlock title="Usage" value={JSON.stringify({
+                durationMs: transcript.durationMs,
+                durationApiMs: transcript.durationApiMs,
+                totalCostUsd: transcript.totalCostUsd,
+                terminalReason: transcript.terminalReason,
+                usage: transcript.usage,
+                modelUsage: transcript.modelUsage,
+              }, null, 2)} />
+              <TranscriptBlock title="Permission Denials / Raw Tail" value={JSON.stringify({
+                permissionDenials: transcript.permissionDenials ?? [],
+                rawOutput: transcript.rawOutput,
+              }, null, 2)} />
+            </div>
+          </div>
         </div>
       )}
 
@@ -245,5 +315,16 @@ export function AnalyzeProjectButton({
         </div>
       )}
     </span>
+  );
+}
+
+function TranscriptBlock({ title, value }: { title: string; value?: string | null }) {
+  return (
+    <section className="min-h-72 overflow-hidden rounded-xl border border-border bg-bg-base">
+      <div className="border-b border-border bg-card px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-text-muted">{title}</div>
+      <pre className="max-h-[28rem] overflow-auto whitespace-pre-wrap p-3 font-mono text-[11px] leading-relaxed text-text-muted">
+        {value || "--"}
+      </pre>
+    </section>
   );
 }

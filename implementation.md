@@ -23,6 +23,14 @@
 - Task Board cards, slide-over detail, full task detail page, and project detail backlog now render the new task details.
 - Checks: `npx prisma generate`, `python -m py_compile hooks/gcs_bridge_daemon.py`, `npm run lint`, `npm run build`.
 
+## Latest Update - Analysis Transcript Details
+
+- Local bridge analysis now saves an `analysisTranscript` into the bridge action result.
+- Transcript includes prompt/context, Claude response text, raw output tail, session id, duration, cost, usage/model usage, terminal reason, and permission denials.
+- Analyze status API returns transcript data for both explicit `actionId` polling and latest-action resume.
+- Analyze UI now shows a `Details` button beside local output and opens a modal with Prompt/Context, Claude Response, Usage, and Permission Denials/Raw Tail.
+- Checks: `python -m py_compile hooks/gcs_bridge_daemon.py`, `npm run lint`, `npm run build`.
+
 ## Changed Files
 
 - `apps/dashboard/src/components/projects/OnboardingEmptyState.tsx`

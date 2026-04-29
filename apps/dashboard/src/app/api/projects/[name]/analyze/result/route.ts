@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { bridgeTokenFromHeaders, verifyBridgeRequest } from "@/lib/bridge-auth";
 
@@ -33,6 +34,7 @@ const ResultSchema = z.object({
   actionId: z.string(),
   projectName: z.string(),
   modules: z.array(ModuleSchema).min(1).max(30),
+  analysisTranscript: z.record(z.string(), z.unknown()).optional(),
 });
 
 type ParsedTask = z.infer<typeof ModuleSchema>["features"][number]["tasks"][number];
@@ -86,7 +88,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ nam
   // Mark bridge action complete
   await db.bridgeFileAction.update({
     where: { id: parsed.data.actionId },
-    data: { status: "succeeded", completedAt: new Date() },
+    data: {
+      status: "succeeded",
+      completedAt: new Date(),
+      result: parsed.data.analysisTranscript
+        ? { analysisTranscript: parsed.data.analysisTranscript } as Prisma.InputJsonValue
+        : undefined,
+    },
   }).catch(() => null);
 
   // Check no tasks exist yet (idempotent guard)
