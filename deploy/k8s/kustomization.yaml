@@ -14,4 +14,4 @@ resources:
 
 images:
   - name: ghcr.io/zenuslouis/gcs-dashboard
-    newTag: "63"
+    newTag: "64"
