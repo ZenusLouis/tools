@@ -281,8 +281,8 @@ export async function analyzeProjectForWorkspace(
   if (!docs.brd && !docs.prd) return { ok: false, error: "Add a BRD or PRD before analysis." };
 
   const roleSelect = {
-    id: true, provider: true, defaultModel: true, credentialService: true,
-    executionModeDefault: true, rulesMarkdown: true, name: true,
+    id: true, slug: true, phase: true, provider: true, defaultModel: true,
+    credentialService: true, executionModeDefault: true, rulesMarkdown: true, name: true,
     skills: { select: { slug: true } },
   } as const;
 
