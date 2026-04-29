@@ -65,7 +65,7 @@ export default async function TokensPage({ searchParams }: Props) {
 
           <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <DonutChart breakdown={analytics.toolBreakdown} />
-            <DailyBarChart dailyUsage={analytics.dailyUsage} />
+            <DailyBarChart dailyUsage={analytics.dailyUsage} isToday={dateRange === "today"} />
           </section>
 
           <SessionsTable

@@ -39,11 +39,14 @@ function usageBucket(date: Date, range: DateRange): { key: string; label: string
     const key = date.toISOString().slice(0, 7);
     return { key, label: date.toLocaleString("en", { month: "short" }) };
   }
+  if (range === "today") {
+    // Hourly buckets for today
+    const h = date.getHours().toString().padStart(2, "0");
+    const key = `${date.toISOString().slice(0, 10)}T${h}`;
+    return { key, label: `${h}:00` };
+  }
   const key = date.toISOString().slice(0, 10);
-  return {
-    key,
-    label: date.toLocaleDateString("en", range === "today" ? { hour: undefined, month: "short", day: "numeric" } : { month: "short", day: "numeric" }),
-  };
+  return { key, label: date.toLocaleDateString("en", { month: "short", day: "numeric" }) };
 }
 
 function sessionTime(date: Date): string {

@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { Zap } from "lucide-react";
-import { formatCompactNumber } from "@/lib/format";
+
 
 type ProviderBreakdown = {
   provider: "claude" | "codex" | "chatgpt";
@@ -44,8 +44,8 @@ export function TokenUsageCard({
         <span className="text-[10px] font-bold text-in-progress">{topLabel}</span>
       </div>
 
-      <p className="text-3xl font-black tracking-tight text-white sm:text-4xl" title={total.toLocaleString()}>
-        {formatCompactNumber(total)}
+      <p className="text-3xl font-black tracking-tight text-white sm:text-4xl">
+        {total.toLocaleString()}
       </p>
       <p className="mt-1 text-xs font-medium text-text-muted">Tokens {rangeLabel}</p>
 
@@ -71,7 +71,7 @@ export function TokenUsageCard({
               <div className="h-1.5 overflow-hidden rounded-full bg-bg-base">
                 <div className={`h-full rounded-full ${ui.bar}`} style={{ width: `${item.percent}%` }} />
               </div>
-              <span className="tabular-nums text-text-muted" title={item.tokens.toLocaleString()}>{formatCompactNumber(item.tokens)}</span>
+              <span className="tabular-nums text-text-muted">{item.tokens.toLocaleString()}</span>
             </div>
           );
         })}

@@ -37,7 +37,14 @@ export function Sidebar() {
           </div>
           <div>
             <div className="text-xl font-black leading-none tracking-tight text-accent">GCS Console</div>
-            <div className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-text-muted">v4.2.0-stable</div>
+            <div className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+              v{process.env.NEXT_PUBLIC_APP_VERSION ?? "dev"}
+            </div>
+            {process.env.NEXT_PUBLIC_BUILD_TIME && (
+              <div className="text-[9px] text-text-muted/50 tracking-wide">
+                {new Date(process.env.NEXT_PUBLIC_BUILD_TIME).toLocaleDateString("en", { month: "short", day: "numeric", year: "numeric" })}
+              </div>
+            )}
           </div>
         </div>
       </div>
