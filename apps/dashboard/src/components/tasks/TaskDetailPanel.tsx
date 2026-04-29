@@ -77,6 +77,9 @@ export function TaskDetailPanel({ task, projectName, completedIds, onClose }: Pr
               )}
               {task.gates.includes("G3") && <span className="rounded bg-in-progress/15 px-1.5 py-0.5 text-[10px] font-bold text-in-progress">G3</span>}
               {task.gates.includes("G4") && <span className="rounded bg-done/15 px-1.5 py-0.5 text-[10px] font-bold text-done">G4</span>}
+              {task.reqIds?.slice(0, 6).map((reqId) => (
+                <span key={reqId} className="rounded bg-done/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-done">{reqId}</span>
+              ))}
             </div>
 
             <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">

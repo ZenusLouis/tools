@@ -21,6 +21,7 @@ const ModuleSchema = z.object({
         details: NullableString,
         acceptanceCriteria: NullableStringArray,
         steps: NullableStringArray,
+        reqIds: NullableStringArray,
         priority: NullableString,
         estimate: NullableString,
         risk: NullableString,
@@ -47,6 +48,7 @@ function normalizeTask(task: ParsedTask, fallbackName: string) {
       details: `Implement and verify: ${task}.`,
       acceptanceCriteria: [`${task} is implemented and visible in the expected user flow.`, "Main error and empty states are handled."],
       steps: ["Review BRD/PRD context and related code.", "Implement the scoped change.", "Verify the result."],
+      reqIds: [],
       priority: "must",
       estimate: undefined,
       risk: "",
@@ -60,6 +62,7 @@ function normalizeTask(task: ParsedTask, fallbackName: string) {
     details: task.details || `Implement and verify: ${name}.`,
     acceptanceCriteria: task.acceptanceCriteria ?? [`${name} is implemented and testable.`],
     steps: task.steps ?? ["Inspect current flow.", "Implement scoped changes.", "Run verification."],
+    reqIds: task.reqIds ?? [],
     priority: task.priority ?? "must",
     estimate: task.estimate,
     risk: task.risk ?? "",
@@ -85,17 +88,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ nam
     return NextResponse.json({ error: "Project name mismatch" }, { status: 400 });
   }
 
+  const action = await db.bridgeFileAction.findFirst({
+    where: { id: parsed.data.actionId, workspaceId: ctx.workspaceId },
+    select: { id: true, status: true },
+  });
+  if (action?.status === "cancelled") {
+    return NextResponse.json({ ok: true, ignored: true });
+  }
+
   // Mark bridge action complete
-  await db.bridgeFileAction.update({
-    where: { id: parsed.data.actionId },
-    data: {
-      status: "succeeded",
-      completedAt: new Date(),
-      result: parsed.data.analysisTranscript
-        ? { analysisTranscript: parsed.data.analysisTranscript } as Prisma.InputJsonValue
-        : undefined,
-    },
-  }).catch(() => null);
+  if (action) {
+    await db.bridgeFileAction.update({
+      where: { id: action.id },
+      data: {
+        status: "succeeded",
+        completedAt: new Date(),
+        result: parsed.data.analysisTranscript
+          ? { analysisTranscript: parsed.data.analysisTranscript } as Prisma.InputJsonValue
+          : undefined,
+      },
+    }).catch(() => null);
+  }
 
   // Check no tasks exist yet (idempotent guard)
   const existing = await db.task.count({ where: { feature: { module: { projectName } }, workspaceId: ctx.workspaceId } });
@@ -126,6 +139,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ nam
             details: task.details,
             acceptanceCriteria: task.acceptanceCriteria,
             steps: task.steps,
+            reqIds: task.reqIds,
             priority: task.priority,
             risk: task.risk,
             status: taskId === firstTaskId ? "in_progress" : "pending",

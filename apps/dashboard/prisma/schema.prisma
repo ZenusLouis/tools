@@ -58,6 +58,7 @@ model Task {
   details   String?
   acceptanceCriteria String[] @default([])
   steps     String[]   @default([])
+  reqIds    String[]   @default([])
   priority  String?
   risk      String?
   status    TaskStatus @default(pending)

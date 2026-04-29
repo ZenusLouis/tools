@@ -382,28 +382,54 @@ def _safe_local_target(project_path: str, relative_path: str) -> Path:
 
 
 def _analysis_document_context(document_path: str) -> str:
-    """Return a small local document excerpt so claude -p does not spend turns searching files."""
+    """Return extracted document text so claude -p does not spend turns searching files."""
     if not document_path:
         return "No document path configured."
 
     path = Path(document_path).expanduser()
     if not path.exists():
-        return f"Document path configured but not accessible on this device: {document_path}"
+        raise ValueError(f"Document path configured but not accessible on this device: {document_path}")
 
     suffix = path.suffix.lower()
     try:
         if suffix in {".md", ".txt", ".json", ".yaml", ".yml"}:
             text = path.read_text(encoding="utf-8", errors="replace")
-            return text[:8000]
+            return text[: int(os.environ.get("GCS_ANALYZE_DOC_MAX_CHARS", "140000"))]
         if suffix == ".pdf":
-            return (
-                f"PDF exists locally at: {path}\n"
-                "Do not search Desktop or Downloads. Infer modules from the project name and PDF filename if direct PDF text extraction is unavailable."
+            if shutil.which("pdftotext") is None:
+                raise ValueError("pdftotext is required to analyze PDF BRDs, but it is not available in PATH.")
+            import subprocess
+            proc = subprocess.run(
+                ["pdftotext", "-layout", str(path), "-"],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=int(os.environ.get("GCS_PDFTOTEXT_TIMEOUT_SEC", "60")),
             )
+            if proc.returncode != 0:
+                detail = (proc.stderr or proc.stdout or "").strip()[:500]
+                raise ValueError(f"pdftotext failed for {path}: {detail}")
+            text = proc.stdout.strip()
+            if not text:
+                raise ValueError(f"pdftotext produced no text for {path}")
+            max_chars = int(os.environ.get("GCS_ANALYZE_DOC_MAX_CHARS", "140000"))
+            return text[:max_chars]
     except Exception as exc:
-        return f"Document path is present but could not be read: {path} ({exc})"
+        raise ValueError(f"Document path is present but could not be read: {path} ({exc})")
 
-    return f"Document exists locally at: {path}. Infer modules from the project name and filename."
+    raise ValueError(f"Unsupported analysis document type: {path.suffix or 'unknown'}")
+
+
+def _requirement_groups(text: str) -> list[str]:
+    import re
+    groups = sorted(set(re.findall(r"\b(CORE-[A-Z]+|CIN-[A-Z]+|HOT-[A-Z]+|CROSS-[A-Z]+|UI-[A-Z]+)-\d{3}\b", text)))
+    return groups
+
+
+def _requirement_ids(text: str) -> list[str]:
+    import re
+    return sorted(set(re.findall(r"\b(?:CORE-[A-Z]+|CIN-[A-Z]+|HOT-[A-Z]+|CROSS-[A-Z]+|UI-[A-Z]+)-\d{3}\b", text)))
 
 
 def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
@@ -419,6 +445,9 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
     brd_path = docs.get("brd") or docs.get("prd") or ""
     brd_filename = Path(brd_path).name if brd_path else "no document"
     document_context = _analysis_document_context(str(brd_path))
+    req_groups = _requirement_groups(document_context)
+    req_ids = _requirement_ids(document_context)
+    page_estimate = document_context.count("\f") + 1 if document_context else 0
     fw = ", ".join(f for f in frameworks if f != "unknown") or "unknown stack"
 
     # Load skill summaries from local SKILL.md files
@@ -452,19 +481,27 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
         f"\n\n## Document Context\n{document_context}"
         f"{skill_block}\n\n"
         f"## Output Requirements\n"
-        f"Generate 3-6 modules, each with 1-4 features, each 2-5 atomic tasks.\n"
-        f"Infer domain from project name + document. Tasks must be specific and actionable.\n"
+        f"Generate modules from the BRD requirement groups, not from generic booking app assumptions.\n"
+        f"Use these domain modules when supported by the BRD: Core Platform, Cinema Booking, Hotel Booking, Cross-domain Payment/Refund/State, Global UI/Reporting/Operations.\n"
+        f"Do not create generic modules such as Listing & Inventory unless they map directly to BRD requirement IDs.\n"
+        f"Each module should have 1-5 features, each feature 1-6 atomic tasks.\n"
+        f"Tasks must be specific and actionable (real BRD entities, screens, actions, state rules).\n"
         f"Each task must be an object with developer-ready detail: summary, details, acceptanceCriteria, steps, priority, estimate, risk, deps.\n"
+        f"Each task MUST include reqIds: string[] containing the BRD requirement IDs it implements, e.g. CORE-AUTH-001 or CIN-SHOW-003.\n"
+        f"If a task comes from a BRD section without a clear Req ID, keep reqIds empty and put the assumption in risk.\n"
         f"Apply MoSCoW: must-have tasks first. Flag high-risk: payments, real-time, auth.\n\n"
         f"Do not use shell commands or search the filesystem. Use only the context in this prompt.\n"
         f"Respond ONLY with valid JSON:\n"
-        f'{{"modules":[{{"name":"...","features":[{{"name":"...","tasks":[{{"name":"...","summary":"one sentence","details":"implementation scope and context","acceptanceCriteria":["..."],"steps":["..."],"priority":"must|should|could","estimate":"1h|2h|4h","risk":"optional risk note","deps":[]}}]}}]}}]}}'
+        f'{{"modules":[{{"name":"...","features":[{{"name":"...","tasks":[{{"name":"...","summary":"one sentence","details":"implementation scope and context","acceptanceCriteria":["..."],"steps":["..."],"reqIds":["CORE-AUTH-001"],"priority":"must|should|could","estimate":"1h|2h|4h","risk":"optional risk note","deps":[]}}]}}]}}]}}'
     )
 
     action_id = str(action.get("id") or "")
     post_action_progress(action_id, [
         f"Started local Claude analysis for {project_name}.",
         f"Document path: {brd_path or 'none'}",
+        f"Extracted document text: {len(document_context):,} chars, ~{page_estimate} pages.",
+        f"Detected requirement groups: {', '.join(req_groups) if req_groups else 'none'}",
+        f"Detected requirement IDs: {len(req_ids)}",
         f"Stack: {fw}",
     ])
     import tempfile
@@ -579,6 +616,8 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
         "projectName": project_name,
         "documentPath": str(brd_path or ""),
         "documentContext": document_context,
+        "detectedRequirementGroups": req_groups,
+        "detectedRequirementIds": req_ids[:500],
         "frameworks": fw,
         "skillSlugs": skill_slugs,
         "prompt": prompt,
@@ -615,9 +654,25 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
             "modules": [
                 {
                     "name": str(module.get("name") or "Untitled"),
+                    "reqIds": sorted({
+                        req_id
+                        for feature in module.get("features", [])
+                        if isinstance(feature, dict)
+                        for task in feature.get("tasks", [])
+                        if isinstance(task, dict)
+                        for req_id in task.get("reqIds", [])
+                        if isinstance(req_id, str)
+                    })[:16],
                     "features": [
                         {
                             "name": str(feature.get("name") or "Untitled"),
+                            "reqIds": sorted({
+                                req_id
+                                for task in feature.get("tasks", [])
+                                if isinstance(task, dict)
+                                for req_id in task.get("reqIds", [])
+                                if isinstance(req_id, str)
+                            })[:12],
                             "tasks": [
                                 str(task.get("name") or "Untitled task") if isinstance(task, dict) else str(task)
                                 for task in feature.get("tasks", [])[:5]

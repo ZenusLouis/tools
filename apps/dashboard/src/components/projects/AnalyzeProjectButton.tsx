@@ -19,7 +19,8 @@ type AnalyzeResult = {
 type AnalyzeSummary = {
   modules?: Array<{
     name?: string;
-    features?: Array<{ name?: string; tasks?: string[] }>;
+    features?: Array<{ name?: string; tasks?: string[]; reqIds?: string[] }>;
+    reqIds?: string[];
   }>;
 };
 
@@ -353,6 +354,13 @@ export function AnalyzeProjectButton({
                     </li>
                   ))}
                 </ul>
+                {(mod.reqIds ?? []).length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {(mod.reqIds ?? []).slice(0, 5).map((reqId) => (
+                      <span key={reqId} className="rounded bg-done/10 px-1.5 py-0.5 font-mono text-[9px] font-bold text-done">{reqId}</span>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>

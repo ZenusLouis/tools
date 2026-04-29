@@ -106,6 +106,13 @@ export default async function ProjectDetailConsolePage({ params }: { params: Pro
                                 <span className="min-w-0 flex-1">
                                   <span className="block text-text-muted">{task.name}</span>
                                   {task.summary && <span className="mt-0.5 line-clamp-1 block text-[10px] text-text-muted/70">{task.summary}</span>}
+                                  {task.reqIds.length > 0 && (
+                                    <span className="mt-1 flex flex-wrap gap-1">
+                                      {task.reqIds.slice(0, 4).map((reqId) => (
+                                        <span key={reqId} className="rounded bg-done/10 px-1.5 py-0.5 font-mono text-[9px] font-bold text-done">{reqId}</span>
+                                      ))}
+                                    </span>
+                                  )}
                                 </span>
                                 {task.estimate && <span className="ml-auto shrink-0 text-[10px] text-text-muted">{task.estimate}</span>}
                               </Link>

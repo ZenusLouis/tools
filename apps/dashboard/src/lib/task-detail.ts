@@ -8,6 +8,7 @@ export type TaskDetail = {
   details: string | null;
   acceptanceCriteria: string[];
   steps: string[];
+  reqIds: string[];
   priority: string | null;
   risk: string | null;
   status: string;
@@ -55,6 +56,7 @@ export async function findTaskDetail(taskId: string): Promise<TaskDetail | null>
     details: task.details,
     acceptanceCriteria: task.acceptanceCriteria,
     steps: task.steps,
+    reqIds: task.reqIds,
     priority: task.priority,
     risk: task.risk,
     status: task.status === "in_progress" ? "in-progress" : task.status,

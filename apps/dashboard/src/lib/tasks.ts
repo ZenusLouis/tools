@@ -10,6 +10,7 @@ export type KanbanTask = {
   details?: string | null;
   acceptanceCriteria?: string[];
   steps?: string[];
+  reqIds?: string[];
   priority?: string | null;
   risk?: string | null;
   status: TaskStatus;
@@ -97,6 +98,7 @@ export async function getModuleTasks(
         details: task.details,
         acceptanceCriteria: task.acceptanceCriteria,
         steps: task.steps,
+        reqIds: task.reqIds,
         priority: task.priority,
         risk: task.risk,
         status: dbStatusToKanban(task.status),
@@ -137,6 +139,7 @@ export async function getModuleTasks(
         details: task.details,
         acceptanceCriteria: task.acceptanceCriteria,
         steps: task.steps,
+        reqIds: task.reqIds,
         priority: task.priority,
         risk: task.risk,
         status: dbStatusToKanban(task.status),

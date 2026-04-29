@@ -71,6 +71,15 @@ export function TaskMetaCard({ task, log }: Props) {
             <span className="rounded bg-in-progress/10 px-2 py-0.5 text-xs font-bold uppercase text-in-progress">{task.priority}</span>
           </Row>
         )}
+        {task.reqIds.length > 0 && (
+          <Row label="Source requirements" icon={ClipboardCheck}>
+            <div className="flex flex-wrap gap-1.5">
+              {task.reqIds.map((reqId) => (
+                <span key={reqId} className="rounded bg-done/10 px-2 py-0.5 font-mono text-xs font-bold text-done">{reqId}</span>
+              ))}
+            </div>
+          </Row>
+        )}
         {task.details && (
           <Row label="Implementation detail" icon={FileText}>
             <p className="text-sm leading-6 text-text-muted">{task.details}</p>

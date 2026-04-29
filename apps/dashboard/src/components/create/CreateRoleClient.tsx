@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { Check, Edit2, Search, Sparkles, Trash2, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
@@ -11,10 +11,21 @@ type Role = {
   slug: string;
   description: string;
   provider: "claude" | "codex" | "chatgpt";
+  defaultModel?: string | null;
   phase: string;
   executionModeDefault: "local" | "dashboard";
   skills: Skill[];
 };
+
+const MODEL_OPTIONS: Record<Role["provider"], string[]> = {
+  claude: ["", "claude-sonnet-4-6", "claude-haiku-4-5-20251001", "claude-opus-4-1-20250805"],
+  codex: ["", "gpt-5.2-codex", "gpt-5.1-codex", "gpt-5.1-codex-max", "gpt-5-codex"],
+  chatgpt: ["", "gpt-5.2", "gpt-5.2-pro", "gpt-5.1", "gpt-5", "gpt-4.1", "gpt-4o-mini"],
+};
+
+function modelOptionsFor(provider: Role["provider"], liveModels: string[] = []) {
+  return Array.from(new Set([...MODEL_OPTIONS[provider], ...liveModels])).filter((model) => model === "" || !!model);
+}
 
 export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; skills: Skill[]; profiles: string[] }) {
   const [mode, setMode] = useState<"list" | "create" | "edit">("list");
@@ -28,6 +39,9 @@ export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; s
   const [activeCategory, setActiveCategory] = useState("all");
   const [selectedRole, setSelectedRole] = useState<Role | null>(roleList[0] ?? null);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
+  const [providerDraft, setProviderDraft] = useState<Role["provider"]>("claude");
+  const [modelDraft, setModelDraft] = useState("");
+  const [modelOptions, setModelOptions] = useState(MODEL_OPTIONS.claude);
   const [deletingSlug, setDeletingSlug] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Role | null>(null);
   const [pending, startTransition] = useTransition();
@@ -50,12 +64,37 @@ export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; s
     }, {});
   }, [filteredSkills]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch(`/api/models?provider=${encodeURIComponent(providerDraft)}`)
+      .then((res) => res.ok ? res.json() : null)
+      .then((body: { models?: string[] } | null) => {
+        if (cancelled) return;
+        const nextOptions = modelOptionsFor(providerDraft, body?.models ?? []);
+        setModelOptions(nextOptions);
+        setModelDraft((current) => nextOptions.includes(current) ? current : "");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setModelOptions(MODEL_OPTIONS[providerDraft]);
+        setModelDraft((current) => MODEL_OPTIONS[providerDraft].includes(current) ? current : "");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [providerDraft]);
+
   function toggleSkill(id: string) {
     setSelectedSkillIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
   }
 
   function startEdit(role: Role) {
     setEditingRole(role);
+    setProviderDraft(role.provider);
+    setModelOptions(MODEL_OPTIONS[role.provider]);
+    setModelDraft(role.defaultModel ?? "");
     setSelectedSkillIds(role.skills.map((s) => s.id));
     setRulesDraft("");
     setMode("edit");
@@ -133,7 +172,15 @@ export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; s
             </div>
             <button
               type="button"
-              onClick={() => setMode("create")}
+              onClick={() => {
+                setEditingRole(null);
+                setProviderDraft("claude");
+                setModelOptions(MODEL_OPTIONS.claude);
+                setModelDraft("");
+                setSelectedSkillIds([]);
+                setRulesDraft("");
+                setMode("create");
+              }}
               className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-hover"
             >
               Create Custom AI
@@ -209,6 +256,7 @@ export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; s
             <p className="text-sm leading-relaxed text-text-muted">{selectedRole.description}</p>
             <div className="mt-4 grid gap-3 md:grid-cols-4">
               <Detail label="Provider" value={selectedRole.provider} />
+              <Detail label="Model" value={selectedRole.defaultModel || "provider default"} />
               <Detail label="Phase" value={selectedRole.phase} />
               <Detail label="Execution" value={selectedRole.executionModeDefault} />
               <Detail label="Skills" value={`${selectedRole.skills.length}`} />
@@ -277,8 +325,19 @@ export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; s
           <Input name="name" label="Name" placeholder="Backend Reviewer" defaultValue={editingRole?.name} />
           <Input name="slug" label="Slug" placeholder="backend-reviewer" defaultValue={editingRole?.slug} readOnly={!!editingRole} />
           <Input name="description" label="Description" placeholder="Reviews backend API and DB changes" defaultValue={editingRole?.description} />
-          <Input name="defaultModel" label="Model / version" placeholder="optional" />
-          <Select name="provider" label="Provider" options={["claude", "codex", "chatgpt"]} defaultValue={editingRole?.provider} />
+          <ModelSelect options={modelOptions} value={modelDraft} onChange={setModelDraft} />
+          <Select
+            name="provider"
+            label="Provider"
+            options={["claude", "codex", "chatgpt"]}
+            defaultValue={editingRole?.provider}
+            onChange={(value) => {
+              const nextProvider = value as Role["provider"];
+              setProviderDraft(nextProvider);
+              setModelOptions(MODEL_OPTIONS[nextProvider]);
+              setModelDraft((current) => MODEL_OPTIONS[nextProvider].includes(current) ? current : "");
+            }}
+          />
           <Select name="phase" label="Phase" options={["analysis", "implementation", "review", "research", "design", "custom"]} defaultValue={editingRole?.phase} />
           <Select name="executionModeDefault" label="Execution mode" options={["local", "dashboard"]} defaultValue={editingRole?.executionModeDefault} />
           <Select name="credentialService" label="Credential" options={["none", "openai", "anthropic"]} />
@@ -418,11 +477,31 @@ function Input({ name, label, placeholder, defaultValue, readOnly }: { name: str
   );
 }
 
-function Select({ name, label, options, defaultValue }: { name: string; label: string; options: string[]; defaultValue?: string }) {
+function ModelSelect({ options, value, onChange }: { options: string[]; value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-xs font-bold uppercase tracking-wide text-text-muted">Model / version</span>
+      <select
+        name="defaultModel"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="rounded-lg border border-border bg-bg-base px-3 py-2 text-sm text-text outline-none focus:border-accent"
+      >
+        {options.map((option) => (
+          <option key={option || "default"} value={option}>
+            {option || "optional / provider default"}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function Select({ name, label, options, defaultValue, onChange }: { name: string; label: string; options: string[]; defaultValue?: string; onChange?: (value: string) => void }) {
   return (
     <label className="flex flex-col gap-1.5">
       <span className="text-xs font-bold uppercase tracking-wide text-text-muted">{label}</span>
-      <select name={name} defaultValue={defaultValue} className="rounded-lg border border-border bg-bg-base px-3 py-2 text-sm text-text outline-none focus:border-accent">
+      <select name={name} defaultValue={defaultValue} onChange={(event) => onChange?.(event.target.value)} className="rounded-lg border border-border bg-bg-base px-3 py-2 text-sm text-text outline-none focus:border-accent">
         {options.map((option) => <option key={option} value={option}>{option || "none"}</option>)}
       </select>
     </label>

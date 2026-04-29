@@ -21,6 +21,7 @@ type AiTask = {
   details?: string;
   acceptanceCriteria?: string[];
   steps?: string[];
+  reqIds?: string[];
   priority?: string;
   estimate?: string;
   risk?: string;
@@ -77,6 +78,7 @@ function normalizeAiTask(task: string | AiTask, fallbackName = "Untitled task"):
       details: `Implement and verify: ${task}.`,
       acceptanceCriteria: [`${task} is implemented and visible in the expected user flow.`, "Main error and empty states are handled.", "Relevant smoke/regression checks pass."],
       steps: ["Review BRD/PRD context and related code.", "Implement the smallest complete vertical slice.", "Verify the flow and record artifacts."],
+      reqIds: [],
       priority: "must",
       risk: "",
       deps: [],
@@ -94,6 +96,7 @@ function normalizeAiTask(task: string | AiTask, fallbackName = "Untitled task"):
     steps: Array.isArray(task.steps) && task.steps.length > 0
       ? task.steps.map(String).filter(Boolean)
       : ["Inspect current flow.", "Implement scoped changes.", "Run verification."],
+    reqIds: Array.isArray(task.reqIds) ? task.reqIds.map(String).filter(Boolean) : [],
     priority: task.priority ? String(task.priority) : "must",
     estimate: task.estimate ? String(task.estimate) : undefined,
     risk: task.risk ? String(task.risk) : "",
@@ -192,11 +195,12 @@ Generate 3–6 modules, each with 1–4 features, each feature with 2–5 atomic
 - Infer domain from project name + document filename
 - Tasks must be specific and actionable (real entity names, screens, actions)
 - Each task must be an object with enough detail for a developer to implement without rereading the whole BRD.
+- Each task must include reqIds: string[] with source requirement IDs when available.
 - Apply MoSCoW: must-have tasks first per feature
 - Flag high-risk: payments, real-time, auth, file upload
 
 Respond ONLY with valid JSON — no markdown, no explanation:
-{"modules":[{"name":"...","features":[{"name":"...","tasks":[{"name":"...","summary":"one sentence","details":"implementation scope and context","acceptanceCriteria":["..."],"steps":["..."],"priority":"must|should|could","estimate":"1h|2h|4h","risk":"optional risk note","deps":[]}]}]}]}`;
+{"modules":[{"name":"...","features":[{"name":"...","tasks":[{"name":"...","summary":"one sentence","details":"implementation scope and context","acceptanceCriteria":["..."],"steps":["..."],"reqIds":["CORE-AUTH-001"],"priority":"must|should|could","estimate":"1h|2h|4h","risk":"optional risk note","deps":[]}]}]}]}`;
 
   let raw = "";
   if (role.credentialService === "anthropic") {
@@ -307,6 +311,11 @@ function providerLabel(provider: string) {
   return "Claude";
 }
 
+function isLocalDocumentPath(path?: string) {
+  if (!path) return false;
+  return /^[a-zA-Z]:[\\/]/.test(path) || path.startsWith("/") || path.startsWith("\\\\");
+}
+
 export async function analyzeProjectForWorkspace(
   projectName: string,
   workspaceId: string,
@@ -322,8 +331,9 @@ export async function analyzeProjectForWorkspace(
 }> {
   const project = await loadProjectForAnalysis(projectName, workspaceId);
   if (!project) return { ok: false, error: "Project not found" };
+  const analysisProject = project;
 
-  const docs = docRecord(project);
+  const docs = docRecord(analysisProject);
   if (!docs.brd && !docs.prd) return { ok: false, error: "Add a BRD or PRD before analysis." };
 
   const roleSelect = {
@@ -350,13 +360,62 @@ export async function analyzeProjectForWorkspace(
   let source: "ai" | "bridge" | "fallback" = "fallback";
   let selectedProvider: AnalysisProvider = "claude";
   let selectedRunner = "Claude";
+  const localDocumentPath = docs.brd || docs.prd || "";
+  const shouldPreferLocalBridge = isLocalDocumentPath(localDocumentPath);
+
+  async function queueLocalBridgeAnalysis() {
+    const bridgeDevice = await db.bridgeDevice.findFirst({
+      where: { workspaceId, claudeAvailable: true, lastSeenAt: { gte: new Date(Date.now() - 5 * 60_000) } },
+      select: { id: true },
+    });
+    if (!bridgeDevice) return null;
+
+    await db.task.deleteMany({ where: { feature: { module: { projectName } }, workspaceId } });
+    await db.feature.deleteMany({ where: { module: { projectName } } });
+    await db.module.deleteMany({ where: { projectName } });
+    await db.bridgeFileAction.deleteMany({
+      where: {
+        workspaceId,
+        type: "run_analysis",
+        payload: { path: ["projectName"], equals: projectName },
+      },
+    });
+    await db.project.update({ where: { name: projectName }, data: { activeTask: null } });
+
+    const analysisRole = await db.agentRole.findFirst({
+      where: { workspaceId, phase: "analysis" },
+      select: { skills: { select: { slug: true } } },
+    });
+    const action = await db.bridgeFileAction.create({
+      data: {
+        workspaceId,
+        deviceId: bridgeDevice.id,
+        type: "run_analysis",
+        payload: {
+          projectName,
+          frameworks: analysisProject.frameworks,
+          docs,
+          provider: selectedProvider,
+          runnerLabel: selectedRunner,
+          skillSlugs: analysisRole?.skills.map((s) => s.slug) ?? [],
+          callbackPath: `/api/projects/${encodeURIComponent(projectName)}/analyze/result`,
+        },
+      },
+    });
+    return { ok: true as const, pending: true as const, actionId: action.id, created: 0, source: "bridge" as const, provider: selectedProvider, runnerLabel: selectedRunner };
+  }
+
+  if (shouldPreferLocalBridge) {
+    const queued = await queueLocalBridgeAnalysis();
+    if (queued) return queued;
+  }
 
   // Try each dashboard-runnable agent in order until one succeeds
   for (const role of prioritized) {
     const cred = providerCredential(role.provider, role.credentialService);
     if (cred !== "openai" && cred !== "anthropic") continue; // skip local-only
     try {
-      modules = await generateModulesWithAI(projectName, project.frameworks, docs, {
+      modules = await generateModulesWithAI(projectName, analysisProject.frameworks, docs, {
         ...role, credentialService: cred, skillSlugs: role.skills.map((s) => s.slug),
       }, workspaceId);
       if (modules) {
@@ -379,44 +438,8 @@ export async function analyzeProjectForWorkspace(
   }
 
   if (!modules) {
-    const bridgeDevice = await db.bridgeDevice.findFirst({
-      where: { workspaceId, claudeAvailable: true, lastSeenAt: { gte: new Date(Date.now() - 5 * 60_000) } },
-      select: { id: true },
-    });
-    if (bridgeDevice) {
-      await db.task.deleteMany({ where: { feature: { module: { projectName } }, workspaceId } });
-      await db.feature.deleteMany({ where: { module: { projectName } } });
-      await db.module.deleteMany({ where: { projectName } });
-      await db.bridgeFileAction.deleteMany({
-        where: {
-          workspaceId,
-          type: "run_analysis",
-          payload: { path: ["projectName"], equals: projectName },
-        },
-      });
-      await db.project.update({ where: { name: projectName }, data: { activeTask: null } });
-
-      const action = await db.bridgeFileAction.create({
-        data: {
-          workspaceId,
-          deviceId: bridgeDevice.id,
-          type: "run_analysis",
-          payload: {
-            projectName,
-            frameworks: project.frameworks,
-            docs,
-            provider: selectedProvider,
-            runnerLabel: selectedRunner,
-            skillSlugs: (await db.agentRole.findFirst({
-              where: { workspaceId, phase: "analysis" },
-              select: { skills: { select: { slug: true } } },
-            }))?.skills.map((s) => s.slug) ?? [],
-            callbackPath: `/api/projects/${encodeURIComponent(projectName)}/analyze/result`,
-          },
-        },
-      });
-      return { ok: true, pending: true, actionId: action.id, created: 0, source: "bridge", provider: selectedProvider, runnerLabel: selectedRunner };
-    }
+    const queued = await queueLocalBridgeAnalysis();
+    if (queued) return queued;
   }
 
   if (!modules && selectedProvider === "chatgpt") {
@@ -467,6 +490,7 @@ export async function analyzeProjectForWorkspace(
             details: task.details,
             acceptanceCriteria: task.acceptanceCriteria ?? [],
             steps: task.steps ?? [],
+            reqIds: task.reqIds ?? [],
             priority: task.priority,
             risk: task.risk,
             status: taskId === firstTaskId ? "in_progress" : "pending",
@@ -497,7 +521,7 @@ export async function analyzeProjectForWorkspace(
       date: now,
       tasksCompleted: [],
       sessionNotes: `Analysis (${source}) generated ${created} tasks from ${docs.brd ? "BRD" : "PRD"}.`,
-      cwd: project.bridgePaths[0]?.path ?? project.path,
+      cwd: analysisProject.bridgePaths[0]?.path ?? analysisProject.path,
     },
   });
 
@@ -518,6 +542,7 @@ export async function analyzeProjectForWorkspace(
             name: task.name,
             summary: task.summary,
             acceptanceCriteria: task.acceptanceCriteria,
+            reqIds: task.reqIds,
             status: ti === 0 && mi === 0 && fi === 0 ? "in_progress" : "pending",
           };
         }),
@@ -526,7 +551,7 @@ export async function analyzeProjectForWorkspace(
     risks: [],
     gates: { G1: { status: "done" }, G2: { status: "pending" }, G3: { status: "pending" }, G4: { status: "pending" } },
   };
-  await queueProgressSync(project, workspaceId, JSON.stringify(progressPayload, null, 2));
+  await queueProgressSync(analysisProject, workspaceId, JSON.stringify(progressPayload, null, 2));
 
   revalidatePath("/");
   revalidatePath("/projects");

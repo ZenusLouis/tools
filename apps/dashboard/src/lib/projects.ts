@@ -24,6 +24,7 @@ export type ModuleProgress = {
       id: string;
       name: string;
       summary: string | null;
+      reqIds: string[];
       status: string;
       phase: string | null;
       estimate: string | null;
@@ -129,6 +130,7 @@ export async function getProjectDetail(name: string, workspaceId?: string): Prom
             id: task.id,
             name: task.name,
             summary: task.summary,
+            reqIds: task.reqIds,
             status: task.status === "in_progress" ? "in-progress" : task.status,
             phase: task.phase,
             estimate: task.estimate,

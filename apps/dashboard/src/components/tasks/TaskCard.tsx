@@ -45,6 +45,9 @@ export function TaskCard({ task, completedIds, onClick, isSelected }: Props) {
 
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="rounded-md bg-border px-1.5 py-0.5 text-[10px] font-medium text-text-muted">{task.featureId}</span>
+        {task.reqIds?.slice(0, 3).map((reqId) => (
+          <span key={reqId} className="rounded-md bg-done/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-done">{reqId}</span>
+        ))}
         <span className="rounded-md bg-accent/10 px-1.5 py-0.5 text-[10px] font-bold text-accent">{task.phase}</span>
         {task.baRoleName && <span className="rounded-md bg-card px-1.5 py-0.5 text-[10px] font-medium text-text-muted">BA: {task.baRoleName}</span>}
         {task.devRoleName && <span className="rounded-md bg-card px-1.5 py-0.5 text-[10px] font-medium text-text-muted">Dev: {task.devRoleName}</span>}

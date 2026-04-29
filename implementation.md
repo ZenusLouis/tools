@@ -1,5 +1,23 @@
 # Implementation
 
+## Latest Update - BRD-Traceable Analysis + Model Dropdown
+
+- Added `Task.reqIds` with Prisma migration `20260429121500_task_req_ids`, and threaded requirement IDs through analyze result parsing, task creation, task board cards, task detail panels, project detail, and generated backlog review.
+- Updated local bridge analysis to extract PDF text with `pdftotext -layout`, log extracted character/page estimates, detect `CORE-*`, `CIN-*`, `HOT-*`, `CROSS-*`, and `UI-*` requirement groups, and stop with a clear error if PDF extraction fails instead of inventing a filename-based backlog.
+- Updated the Claude analysis prompt to require BRD-traceable modules/tasks and `reqIds`, with OmniBooking domains such as Core Platform, Cinema Booking, Hotel Booking, Cross-domain Payment/Refund/State, and UI/Operations when those IDs exist in the BRD.
+- Changed dashboard analysis to prefer the local bridge for local document paths, so the local machine hands full extracted BRD context to Claude instead of the hosted dashboard trying to read a Windows path.
+- Added `/api/models` for provider-aware model discovery: curated static models are always available, and OpenAI/Anthropic model lists are fetched when the workspace has the matching encrypted API key.
+- Replaced the free-text `MODEL / VERSION` field in Create/Edit Role with a provider-aware dropdown. Changing provider resets incompatible models and persists the selected value to `AgentRole.defaultModel`.
+
+## Checks
+
+- `pdftotext -layout D:\Code\OmniBooking\docx\BRD_OmniBooking_Requirement_Deep_Dive_FINAL6.pdf -` detected `CORE-*`, `CIN-*`, `HOT-*`, `CROSS-*`, and UI/cross-domain requirement content.
+- `python -m py_compile hooks/gcs_bridge_daemon.py`
+- `npx prisma generate`
+- `npx prisma migrate deploy`
+- `npm run lint`
+- `npm run build`
+
 ## Latest Update - Confirmation Popups
 
 - Added `apps/dashboard/src/components/ui/ConfirmDialog.tsx` as the shared in-app confirmation modal.
