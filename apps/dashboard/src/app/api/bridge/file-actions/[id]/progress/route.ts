@@ -21,9 +21,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const action = await db.bridgeFileAction.findFirst({
     where: { id, workspaceId: ctx.workspaceId },
-    select: { id: true, result: true },
+    select: { id: true, result: true, status: true },
   });
   if (!action) return NextResponse.json({ error: "not found" }, { status: 404 });
+  if (action.status === "cancelled") return NextResponse.json({ ok: true, ignored: true });
 
   // Append new lines to existing log (keep last 200 lines max)
   const prev = (action.result as { log?: string[] } | null)?.log ?? [];

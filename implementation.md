@@ -255,6 +255,8 @@
 - Fixed stale project-path ownership after device identity changes: heartbeat and file-action result now remove duplicate path mappings for the same workspace/project/path on older devices, and project/settings path cards sort online devices first.
 - Standardized local device/settings timestamps through `formatDateTime()` with default timezone `Asia/Ho_Chi_Minh` (`NEXT_PUBLIC_APP_TIME_ZONE` override), so device path sync times render in ICT instead of browser/host-default ambiguous time.
 - Fixed Analyze queue reuse after reset/regenerate: resetting a backlog now deletes stale `run_analysis` bridge actions for that project, starting a new local analysis clears old analysis actions before queueing, and the bridge pending endpoint prioritizes fresh `run_analysis` jobs ahead of older generic file actions. This prevents the UI from getting stuck at `Queued - waiting for local Claude...` after a reset.
+- Added an Analyze cancel flow: `/api/projects/:name/analyze/cancel` marks pending/claimed/running analysis actions as `cancelled`, the Analyze UI shows a `Cancel` button while polling, stops local polling immediately, and bridge result callbacks ignore cancelled actions so late local-Claude results cannot overwrite the cancelled state.
+- Hardened stuck Analyze recovery: the `Cancel` button now appears whenever an active analysis action exists, not only when the local polling state is true; bridge progress callbacks also ignore cancelled actions; and the status API auto-cancels stale analysis actions after `GCS_ANALYSIS_STALE_MINUTES` (default 30 minutes) without progress.
 
 ## Checks
 

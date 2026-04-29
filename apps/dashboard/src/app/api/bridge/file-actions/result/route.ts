@@ -38,9 +38,12 @@ export async function POST(req: NextRequest) {
 
   const action = await db.bridgeFileAction.findFirst({
     where: { id: parsed.data.id, workspaceId: ctx.workspaceId },
-    select: { id: true, type: true, payload: true, result: true },
+    select: { id: true, type: true, payload: true, result: true, status: true },
   });
   if (!action) return NextResponse.json({ error: "Action not found" }, { status: 404 });
+  if (action.status === "cancelled") {
+    return NextResponse.json({ ok: true, ignored: true });
+  }
 
   const previousResult =
     action.result && typeof action.result === "object" && !Array.isArray(action.result)

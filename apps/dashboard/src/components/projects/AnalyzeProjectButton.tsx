@@ -61,6 +61,7 @@ export function AnalyzeProjectButton({
   const [summary, setSummary] = useState<AnalyzeSummary | null>(null);
   const [transcript, setTranscript] = useState<AnalysisTranscript | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [activeActionId, setActiveActionId] = useState<string | null>(null);
   const logRef = useRef<HTMLPreElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -76,6 +77,7 @@ export function AnalyzeProjectButton({
     if (pollRef.current) clearInterval(pollRef.current);
     setPolling(true);
     setRunnerLabel(labelForRunner);
+    setActiveActionId(actionId);
     setLog((prev) => prev.length > 0 ? prev : [`Queued - waiting for local ${labelForRunner}...`]);
     setSummary((prev) => prev ?? null);
     let attempts = 0;
@@ -94,6 +96,7 @@ export function AnalyzeProjectButton({
           if (data.failed) {
             clearInterval(pollRef.current!);
             setPolling(false);
+            setActiveActionId(null);
             setFeedback(`Failed: ${data.error}`);
             setLog((prev) => [...prev, `Failed: ${data.error}`]);
             return;
@@ -101,6 +104,7 @@ export function AnalyzeProjectButton({
           if (data.ready) {
             clearInterval(pollRef.current!);
             setPolling(false);
+            setActiveActionId(null);
             setOk(true);
             setFeedback(`${data.created ?? "?"} tasks generated (local ${labelForRunner}).`);
             setLog((prev) => [...prev, "Done."]);
@@ -116,6 +120,7 @@ export function AnalyzeProjectButton({
       if (attempts >= 120 && lastStatus !== "running" && lastStatus !== "claimed") {
         clearInterval(pollRef.current!);
         setPolling(false);
+        setActiveActionId(null);
         setFeedback("Timed out. Check bridge daemon.");
         setLog((prev) => [...prev, "Timed out after 10 minutes."]);
       } else if (attempts >= 120 && attempts % 12 === 0) {
@@ -168,6 +173,7 @@ export function AnalyzeProjectButton({
           return;
         }
         if (active && data.actionId) {
+          setActiveActionId(data.actionId);
           setFeedback("Analysis still running locally.");
           startPolling(projectEnc, data.actionId, labelForRunner);
         }
@@ -209,7 +215,33 @@ export function AnalyzeProjectButton({
     });
   }
 
+  async function cancelAnalysis() {
+    if (pollRef.current) clearInterval(pollRef.current);
+    setPolling(false);
+    const actionId = activeActionId;
+    setActiveActionId(null);
+    setFeedback("Cancelling analysis...");
+    setLog((prev) => [...prev, "Cancelling analysis..."]);
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectName)}/analyze/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ actionId }),
+      });
+      const data = await res.json().catch(() => ({})) as { cancelled?: number; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Cancel failed");
+      setFeedback("Analysis cancelled.");
+      setLog((prev) => [...prev, `Cancelled ${data.cancelled ?? 0} queued/running action(s).`]);
+      router.refresh();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Cancel failed";
+      setFeedback(message);
+      setLog((prev) => [...prev, `Cancel failed: ${message}`]);
+    }
+  }
+
   const isLoading = pending || polling;
+  const canCancel = polling || !!activeActionId;
   const btnClass = size === "sm"
     ? "inline-flex shrink-0 items-center gap-1 rounded-lg bg-accent/10 px-2 py-1 text-[10px] font-bold text-accent transition-colors hover:bg-accent/20 disabled:opacity-50"
     : "inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-accent/90 disabled:opacity-50";
@@ -221,6 +253,18 @@ export function AnalyzeProjectButton({
           {isLoading ? <Loader2 size={size === "sm" ? 10 : 13} className="animate-spin" /> : <Sparkles size={size === "sm" ? 10 : 13} />}
           {polling ? "Analyzing..." : label}
         </button>
+        {canCancel && (
+          <button
+            type="button"
+            onClick={cancelAnalysis}
+            className={size === "sm"
+              ? "inline-flex shrink-0 items-center gap-1 rounded-lg border border-blocked/40 px-2 py-1 text-[10px] font-bold text-blocked transition-colors hover:bg-blocked/10"
+              : "inline-flex items-center gap-1.5 rounded-lg border border-blocked/40 px-3 py-2 text-xs font-bold text-blocked transition-colors hover:bg-blocked/10"}
+          >
+            <X size={size === "sm" ? 10 : 13} />
+            Cancel
+          </button>
+        )}
         {feedback && (
           <span className={ok ? "inline-flex items-center gap-1 text-[11px] text-done" : "inline-flex items-center gap-1 text-[11px] text-text-muted"}>
             {ok && <Check size={12} />}
