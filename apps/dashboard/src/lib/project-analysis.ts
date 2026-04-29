@@ -162,7 +162,8 @@ Respond ONLY with valid JSON — no markdown, no explanation:
     const key = await getApiKeyByService("openai", workspaceId);
     if (!key) throw new Error("OpenAI API key not configured");
     // OpenAI doesn't have explicit cache_control but caches automatically for identical prefixes
-    raw = await callOpenAI(key, role.defaultModel ?? "gpt-4o-mini", stableBlock + "\n\n" + projectBlock);
+    const model = role.defaultModel && role.defaultModel !== "optional" ? role.defaultModel : "gpt-4o-mini";
+    raw = await callOpenAI(key, model, stableBlock + "\n\n" + projectBlock);
   } else {
     return null;
   }
@@ -297,6 +298,8 @@ export async function analyzeProjectForWorkspace(
     ...allRoles.filter((r) => r.phase === "analysis" && r.slug !== "ba-analyst"),
     ...allRoles.filter((r) => r.phase !== "analysis"),
   ].filter((r, i, arr) => arr.findIndex((x) => x.id === r.id) === i); // dedup
+  const primaryBaRole = prioritized.find((role) => role.slug === "ba-analyst");
+  const primaryBaIsChatGPT = primaryBaRole?.provider === "chatgpt";
 
   let modules: AiModule[] | null = null;
   let source: "ai" | "bridge" | "fallback" = "fallback";
@@ -321,6 +324,15 @@ export async function analyzeProjectForWorkspace(
   }
 
   // Cách 2: No dashboard agent worked → queue via local bridge (claude -p)
+  if (!modules && primaryBaIsChatGPT) {
+    return {
+      ok: false,
+      error: "BA Analyst is set to ChatGPT, but OpenAI analysis did not complete. Check the OpenAI API Key in Settings.",
+      provider: "chatgpt",
+      runnerLabel: "ChatGPT",
+    };
+  }
+
   if (!modules) {
     const bridgeDevice = await db.bridgeDevice.findFirst({
       where: { workspaceId, claudeAvailable: true, lastSeenAt: { gte: new Date(Date.now() - 5 * 60_000) } },

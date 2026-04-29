@@ -8,8 +8,6 @@ const SERVICE_OPTIONS = [
   { value: "stitch", label: "Stitch Design" },
   { value: "figma", label: "Figma" },
   { value: "github", label: "GitHub" },
-  { value: "openai", label: "OpenAI Runtime" },
-  { value: "openai_admin", label: "OpenAI Usage/Admin" },
   { value: "anthropic", label: "Anthropic" },
   { value: "custom", label: "Custom" },
 ];
@@ -168,10 +166,112 @@ function AddKeyForm({ onAdded }: { onAdded: (key: ApiKeyRow) => void }) {
   );
 }
 
+function OpenAIKeysForm({ keys, onAdded }: { keys: ApiKeyRow[]; onAdded: (key: ApiKeyRow) => void }) {
+  const runtimeKey = keys.find((key) => key.service === "openai");
+  const adminKey = keys.find((key) => key.service === "openai_admin" || key.service === "openai_usage");
+  const [runtimeValue, setRuntimeValue] = useState("");
+  const [adminValue, setAdminValue] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
+
+  async function saveOne(service: string, name: string, value: string) {
+    const res = await fetch("/api/keys", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, service, value }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? `Failed to save ${name}`);
+    onAdded(data);
+  }
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    setMessage(null);
+    if (!runtimeValue.trim() && !adminValue.trim()) {
+      setMessage({ type: "error", text: "Paste at least one OpenAI key." });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      if (runtimeValue.trim()) {
+        await saveOne("openai", "OpenAI API Key", runtimeValue.trim());
+      }
+      if (adminValue.trim()) {
+        await saveOne("openai_admin", "OpenAI Admin API Key", adminValue.trim());
+      }
+      setRuntimeValue("");
+      setAdminValue("");
+      setMessage({ type: "ok", text: "OpenAI keys saved encrypted." });
+    } catch (error) {
+      setMessage({ type: "error", text: error instanceof Error ? error.message : "Failed to save OpenAI keys" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3 rounded-xl border border-border bg-bg-base p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wider text-accent">OpenAI</p>
+          <p className="mt-1 text-xs text-text-muted">
+            Runtime key is used for ChatGPT/model calls. Admin key is used only for usage/cost sync and needs <span className="font-mono">api.usage.read</span>.
+          </p>
+        </div>
+        <div className="flex shrink-0 gap-1">
+          <span className={`rounded px-2 py-1 text-[10px] font-bold uppercase ${runtimeKey ? "bg-done/10 text-done" : "bg-card-hover text-text-muted"}`}>
+            API {runtimeKey ? "saved" : "missing"}
+          </span>
+          <span className={`rounded px-2 py-1 text-[10px] font-bold uppercase ${adminKey ? "bg-done/10 text-done" : "bg-in-progress/10 text-in-progress"}`}>
+            Admin {adminKey ? "saved" : "missing"}
+          </span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <label className="space-y-1">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-text-muted">OpenAI API Key</span>
+          <input
+            type="password"
+            value={runtimeValue}
+            onChange={(event) => setRuntimeValue(event.target.value)}
+            placeholder={runtimeKey ? "Saved - paste a new key to rotate" : "Paste runtime API key"}
+            className="w-full rounded-lg border border-border bg-card px-3 py-2 font-mono text-sm text-text outline-none focus:ring-1 focus:ring-accent"
+          />
+        </label>
+        <label className="space-y-1">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-text-muted">OpenAI Admin API Key</span>
+          <input
+            type="password"
+            value={adminValue}
+            onChange={(event) => setAdminValue(event.target.value)}
+            placeholder={adminKey ? "Saved - paste a new key to rotate" : "Paste usage/admin key"}
+            className="w-full rounded-lg border border-border bg-card px-3 py-2 font-mono text-sm text-text outline-none focus:ring-1 focus:ring-accent"
+          />
+        </label>
+      </div>
+
+      {message && <p className={`text-xs ${message.type === "ok" ? "text-done" : "text-blocked"}`}>{message.text}</p>}
+
+      <button
+        type="submit"
+        disabled={saving}
+        className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+      >
+        {saving ? <Loader2 size={13} className="animate-spin" /> : <Key size={13} />}
+        Save OpenAI Keys
+      </button>
+    </form>
+  );
+}
+
 export function ApiKeysPanel({ initialKeys }: { initialKeys: ApiKeyRow[] }) {
   const [keys, setKeys] = useState<ApiKeyRow[]>(initialKeys);
   const hasOpenAIRuntime = keys.some((key) => key.service === "openai");
   const hasOpenAIUsage = keys.some((key) => key.service === "openai_admin" || key.service === "openai_usage");
+  const nonOpenAIKeys = keys.filter((key) => !["openai", "openai_admin", "openai_usage"].includes(key.service));
 
   return (
     <div className="space-y-4">
@@ -191,9 +291,11 @@ export function ApiKeysPanel({ initialKeys }: { initialKeys: ApiKeyRow[] }) {
         </div>
       )}
 
-      {keys.length > 0 && (
+      <OpenAIKeysForm keys={keys} onAdded={(key) => setKeys((prev) => [...prev, key])} />
+
+      {nonOpenAIKeys.length > 0 && (
         <div className="space-y-2">
-          {keys.map((key) => <KeyRow key={key.id} row={key} onDelete={(id) => setKeys((prev) => prev.filter((item) => item.id !== id))} />)}
+          {nonOpenAIKeys.map((key) => <KeyRow key={key.id} row={key} onDelete={(id) => setKeys((prev) => prev.filter((item) => item.id !== id))} />)}
         </div>
       )}
 

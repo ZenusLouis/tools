@@ -402,8 +402,9 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
 
     action_id = str(action.get("id") or "")
     import tempfile
+    max_turns = os.environ.get("GCS_CLAUDE_ANALYZE_MAX_TURNS", "4")
     process = subprocess.Popen(
-        ["claude", "-p", prompt, "--output-format", "json", "--max-turns", "1"],
+        ["claude", "-p", prompt, "--output-format", "json", "--max-turns", max_turns],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
         cwd=tempfile.gettempdir(),  # neutral dir — avoid loading GCS CLAUDE.md
     )
@@ -435,7 +436,9 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("claude -p timed out after 90s")
     if process.returncode != 0:
         stderr = (process.stderr.read() if process.stderr else "")[:300]
-        raise ValueError(f"claude -p failed (rc={process.returncode}): {stderr}")
+        stdout_tail = "".join(raw_chunks).strip()[-600:]
+        detail = stderr or stdout_tail
+        raise ValueError(f"claude -p failed (rc={process.returncode}): {detail}")
 
     raw = "".join(raw_chunks).strip()
     try:

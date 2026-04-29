@@ -205,6 +205,9 @@
 - Replaced the browser `window.confirm` Codex reset prompt with an in-app confirmation modal.
 - Added a Settings warning when an OpenAI runtime key exists but no OpenAI Usage/Admin key is configured.
 - Hardened OpenAI usage sync error handling so upstream non-JSON/failed responses return dashboard JSON errors instead of bubbling into a Cloudflare 502 page.
+- Reworked Settings so OpenAI is configured as one grouped provider card with two encrypted inputs: `OpenAI API Key` for runtime/model calls and `OpenAI Admin API Key` for usage/cost sync.
+- Prevented BA Analyst ChatGPT analysis from silently falling back to local Claude. If BA is configured as ChatGPT and OpenAI analysis cannot complete, the project page now returns a ChatGPT/OpenAI key error instead of queuing `claude -p`.
+- Fixed local Claude analysis max-turn failures by raising the bridge `claude -p` default from 1 to 4 turns (`GCS_CLAUDE_ANALYZE_MAX_TURNS` override) and surfacing stdout JSON errors in the dashboard when Claude exits non-zero.
 - Fixed bridge file sync auth by allowing `/api/bridge/file-actions/*` through the dashboard proxy. Before this, the route returned `401` before bridge-token verification, so local daemon could heartbeat but could not poll/write cloud-to-local file actions.
 - Created a cloud bridge token for this machine, stored it in gitignored `.codex/settings.local.json` under `env.BRIDGE_TOKEN`, restarted the local bridge, manually drained the existing queued OmniBooking file action, wrote `.gcs/context.json`, `.gcs/progress.json`, and `.gcs/code-index.md` to `D:\Code\OmniBooking`, then reported the action as succeeded.
 - Removed bridge-token guidance that suggested Windows environment variables; Chat and Settings now point to `.codex/settings.local.json`.
