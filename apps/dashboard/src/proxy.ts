@@ -14,6 +14,7 @@ const PUBLIC_PATHS = [
 
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))) return true;
+  if (/^\/api\/projects\/[^/]+\/analyze\/result$/.test(pathname)) return true;
   if (pathname.startsWith("/_next/") || pathname === "/favicon.ico") return true;
   return false;
 }
