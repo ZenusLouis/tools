@@ -32,15 +32,28 @@ export async function POST(req: NextRequest) {
     deviceId = device?.id ?? null;
   }
 
-  const actions = await db.bridgeFileAction.findMany({
+  const analysisActions = await db.bridgeFileAction.findMany({
     where: {
       workspaceId: ctx.workspaceId,
       status: "pending",
+      type: "run_analysis",
       OR: [{ deviceId: null }, ...(deviceId ? [{ deviceId }] : [])],
     },
     orderBy: { createdAt: "asc" },
     take: parsed.data.limit,
   });
+  const remaining = Math.max(0, parsed.data.limit - analysisActions.length);
+  const otherActions = remaining > 0 ? await db.bridgeFileAction.findMany({
+    where: {
+      workspaceId: ctx.workspaceId,
+      status: "pending",
+      type: { not: "run_analysis" },
+      OR: [{ deviceId: null }, ...(deviceId ? [{ deviceId }] : [])],
+    },
+    orderBy: { createdAt: "asc" },
+    take: remaining,
+  }) : [];
+  const actions = [...analysisActions, ...otherActions];
 
   if (actions.length > 0) {
     await db.bridgeFileAction.updateMany({

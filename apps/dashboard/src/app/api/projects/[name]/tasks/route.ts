@@ -17,6 +17,13 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ name
   await db.task.deleteMany({ where: { feature: { module: { projectName } }, workspaceId: user.workspaceId } });
   await db.feature.deleteMany({ where: { module: { projectName } } });
   await db.module.deleteMany({ where: { projectName } });
+  await db.bridgeFileAction.deleteMany({
+    where: {
+      workspaceId: user.workspaceId,
+      type: "run_analysis",
+      payload: { path: ["projectName"], equals: projectName },
+    },
+  });
   await db.project.update({ where: { name: projectName }, data: { activeTask: null } });
 
   revalidatePath(`/projects/${encodeURIComponent(projectName)}`);

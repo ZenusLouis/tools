@@ -387,6 +387,13 @@ export async function analyzeProjectForWorkspace(
       await db.task.deleteMany({ where: { feature: { module: { projectName } }, workspaceId } });
       await db.feature.deleteMany({ where: { module: { projectName } } });
       await db.module.deleteMany({ where: { projectName } });
+      await db.bridgeFileAction.deleteMany({
+        where: {
+          workspaceId,
+          type: "run_analysis",
+          payload: { path: ["projectName"], equals: projectName },
+        },
+      });
       await db.project.update({ where: { name: projectName }, data: { activeTask: null } });
 
       const action = await db.bridgeFileAction.create({
