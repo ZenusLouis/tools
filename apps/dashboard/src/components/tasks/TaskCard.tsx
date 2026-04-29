@@ -39,6 +39,9 @@ export function TaskCard({ task, completedIds, onClick, isSelected }: Props) {
       <p className={`line-clamp-2 text-xs leading-snug ${isSelected ? "font-medium text-text" : "text-text"}`}>
         {task.name}
       </p>
+      {task.summary && task.summary !== task.name && (
+        <p className="line-clamp-2 text-[11px] leading-relaxed text-text-muted">{task.summary}</p>
+      )}
 
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="rounded-md bg-border px-1.5 py-0.5 text-[10px] font-medium text-text-muted">{task.featureId}</span>
@@ -46,6 +49,7 @@ export function TaskCard({ task, completedIds, onClick, isSelected }: Props) {
         {task.baRoleName && <span className="rounded-md bg-card px-1.5 py-0.5 text-[10px] font-medium text-text-muted">BA: {task.baRoleName}</span>}
         {task.devRoleName && <span className="rounded-md bg-card px-1.5 py-0.5 text-[10px] font-medium text-text-muted">Dev: {task.devRoleName}</span>}
         {task.estimate && <span className="rounded-md bg-accent/10 px-1.5 py-0.5 text-[10px] font-medium text-accent">{task.estimate}</span>}
+        {task.priority && <span className="rounded-md bg-in-progress/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-in-progress">{task.priority}</span>}
         {isActive && <span className="rounded-md bg-in-progress/15 px-1.5 py-0.5 text-[10px] font-semibold text-in-progress">active</span>}
         {isLocked && (
           <span className="flex items-center gap-1 rounded-md bg-blocked/15 px-1.5 py-0.5 text-[10px] font-semibold text-blocked">

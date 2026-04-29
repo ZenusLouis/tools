@@ -17,6 +17,18 @@ export type ModuleProgress = {
   completed: number;
   total: number;
   percent: number;
+  features: Array<{
+    id: string;
+    name: string;
+    tasks: Array<{
+      id: string;
+      name: string;
+      summary: string | null;
+      status: string;
+      phase: string | null;
+      estimate: string | null;
+    }>;
+  }>;
 };
 
 export type ProjectDetail = {
@@ -108,6 +120,20 @@ export async function getProjectDetail(name: string, workspaceId?: string): Prom
       completed,
       total,
       percent: total > 0 ? Math.round((completed / total) * 100) : 0,
+      features: mod.features
+        .sort((left, right) => left.order - right.order)
+        .map((feature) => ({
+          id: feature.id,
+          name: feature.name,
+          tasks: feature.tasks.map((task) => ({
+            id: task.id,
+            name: task.name,
+            summary: task.summary,
+            status: task.status === "in_progress" ? "in-progress" : task.status,
+            phase: task.phase,
+            estimate: task.estimate,
+          })),
+        })),
     };
   });
 

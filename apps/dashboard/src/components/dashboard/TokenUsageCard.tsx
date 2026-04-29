@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { Zap } from "lucide-react";
-import { formatCredits } from "@/lib/format";
+import { formatCredits, formatNumber } from "@/lib/format";
 
 
 type ProviderBreakdown = {
@@ -25,6 +25,19 @@ const PROVIDER_UI: Record<ProviderBreakdown["provider"], { label: string; color:
   chatgpt: { label: "ChatGPT", color: "text-emerald-300", bar: "bg-emerald-400" },
 };
 
+function displayValue(item: ProviderBreakdown) {
+  if (item.provider === "codex" && item.credits > 0) {
+    return {
+      value: formatCredits(item.credits),
+      rawTitle: `${formatNumber(item.tokens)} raw thread tokens`,
+    };
+  }
+  return {
+    value: `${formatNumber(item.tokens)} tokens`,
+    rawTitle: formatNumber(item.tokens),
+  };
+}
+
 export function TokenUsageCard({
   total,
   rangeLabel,
@@ -37,6 +50,10 @@ export function TokenUsageCard({
   const activeBreakdown = breakdown.filter((item) => item.tokens > 0);
   const topProvider = [...breakdown].sort((a, b) => b.tokens - a.tokens)[0];
   const topLabel = topProvider && topProvider.tokens > 0 ? PROVIDER_UI[topProvider.provider].label : "No usage";
+  const totalCredits = breakdown.reduce((sum, item) => sum + item.credits, 0);
+  const codexDominant = topProvider?.provider === "codex" && totalCredits > 0;
+  const primaryValue = codexDominant ? formatCredits(totalCredits) : formatNumber(total);
+  const primaryLabel = codexDominant ? `${rangeLabel} Codex credits` : `Tokens ${rangeLabel}`;
 
   return (
     <motion.div
@@ -51,15 +68,18 @@ export function TokenUsageCard({
         <span className="text-[10px] font-bold text-in-progress">{topLabel}</span>
       </div>
 
-      <p className="text-3xl font-black tracking-tight text-white sm:text-4xl">
-        {total.toLocaleString()}
+      <p className="break-words text-3xl font-black tracking-tight text-white sm:text-4xl" title={codexDominant ? `${formatNumber(total)} raw thread tokens` : formatNumber(total)}>
+        {primaryValue}
       </p>
-      <p className="mt-1 text-xs font-medium text-text-muted">Tokens {rangeLabel}</p>
+      <p className="mt-1 text-xs font-medium text-text-muted">{primaryLabel}</p>
+      {!codexDominant && totalCredits > 0 && (
+        <p className="mt-1 text-xs font-semibold text-in-progress">{formatCredits(totalCredits)}</p>
+      )}
 
       <div className="mt-4">
         <div className="mb-1 flex justify-between text-[10px] font-semibold">
-          <span className="text-in-progress">Meter split</span>
-          <span className="text-text-muted">mixed sources</span>
+          <span className="text-in-progress">Provider split</span>
+          <span className="text-text-muted">usage</span>
         </div>
         <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-bg-base">
           {breakdown.map((item) => {
@@ -72,26 +92,18 @@ export function TokenUsageCard({
       <div className="mt-4 space-y-2">
         {(activeBreakdown.length ? activeBreakdown : breakdown.slice(0, 2)).map((item) => {
           const ui = PROVIDER_UI[item.provider];
+          const display = displayValue(item);
           return (
-            <div key={item.provider} className="grid grid-cols-[64px_1fr_auto] items-center gap-2 text-[10px]" title={item.meterDescription}>
+            <div key={item.provider} className="grid grid-cols-[64px_1fr_auto] items-center gap-2 text-[10px]" title={display.rawTitle}>
               <span className={`font-bold uppercase ${ui.color}`}>{ui.label}</span>
               <div className="h-1.5 overflow-hidden rounded-full bg-bg-base">
                 <div className={`h-full rounded-full ${ui.bar}`} style={{ width: `${item.percent}%` }} />
               </div>
-              <span className="tabular-nums text-text-muted">{item.tokens.toLocaleString()}</span>
-              <span className="col-span-3 -mt-1 text-[9px] uppercase tracking-wide text-text-muted">{item.meterLabel}</span>
-              {item.credits > 0 && (
-                <span className="col-span-3 -mt-1 text-[9px] uppercase tracking-wide text-in-progress" title={item.creditNote}>
-                  {formatCredits(item.credits)} / {item.creditBasis.replace("_", " ")}
-                </span>
-              )}
+              <span className="tabular-nums text-text-muted">{display.value}</span>
             </div>
           );
         })}
       </div>
-      <p className="mt-3 text-[10px] leading-relaxed text-text-muted">
-        Sources differ. Codex credits follow the OpenAI Codex rate card when model metadata exists; total-only Codex rows use input-equivalent credits.
-      </p>
     </motion.div>
   );
 }

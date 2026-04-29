@@ -15,11 +15,23 @@ type ProjectWithLatestPath = {
 
 type AnalysisProvider = "claude" | "codex" | "chatgpt";
 
+type AiTask = {
+  name: string;
+  summary?: string;
+  details?: string;
+  acceptanceCriteria?: string[];
+  steps?: string[];
+  priority?: string;
+  estimate?: string;
+  risk?: string;
+  deps?: string[];
+};
+
 type AiModule = {
   name: string;
   features: Array<{
     name: string;
-    tasks: string[];
+    tasks: Array<string | AiTask>;
   }>;
 };
 
@@ -55,6 +67,38 @@ function buildSkillBlock(skills: SkillSummary[]): string {
     .map((s) => `### ${s.slug}\n${s.guidance || s.description}`)
     .join("\n\n");
   return lines ? `\n\n## Attached Skills (apply all patterns below)\n${lines}` : "";
+}
+
+function normalizeAiTask(task: string | AiTask, fallbackName = "Untitled task"): AiTask {
+  if (typeof task === "string") {
+    return {
+      name: task,
+      summary: task,
+      details: `Implement and verify: ${task}.`,
+      acceptanceCriteria: [`${task} is implemented and visible in the expected user flow.`, "Main error and empty states are handled.", "Relevant smoke/regression checks pass."],
+      steps: ["Review BRD/PRD context and related code.", "Implement the smallest complete vertical slice.", "Verify the flow and record artifacts."],
+      priority: "must",
+      risk: "",
+      deps: [],
+    };
+  }
+
+  const name = String(task.name || fallbackName).trim() || fallbackName;
+  return {
+    name,
+    summary: String(task.summary || name).trim(),
+    details: String(task.details || `Implement and verify: ${name}.`).trim(),
+    acceptanceCriteria: Array.isArray(task.acceptanceCriteria) && task.acceptanceCriteria.length > 0
+      ? task.acceptanceCriteria.map(String).filter(Boolean)
+      : [`${name} is implemented and testable.`, "User-facing behavior matches the BRD/PRD intent."],
+    steps: Array.isArray(task.steps) && task.steps.length > 0
+      ? task.steps.map(String).filter(Boolean)
+      : ["Inspect current flow.", "Implement scoped changes.", "Run verification."],
+    priority: task.priority ? String(task.priority) : "must",
+    estimate: task.estimate ? String(task.estimate) : undefined,
+    risk: task.risk ? String(task.risk) : "",
+    deps: Array.isArray(task.deps) ? task.deps.map(String).filter(Boolean) : [],
+  };
 }
 
 // ── AI callers ────────────────────────────────────────────────────────────────
@@ -147,11 +191,12 @@ async function generateModulesWithAI(
 Generate 3–6 modules, each with 1–4 features, each feature with 2–5 atomic tasks.
 - Infer domain from project name + document filename
 - Tasks must be specific and actionable (real entity names, screens, actions)
+- Each task must be an object with enough detail for a developer to implement without rereading the whole BRD.
 - Apply MoSCoW: must-have tasks first per feature
 - Flag high-risk: payments, real-time, auth, file upload
 
 Respond ONLY with valid JSON — no markdown, no explanation:
-{"modules":[{"name":"...","features":[{"name":"...","tasks":["task1","task2"]}]}]}`;
+{"modules":[{"name":"...","features":[{"name":"...","tasks":[{"name":"...","summary":"one sentence","details":"implementation scope and context","acceptanceCriteria":["..."],"steps":["..."],"priority":"must|should|could","estimate":"1h|2h|4h","risk":"optional risk note","deps":[]}]}]}]}`;
 
   let raw = "";
   if (role.credentialService === "anthropic") {
@@ -187,21 +232,21 @@ const FALLBACK_MODULES: AiModule[] = [
   {
     name: "Product Discovery",
     features: [
-      { name: "BRD/PRD Understanding", tasks: ["Extract business goals, actors, and core workflows", "Map user journeys and key screens", "Identify assumptions, constraints, and open questions"] },
-      { name: "Scope Definition", tasks: ["Define MVP scope and deferred scope", "Create acceptance criteria for core flows", "List risks and validation checkpoints"] },
+      { name: "BRD/PRD Understanding", tasks: ["Extract business goals, actors, and core workflows", "Map user journeys and key screens", "Identify assumptions, constraints, and open questions"].map((name) => normalizeAiTask(name)) },
+      { name: "Scope Definition", tasks: ["Define MVP scope and deferred scope", "Create acceptance criteria for core flows", "List risks and validation checkpoints"].map((name) => normalizeAiTask(name)) },
     ],
   },
   {
     name: "Application Architecture",
     features: [
-      { name: "Frontend Plan", tasks: ["Map pages, components, and client/server boundaries", "Define data loading and mutation flows", "Plan validation and error states"] },
-      { name: "Backend & Data Model", tasks: ["Draft entities, relationships, and API contracts", "Identify auth and permission requirements", "Plan integration points and background jobs"] },
+      { name: "Frontend Plan", tasks: ["Map pages, components, and client/server boundaries", "Define data loading and mutation flows", "Plan validation and error states"].map((name) => normalizeAiTask(name)) },
+      { name: "Backend & Data Model", tasks: ["Draft entities, relationships, and API contracts", "Identify auth and permission requirements", "Plan integration points and background jobs"].map((name) => normalizeAiTask(name)) },
     ],
   },
   {
     name: "Quality & Release",
     features: [
-      { name: "Verification Plan", tasks: ["Create smoke test and regression checklist", "Define deployment readiness gates", "Prepare monitoring and rollback notes"] },
+      { name: "Verification Plan", tasks: ["Create smoke test and regression checklist", "Define deployment readiness gates", "Prepare monitoring and rollback notes"].map((name) => normalizeAiTask(name)) },
     ],
   },
 ];
@@ -402,18 +447,25 @@ export async function analyzeProjectForWorkspace(
       const featureId = `${moduleId}-F${fi}`;
       await db.feature.create({ data: { id: featureId, moduleId, name: feature.name, order: fi } });
 
-      for (const [ti, taskName] of feature.tasks.entries()) {
+      for (const [ti, rawTask] of feature.tasks.entries()) {
+        const task = normalizeAiTask(rawTask, `${feature.name} task ${ti + 1}`);
         const taskId = `${featureId}-T${ti + 1}`;
         await db.task.create({
           data: {
             id: taskId,
             workspaceId,
             featureId,
-            name: taskName,
+            name: task.name,
+            summary: task.summary,
+            details: task.details,
+            acceptanceCriteria: task.acceptanceCriteria ?? [],
+            steps: task.steps ?? [],
+            priority: task.priority,
+            risk: task.risk,
             status: taskId === firstTaskId ? "in_progress" : "pending",
             phase: taskId === firstTaskId ? "analysis" : "pending",
-            estimate: ti === 0 ? "1h" : "2h",
-            deps: [],
+            estimate: task.estimate ?? (ti === 0 ? "1h" : "2h"),
+            deps: task.deps ?? [],
             baRoleId: baRole?.id ?? null,
             devRoleId: devRole?.id ?? null,
             reviewRoleId: reviewRole?.id ?? null,
@@ -452,11 +504,16 @@ export async function analyzeProjectForWorkspace(
       features: mod.features.map((f, fi) => ({
         id: `M${mi}-F${fi}`,
         name: f.name,
-        tasks: f.tasks.map((t, ti) => ({
-          id: `${projectName}-M${mi}-F${fi}-T${ti + 1}`,
-          name: t,
-          status: ti === 0 && mi === 0 && fi === 0 ? "in_progress" : "pending",
-        })),
+        tasks: f.tasks.map((rawTask, ti) => {
+          const task = normalizeAiTask(rawTask, `${f.name} task ${ti + 1}`);
+          return {
+            id: `${projectName}-M${mi}-F${fi}-T${ti + 1}`,
+            name: task.name,
+            summary: task.summary,
+            acceptanceCriteria: task.acceptanceCriteria,
+            status: ti === 0 && mi === 0 && fi === 0 ? "in_progress" : "pending",
+          };
+        }),
       })),
     })),
     risks: [],

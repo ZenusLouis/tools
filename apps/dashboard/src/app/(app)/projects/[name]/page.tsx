@@ -137,7 +137,7 @@ export default async function ProjectOverviewPage({
                       const barColor = mod.percent === 100 ? "bg-done" : mod.percent > 0 ? "bg-in-progress" : "bg-border";
                       const textColor = mod.percent === 100 ? "text-done" : mod.percent > 0 ? "text-in-progress" : "text-text-muted";
                       return (
-                        <div key={mod.id} className="space-y-2">
+                        <Link key={mod.id} href={`/tasks?project=${encodedName}&module=${encodeURIComponent(mod.id)}`} className="block space-y-2 rounded-lg p-2 transition-colors hover:bg-card-hover">
                           <div className="flex justify-between text-sm">
                             <span className="text-text font-medium">
                               <span className="font-mono text-[10px] text-text-muted mr-1.5">{mod.id}</span>
@@ -150,7 +150,7 @@ export default async function ProjectOverviewPage({
                           <div className="h-1.5 w-full bg-bg-base rounded-full overflow-hidden">
                             <div className={`h-full rounded-full transition-all duration-700 ${barColor}`} style={{ width: `${mod.percent}%` }} />
                           </div>
-                        </div>
+                        </Link>
                       );
                     })}
                   </div>

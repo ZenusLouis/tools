@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { Check, Edit2, Search, Sparkles, Trash2, X } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 type Skill = { id: string; name: string; slug: string; category: string; description: string; isRemote: boolean };
 type Role = {
@@ -28,6 +29,7 @@ export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; s
   const [selectedRole, setSelectedRole] = useState<Role | null>(roleList[0] ?? null);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [deletingSlug, setDeletingSlug] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Role | null>(null);
   const [pending, startTransition] = useTransition();
 
   const categories = useMemo(() => ["all", ...Array.from(new Set(skillList.map((skill) => skill.category))).sort()], [skillList]);
@@ -66,6 +68,7 @@ export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; s
       setRoleList((prev) => prev.filter((r) => r.slug !== slug));
       if (selectedRole?.slug === slug) setSelectedRole(null);
       setDeletingSlug("");
+      setDeleteTarget(null);
     });
   }
 
@@ -192,9 +195,7 @@ export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; s
                 ) : (
                   <button
                     type="button"
-                    onClick={() => {
-                      if (confirm(`Delete "${selectedRole.name}"? This cannot be undone.`)) deleteRole(selectedRole.slug);
-                    }}
+                    onClick={() => setDeleteTarget(selectedRole)}
                     className="flex items-center gap-1.5 rounded-lg border border-blocked/40 px-3 py-1.5 text-xs font-semibold text-blocked hover:bg-blocked/10 transition-colors"
                   >
                     <Trash2 size={13} /> Delete
@@ -228,6 +229,24 @@ export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; s
             </div>
           </section>
         )}
+
+        <ConfirmDialog
+          open={!!deleteTarget}
+          title="Delete bot role?"
+          description={
+            <>
+              Delete <span className="font-semibold text-text">{deleteTarget?.name}</span>. This removes the role from the dashboard and generated registry artifacts.
+            </>
+          }
+          confirmLabel="Delete Role"
+          pending={pending && !!deletingSlug}
+          onClose={() => {
+            if (!deletingSlug) setDeleteTarget(null);
+          }}
+          onConfirm={() => {
+            if (deleteTarget) deleteRole(deleteTarget.slug);
+          }}
+        />
       </div>
     );
   }

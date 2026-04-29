@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, Copy, Eye, EyeOff, Key, Loader2, Plus, Trash2 } from "lucide-react";
 import type { ApiKeyRow } from "@/lib/api-keys";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 const SERVICE_OPTIONS = [
   { value: "stitch", label: "Stitch Design" },
@@ -29,6 +30,7 @@ function KeyRow({ row, onDelete }: { row: ApiKeyRow; onDelete: (id: string) => v
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   async function toggleReveal() {
     if (revealed) {
@@ -85,10 +87,25 @@ function KeyRow({ row, onDelete }: { row: ApiKeyRow; onDelete: (id: string) => v
         <button onClick={toggleReveal} disabled={loading} className="rounded p-1.5 text-text-muted transition-colors hover:bg-card-hover hover:text-text" title={revealed ? "Hide" : "Reveal"}>
           {loading ? <Loader2 size={13} className="animate-spin" /> : revealed ? <EyeOff size={13} /> : <Eye size={13} />}
         </button>
-        <button onClick={handleDelete} disabled={deleting} className="rounded p-1.5 text-text-muted transition-colors hover:bg-blocked/10 hover:text-blocked" title="Delete">
+        <button onClick={() => setConfirmDelete(true)} disabled={deleting} className="rounded p-1.5 text-text-muted transition-colors hover:bg-blocked/10 hover:text-blocked" title="Delete">
           {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
         </button>
       </div>
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete API key?"
+        description={
+          <>
+            Delete <span className="font-semibold text-text">{row.name}</span>. Any dashboard flow using this credential will stop working until a new key is added.
+          </>
+        }
+        confirmLabel="Delete Key"
+        pending={deleting}
+        onClose={() => {
+          if (!deleting) setConfirmDelete(false);
+        }}
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }

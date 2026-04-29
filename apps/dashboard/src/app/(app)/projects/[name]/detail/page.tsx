@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Activity, ArrowLeft, CheckCircle2, Code2, Layers, Settings, ShieldCheck } from "lucide-react";
+import { Activity, ArrowLeft, CheckCircle2, Circle, Code2, Layers, Route, Settings, ShieldCheck } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { PageShell } from "@/components/layout/PageShell";
 import { ProjectActionButtons } from "@/components/projects/ProjectActionButtons";
@@ -79,6 +79,40 @@ export default async function ProjectDetailConsolePage({ params }: { params: Pro
                     </div>
                     <div className="h-2 overflow-hidden rounded-full bg-card-hover">
                       <div className={mod.percent === 100 ? "h-full rounded-full bg-done" : "h-full rounded-full bg-accent"} style={{ width: `${mod.percent}%` }} />
+                    </div>
+                    <div className="mt-4 space-y-3">
+                      {mod.features.map((feature) => (
+                        <div key={feature.id} className="rounded-lg border border-border bg-card p-3">
+                          <div className="mb-2 flex items-center gap-2">
+                            <Route size={13} className="text-text-muted" />
+                            <p className="text-xs font-bold text-text">{feature.name}</p>
+                            <span className="ml-auto rounded bg-bg-base px-2 py-0.5 font-mono text-[10px] text-text-muted">
+                              {feature.tasks.length} tasks
+                            </span>
+                          </div>
+                          <div className="space-y-1">
+                            {feature.tasks.map((task) => (
+                              <Link
+                                key={task.id}
+                                href={`/tasks/${task.id}`}
+                                className="flex items-start gap-2 rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-card-hover"
+                              >
+                                {task.status === "completed" ? (
+                                  <CheckCircle2 size={13} className="mt-0.5 shrink-0 text-done" />
+                                ) : (
+                                  <Circle size={13} className={task.status === "in-progress" ? "mt-0.5 shrink-0 text-accent" : "mt-0.5 shrink-0 text-text-muted"} />
+                                )}
+                                <span className="min-w-[160px] font-mono text-[10px] text-accent">{task.id}</span>
+                                <span className="min-w-0 flex-1">
+                                  <span className="block text-text-muted">{task.name}</span>
+                                  {task.summary && <span className="mt-0.5 line-clamp-1 block text-[10px] text-text-muted/70">{task.summary}</span>}
+                                </span>
+                                {task.estimate && <span className="ml-auto shrink-0 text-[10px] text-text-muted">{task.estimate}</span>}
+                              </Link>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}

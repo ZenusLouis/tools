@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Check, Loader2, Sparkles, Terminal } from "lucide-react";
 
@@ -13,6 +14,13 @@ type AnalyzeResult = {
   actionId?: string;
   provider?: "claude" | "codex" | "chatgpt";
   runnerLabel?: string;
+};
+
+type AnalyzeSummary = {
+  modules?: Array<{
+    name?: string;
+    features?: Array<{ name?: string; tasks?: string[] }>;
+  }>;
 };
 
 export function AnalyzeProjectButton({
@@ -31,6 +39,7 @@ export function AnalyzeProjectButton({
   const [polling, setPolling] = useState(false);
   const [runnerLabel, setRunnerLabel] = useState("Claude");
   const [log, setLog] = useState<string[]>([]);
+  const [summary, setSummary] = useState<AnalyzeSummary | null>(null);
   const logRef = useRef<HTMLPreElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -46,6 +55,7 @@ export function AnalyzeProjectButton({
     setPolling(true);
     setRunnerLabel(labelForRunner);
     setLog([`Queued - waiting for local ${labelForRunner}...`]);
+    setSummary(null);
     let attempts = 0;
 
     pollRef.current = setInterval(async () => {
@@ -53,8 +63,9 @@ export function AnalyzeProjectButton({
       try {
         const res = await fetch(`/api/projects/${projectEnc}/analyze/status?actionId=${actionId}`);
         if (res.ok) {
-          const data = await res.json() as { ready: boolean; created?: number; log?: string[]; failed?: boolean; error?: string };
+          const data = await res.json() as { ready: boolean; created?: number; log?: string[]; failed?: boolean; error?: string; summary?: AnalyzeSummary };
           if (data.log && data.log.length > 0) setLog(data.log);
+          if (data.summary) setSummary(data.summary);
           if (data.failed) {
             clearInterval(pollRef.current!);
             setPolling(false);
@@ -68,6 +79,7 @@ export function AnalyzeProjectButton({
             setOk(true);
             setFeedback(`${data.created ?? "?"} tasks generated (local ${labelForRunner}).`);
             setLog((prev) => [...prev, "Done."]);
+            if (data.summary) setSummary(data.summary);
             router.refresh();
             return;
           }
@@ -76,11 +88,11 @@ export function AnalyzeProjectButton({
         // Keep polling; transient network errors are normal during deploys.
       }
 
-      if (attempts >= 24) {
+      if (attempts >= 120) {
         clearInterval(pollRef.current!);
         setPolling(false);
         setFeedback("Timed out. Check bridge daemon.");
-        setLog((prev) => [...prev, "Timed out after 2 minutes."]);
+        setLog((prev) => [...prev, "Timed out after 10 minutes."]);
       }
     }, 5000);
   }
@@ -89,6 +101,7 @@ export function AnalyzeProjectButton({
     setFeedback(null);
     setOk(false);
     setLog([]);
+    setSummary(null);
 
     startTransition(async () => {
       try {
@@ -145,6 +158,32 @@ export function AnalyzeProjectButton({
           >
             {log.join("\n")}
           </pre>
+        </div>
+      )}
+
+      {ok && summary?.modules && summary.modules.length > 0 && (
+        <div className="w-full rounded-lg border border-border bg-bg-base p-3 text-left">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-text-muted">Generated Backlog Review</span>
+            <span className="flex gap-2">
+              <Link href={`/projects/${encodeURIComponent(projectName)}/detail`} className="text-[11px] font-semibold text-accent hover:underline">Open detail</Link>
+              <Link href="/tasks" className="text-[11px] font-semibold text-accent hover:underline">Review tasks</Link>
+            </span>
+          </div>
+          <div className="grid gap-2 md:grid-cols-2">
+            {summary.modules.slice(0, 4).map((mod, index) => (
+              <div key={`${mod.name}-${index}`} className="rounded border border-border bg-card px-3 py-2">
+                <p className="truncate text-xs font-bold text-text">{mod.name ?? "Untitled module"}</p>
+                <ul className="mt-1 space-y-1 text-[11px] text-text-muted">
+                  {(mod.features ?? []).slice(0, 2).map((feature, featureIndex) => (
+                    <li key={`${feature.name}-${featureIndex}`} className="truncate">
+                      {feature.name ?? "Feature"}: {(feature.tasks ?? []).slice(0, 2).join("; ")}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </span>

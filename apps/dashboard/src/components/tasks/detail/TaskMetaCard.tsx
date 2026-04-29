@@ -1,6 +1,6 @@
 import type { TaskDetail, TaskLogEntry } from "@/lib/task-detail";
 import Link from "next/link";
-import { Box, CalendarClock, CheckCircle2, Clock3, FileText, GitCommit, Layers, Route, ShieldAlert, WalletCards } from "lucide-react";
+import { Box, CalendarClock, CheckCircle2, ClipboardCheck, Clock3, FileText, GitCommit, Layers, ListChecks, Route, ShieldAlert, WalletCards } from "lucide-react";
 
 const STATUS_STYLES: Record<string, string> = {
   pending:       "bg-pending/15 text-pending",
@@ -40,6 +40,7 @@ export function TaskMetaCard({ task, log }: Props) {
               <span className="rounded-lg border border-border bg-card px-2.5 py-1 text-xs text-text-muted">{task.phase}</span>
             </div>
             <h2 className="text-2xl font-black tracking-tight text-white">{task.name}</h2>
+            {task.summary && <p className="mt-2 max-w-3xl text-sm leading-6 text-text-muted">{task.summary}</p>}
             <p className="mt-2 text-sm text-text-muted">
               {task.moduleName} / {task.featureName}
             </p>
@@ -65,6 +66,35 @@ export function TaskMetaCard({ task, log }: Props) {
         <Row label="Estimate" icon={Clock3}>
           {task.estimate ? <span className="rounded bg-accent/10 px-2 py-0.5 text-xs font-bold text-accent">{task.estimate}</span> : <span className="text-text-muted">Not estimated</span>}
         </Row>
+        {task.priority && (
+          <Row label="Priority" icon={ClipboardCheck}>
+            <span className="rounded bg-in-progress/10 px-2 py-0.5 text-xs font-bold uppercase text-in-progress">{task.priority}</span>
+          </Row>
+        )}
+        {task.details && (
+          <Row label="Implementation detail" icon={FileText}>
+            <p className="text-sm leading-6 text-text-muted">{task.details}</p>
+          </Row>
+        )}
+        {task.acceptanceCriteria.length > 0 && (
+          <Row label="Acceptance criteria" icon={ListChecks}>
+            <ul className="list-disc space-y-1 pl-4 text-sm leading-6 text-text-muted">
+              {task.acceptanceCriteria.map((item) => <li key={item}>{item}</li>)}
+            </ul>
+          </Row>
+        )}
+        {task.steps.length > 0 && (
+          <Row label="Suggested steps" icon={Route}>
+            <ol className="list-decimal space-y-1 pl-4 text-sm leading-6 text-text-muted">
+              {task.steps.map((item) => <li key={item}>{item}</li>)}
+            </ol>
+          </Row>
+        )}
+        {task.risk && (
+          <Row label="Risk note" icon={ShieldAlert}>
+            <p className="text-sm leading-6 text-in-progress">{task.risk}</p>
+          </Row>
+        )}
         {task.deps.length > 0 && (
           <Row label="Dependencies" icon={ShieldAlert}>
             <div className="flex flex-wrap gap-1">

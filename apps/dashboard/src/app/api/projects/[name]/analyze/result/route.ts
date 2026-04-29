@@ -10,7 +10,20 @@ const ModuleSchema = z.object({
   name: z.string(),
   features: z.array(z.object({
     name: z.string(),
-    tasks: z.array(z.string()),
+    tasks: z.array(z.union([
+      z.string(),
+      z.object({
+        name: z.string(),
+        summary: z.string().optional(),
+        details: z.string().optional(),
+        acceptanceCriteria: z.array(z.string()).optional(),
+        steps: z.array(z.string()).optional(),
+        priority: z.string().optional(),
+        estimate: z.string().optional(),
+        risk: z.string().optional(),
+        deps: z.array(z.string()).optional(),
+      }),
+    ])),
   })),
 });
 
@@ -19,6 +32,36 @@ const ResultSchema = z.object({
   projectName: z.string(),
   modules: z.array(ModuleSchema).min(1).max(20),
 });
+
+type ParsedTask = z.infer<typeof ModuleSchema>["features"][number]["tasks"][number];
+
+function normalizeTask(task: ParsedTask, fallbackName: string) {
+  if (typeof task === "string") {
+    return {
+      name: task,
+      summary: task,
+      details: `Implement and verify: ${task}.`,
+      acceptanceCriteria: [`${task} is implemented and visible in the expected user flow.`, "Main error and empty states are handled."],
+      steps: ["Review BRD/PRD context and related code.", "Implement the scoped change.", "Verify the result."],
+      priority: "must",
+      estimate: undefined,
+      risk: "",
+      deps: [],
+    };
+  }
+  const name = task.name || fallbackName;
+  return {
+    name,
+    summary: task.summary || name,
+    details: task.details || `Implement and verify: ${name}.`,
+    acceptanceCriteria: task.acceptanceCriteria ?? [`${name} is implemented and testable.`],
+    steps: task.steps ?? ["Inspect current flow.", "Implement scoped changes.", "Run verification."],
+    priority: task.priority ?? "must",
+    estimate: task.estimate,
+    risk: task.risk ?? "",
+    deps: task.deps ?? [],
+  };
+}
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ name: string }> }) {
   let ctx = await verifyBridgeRequest(bridgeTokenFromHeaders(req.headers));
@@ -63,14 +106,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ nam
     for (const [fi, feature] of mod.features.entries()) {
       const featureId = `${moduleId}-F${fi}`;
       await db.feature.create({ data: { id: featureId, moduleId, name: feature.name, order: fi } });
-      for (const [ti, taskName] of feature.tasks.entries()) {
+      for (const [ti, rawTask] of feature.tasks.entries()) {
+        const task = normalizeTask(rawTask, `${feature.name} task ${ti + 1}`);
         const taskId = `${featureId}-T${ti + 1}`;
         await db.task.create({
           data: {
-            id: taskId, workspaceId: ctx.workspaceId, featureId, name: taskName,
+            id: taskId, workspaceId: ctx.workspaceId, featureId, name: task.name,
+            summary: task.summary,
+            details: task.details,
+            acceptanceCriteria: task.acceptanceCriteria,
+            steps: task.steps,
+            priority: task.priority,
+            risk: task.risk,
             status: taskId === firstTaskId ? "in_progress" : "pending",
             phase: taskId === firstTaskId ? "analysis" : "pending",
-            estimate: ti === 0 ? "1h" : "2h", deps: [],
+            estimate: task.estimate ?? (ti === 0 ? "1h" : "2h"), deps: task.deps,
             baRoleId: baRole?.id ?? null,
             devRoleId: devRole?.id ?? null,
             reviewRoleId: reviewRole?.id ?? null,
@@ -88,6 +138,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ nam
 
   revalidatePath("/");
   revalidatePath(`/projects/${encodeURIComponent(projectName)}`);
+  revalidatePath(`/projects/${encodeURIComponent(projectName)}/detail`);
   revalidatePath("/tasks");
   return NextResponse.json({ ok: true, created });
 }

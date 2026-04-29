@@ -1,5 +1,28 @@
 # Implementation
 
+## Latest Update - Confirmation Popups
+
+- Added `apps/dashboard/src/components/ui/ConfirmDialog.tsx` as the shared in-app confirmation modal.
+- Replaced browser/inline confirmation flows with modal popups for:
+  - Bot role deletion in `apps/dashboard/src/components/create/CreateRoleClient.tsx`
+  - Generic API key deletion in `apps/dashboard/src/components/settings/ApiKeysPanel.tsx`
+  - Project backlog reset in `apps/dashboard/src/components/projects/ResetTasksButton.tsx`
+  - Project removal danger zone in `apps/dashboard/src/components/settings/DangerZone.tsx`
+  - Codex usage reset in `apps/dashboard/src/components/tokens/ResetUsageButton.tsx`
+  - Knowledge lesson deletion in `apps/dashboard/src/components/knowledge/LessonCard.tsx`
+- Verified there are no remaining `confirm()`, `alert()`, or `prompt()` usages in `apps/dashboard/src`.
+- Checks: `npm run lint`, `npm run build`.
+
+## Latest Update - Generated Task Details
+
+- Added DB-backed task detail fields to `Task`: `summary`, `details`, `acceptanceCriteria`, `steps`, `priority`, and `risk`.
+- Added migration `apps/dashboard/prisma/migrations/20260429103000_task_details/migration.sql`.
+- Updated dashboard-run and local bridge analysis prompts to generate task objects instead of only task name strings.
+- Kept backward compatibility: old string-only generated tasks are normalized into default detail/acceptance/steps.
+- Local bridge callback now accepts both string tasks and detailed task objects.
+- Task Board cards, slide-over detail, full task detail page, and project detail backlog now render the new task details.
+- Checks: `npx prisma generate`, `python -m py_compile hooks/gcs_bridge_daemon.py`, `npm run lint`, `npm run build`.
+
 ## Changed Files
 
 - `apps/dashboard/src/components/projects/OnboardingEmptyState.tsx`
@@ -209,6 +232,12 @@
 - Prevented BA Analyst ChatGPT analysis from silently falling back to local Claude. If BA is configured as ChatGPT and OpenAI analysis cannot complete, the project page now returns a ChatGPT/OpenAI key error instead of queuing `claude -p`.
 - Fixed local Claude analysis max-turn failures by raising the bridge `claude -p` default from 1 to 4 turns (`GCS_CLAUDE_ANALYZE_MAX_TURNS` override) and surfacing stdout JSON errors in the dashboard when Claude exits non-zero.
 - Allowed the bridge callback route `/api/projects/:name/analyze/result` through the dashboard proxy while keeping route-level bridge-token verification, fixing 401 Unauthorized when local Claude posts generated modules/tasks back to cloud.
+- Extended project Analyze polling from 2 minutes to 10 minutes and made the status API return running bridge progress, so local Claude/PDF analysis is not marked timed out while the bridge is still working.
+- Preserved bridge progress logs when file actions complete, added structured local-Claude analysis progress lines, and returned a generated backlog summary for UI review.
+- Added a Generated Backlog Review panel after Analyze completes with module/feature/task previews plus links to Project Detail and Task Board.
+- Revalidated the project detail route after bridge analysis result callbacks so generated modules/tasks appear on follow-up views.
+- Expanded Project Detail from module-only progress into a full generated backlog tree: modules now show features and clickable task rows linking to task detail pages.
+- Made Module Progress rows on the project overview clickable, routing directly to the Task Board filtered by that module.
 - Fixed bridge file sync auth by allowing `/api/bridge/file-actions/*` through the dashboard proxy. Before this, the route returned `401` before bridge-token verification, so local daemon could heartbeat but could not poll/write cloud-to-local file actions.
 - Created a cloud bridge token for this machine, stored it in gitignored `.codex/settings.local.json` under `env.BRIDGE_TOKEN`, restarted the local bridge, manually drained the existing queued OmniBooking file action, wrote `.gcs/context.json`, `.gcs/progress.json`, and `.gcs/code-index.md` to `D:\Code\OmniBooking`, then reported the action as succeeded.
 - Removed bridge-token guidance that suggested Windows environment variables; Chat and Settings now point to `.codex/settings.local.json`.

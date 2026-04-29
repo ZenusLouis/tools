@@ -4,6 +4,7 @@ import { useState, useTransition, useRef } from "react";
 import { Pencil, Trash2, Check, X } from "lucide-react";
 import type { Lesson } from "@/lib/knowledge";
 import { editLessonAction, deleteLessonAction } from "@/app/(app)/knowledge/actions";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 interface Props {
   lesson: Lesson;
@@ -98,16 +99,6 @@ export function LessonCard({ lesson, isSelected = false, onSelect }: Props) {
               <X className="h-3.5 w-3.5" />
             </button>
           </>
-        ) : confirmDelete ? (
-          <>
-            <span className="text-[10px] text-blocked">Delete?</span>
-            <button onClick={(event) => { event.stopPropagation(); confirmAndDelete(); }} disabled={isPending} className="text-blocked hover:text-blocked/80 p-1 rounded transition-colors">
-              <Check className="h-3.5 w-3.5" />
-            </button>
-            <button onClick={(event) => { event.stopPropagation(); setConfirmDelete(false); }} className="text-text-muted hover:text-text p-1 rounded transition-colors">
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </>
         ) : (
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <button onClick={(event) => { event.stopPropagation(); startEdit(); }} className="text-text-muted hover:text-accent p-1 rounded transition-colors">
@@ -119,6 +110,17 @@ export function LessonCard({ lesson, isSelected = false, onSelect }: Props) {
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete lesson?"
+        description="Delete this knowledge lesson from the current workspace. This action cannot be undone."
+        confirmLabel="Delete Lesson"
+        pending={isPending}
+        onClose={() => {
+          if (!isPending) setConfirmDelete(false);
+        }}
+        onConfirm={confirmAndDelete}
+      />
     </div>
   );
 }

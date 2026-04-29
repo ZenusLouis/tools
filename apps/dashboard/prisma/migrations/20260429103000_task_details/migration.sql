@@ -1,0 +1,7 @@
+ALTER TABLE "Task"
+  ADD COLUMN "summary" TEXT,
+  ADD COLUMN "details" TEXT,
+  ADD COLUMN "acceptanceCriteria" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+  ADD COLUMN "steps" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+  ADD COLUMN "priority" TEXT,
+  ADD COLUMN "risk" TEXT;

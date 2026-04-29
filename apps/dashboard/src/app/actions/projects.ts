@@ -102,6 +102,21 @@ function docRecord(project: ProjectWithLatestPath): Record<string, string> {
     : {};
 }
 
+function taskDetail(taskName: string, featureName: string) {
+  return {
+    summary: taskName,
+    details: `Plan, implement, and verify "${taskName}" inside the ${featureName} feature.`,
+    acceptanceCriteria: [
+      `${taskName} is represented in the project backlog and can be executed independently.`,
+      "Expected user-facing behavior and error states are documented.",
+      "Verification notes are ready for implementation/review handoff.",
+    ],
+    steps: ["Review linked BRD/PRD context.", "Map impacted screens, APIs, and data.", "Define implementation and verification notes."],
+    priority: "must",
+    risk: "",
+  };
+}
+
 function buildProgressPayload(projectName: string, activeTask: string | null) {
   return {
     project: projectName,
@@ -116,6 +131,7 @@ function buildProgressPayload(projectName: string, activeTask: string | null) {
         tasks: feature.tasks.map((task, index) => ({
           id: `${mod.id}-${feature.id}-T${index + 1}`,
           name: task,
+          ...taskDetail(task, feature.name),
           status: task === "Extract business goals, actors, and core workflows" ? "in_progress" : "pending",
           phase: index === 0 && mod.id === "M0" && feature.id === "F0" ? "analysis" : "pending",
           estimate: index === 0 ? "1h" : "2h",
@@ -232,6 +248,7 @@ export async function analyzeProject(projectName: string): Promise<{ ok: boolean
       });
 
       for (const [taskIndex, taskName] of feature.tasks.entries()) {
+        const detail = taskDetail(taskName, feature.name);
         const taskId = `${projectName}-${mod.id}-${feature.id}-T${taskIndex + 1}`;
         await db.task.create({
           data: {
@@ -239,6 +256,12 @@ export async function analyzeProject(projectName: string): Promise<{ ok: boolean
             workspaceId: user.workspaceId,
             featureId,
             name: taskName,
+            summary: detail.summary,
+            details: detail.details,
+            acceptanceCriteria: detail.acceptanceCriteria,
+            steps: detail.steps,
+            priority: detail.priority,
+            risk: detail.risk,
             status: taskId === firstTaskId ? "in_progress" : "pending",
             phase: taskId === firstTaskId ? "analysis" : "pending",
             estimate: taskIndex === 0 ? "1h" : "2h",

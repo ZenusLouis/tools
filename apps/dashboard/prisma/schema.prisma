@@ -54,6 +54,12 @@ model Task {
   workspaceId String?
   featureId String
   name      String
+  summary   String?
+  details   String?
+  acceptanceCriteria String[] @default([])
+  steps     String[]   @default([])
+  priority  String?
+  risk      String?
   status    TaskStatus @default(pending)
   estimate  String?
   deps      String[]   @default([])

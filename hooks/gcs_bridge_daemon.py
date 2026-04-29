@@ -69,6 +69,12 @@ def post_json_data(path: str, payload: dict, timeout: int = 8) -> tuple[bool, di
     return True, data
 
 
+def post_action_progress(action_id: str, lines: list[str], timeout: int = 4) -> None:
+    if not action_id or not lines:
+        return
+    post_json(f"/api/bridge/file-actions/{action_id}/progress", {"lines": lines}, timeout=timeout)
+
+
 def collect_project_paths() -> list[dict[str, str]]:
     """Read local GCS project contexts and report source folders known to this device."""
     by_name: dict[str, str] = {}
@@ -422,13 +428,19 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
         f"## Output Requirements\n"
         f"Generate 3-6 modules, each with 1-4 features, each 2-5 atomic tasks.\n"
         f"Infer domain from project name + document. Tasks must be specific and actionable.\n"
+        f"Each task must be an object with developer-ready detail: summary, details, acceptanceCriteria, steps, priority, estimate, risk, deps.\n"
         f"Apply MoSCoW: must-have tasks first. Flag high-risk: payments, real-time, auth.\n\n"
         f"Do not use shell commands or search the filesystem. Use only the context in this prompt.\n"
         f"Respond ONLY with valid JSON:\n"
-        f'{{"modules":[{{"name":"...","features":[{{"name":"...","tasks":["task1","task2"]}}]}}]}}'
+        f'{{"modules":[{{"name":"...","features":[{{"name":"...","tasks":[{{"name":"...","summary":"one sentence","details":"implementation scope and context","acceptanceCriteria":["..."],"steps":["..."],"priority":"must|should|could","estimate":"1h|2h|4h","risk":"optional risk note","deps":[]}}]}}]}}]}}'
     )
 
     action_id = str(action.get("id") or "")
+    post_action_progress(action_id, [
+        f"Started local Claude analysis for {project_name}.",
+        f"Document path: {brd_path or 'none'}",
+        f"Stack: {fw}",
+    ])
     import tempfile
     max_turns = os.environ.get("GCS_CLAUDE_ANALYZE_MAX_TURNS", "8")
     process = subprocess.Popen(
@@ -449,13 +461,11 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
         if display:
             pending_lines.append(display)
         if len(pending_lines) >= flush_every:
-            post_json(f"/api/bridge/file-actions/{action_id}/progress",
-                      {"lines": pending_lines}, timeout=4)
+            post_action_progress(action_id, pending_lines)
             pending_lines = []
 
     if pending_lines:
-        post_json(f"/api/bridge/file-actions/{action_id}/progress",
-                  {"lines": pending_lines}, timeout=4)
+        post_action_progress(action_id, pending_lines)
 
     try:
         process.wait(timeout=90)  # hard cap at 90s
@@ -483,6 +493,18 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
     modules = modules_data.get("modules", [])
     if not modules:
         raise ValueError("Empty modules in claude output")
+    total_features = sum(len(module.get("features", [])) for module in modules if isinstance(module, dict))
+    total_tasks = sum(
+        len(feature.get("tasks", []))
+        for module in modules if isinstance(module, dict)
+        for feature in module.get("features", []) if isinstance(feature, dict)
+    )
+    module_names = [str(module.get("name") or "Untitled") for module in modules if isinstance(module, dict)]
+    post_action_progress(action_id, [
+        f"Claude generated {len(modules)} modules, {total_features} features, {total_tasks} tasks.",
+        "Modules: " + ", ".join(module_names[:8]),
+        "Posting generated backlog to dashboard...",
+    ])
 
     # POST result back to dashboard
     ok, detail = post_json_data(callback_path, {
@@ -492,8 +514,34 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
     }, timeout=15)
     if not ok:
         raise ValueError(f"Failed to post analysis result: {detail}")
+    post_action_progress(action_id, ["Dashboard accepted generated backlog.", "Done."])
 
-    return {"source": "local-claude", "modules": len(modules)}
+    return {
+        "source": "local-claude",
+        "modules": len(modules),
+        "features": total_features,
+        "tasks": total_tasks,
+        "summary": {
+            "modules": [
+                {
+                    "name": str(module.get("name") or "Untitled"),
+                    "features": [
+                        {
+                            "name": str(feature.get("name") or "Untitled"),
+                            "tasks": [
+                                str(task.get("name") or "Untitled task") if isinstance(task, dict) else str(task)
+                                for task in feature.get("tasks", [])[:5]
+                            ],
+                        }
+                        for feature in module.get("features", [])[:4]
+                        if isinstance(feature, dict)
+                    ],
+                }
+                for module in modules[:8]
+                if isinstance(module, dict)
+            ],
+        },
+    }
 
 
 def execute_file_action(action: dict[str, Any]) -> dict[str, Any]:

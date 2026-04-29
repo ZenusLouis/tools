@@ -4,6 +4,12 @@ import { db } from "@/lib/db";
 export type TaskDetail = {
   id: string;
   name: string;
+  summary: string | null;
+  details: string | null;
+  acceptanceCriteria: string[];
+  steps: string[];
+  priority: string | null;
+  risk: string | null;
   status: string;
   estimate: string | null;
   deps: string[];
@@ -45,6 +51,12 @@ export async function findTaskDetail(taskId: string): Promise<TaskDetail | null>
   return {
     id: task.id,
     name: task.name,
+    summary: task.summary,
+    details: task.details,
+    acceptanceCriteria: task.acceptanceCriteria,
+    steps: task.steps,
+    priority: task.priority,
+    risk: task.risk,
     status: task.status === "in_progress" ? "in-progress" : task.status,
     estimate: task.estimate,
     deps: task.deps,

@@ -6,6 +6,12 @@ export type TaskStatus = "pending" | "in-progress" | "completed" | "blocked";
 export type KanbanTask = {
   id: string;
   name: string;
+  summary?: string | null;
+  details?: string | null;
+  acceptanceCriteria?: string[];
+  steps?: string[];
+  priority?: string | null;
+  risk?: string | null;
   status: TaskStatus;
   phase: string;
   featureId: string;
@@ -87,6 +93,12 @@ export async function getModuleTasks(
       return {
         id: task.id,
         name: task.name,
+        summary: task.summary,
+        details: task.details,
+        acceptanceCriteria: task.acceptanceCriteria,
+        steps: task.steps,
+        priority: task.priority,
+        risk: task.risk,
         status: dbStatusToKanban(task.status),
         phase: task.phase ?? dbStatusToKanban(task.status),
         featureId: task.feature.id,
@@ -121,6 +133,12 @@ export async function getModuleTasks(
       return {
         id: task.id,
         name: task.name,
+        summary: task.summary,
+        details: task.details,
+        acceptanceCriteria: task.acceptanceCriteria,
+        steps: task.steps,
+        priority: task.priority,
+        risk: task.risk,
         status: dbStatusToKanban(task.status),
         phase: task.phase ?? dbStatusToKanban(task.status),
         featureId: feature.id,

@@ -38,15 +38,24 @@ export async function POST(req: NextRequest) {
 
   const action = await db.bridgeFileAction.findFirst({
     where: { id: parsed.data.id, workspaceId: ctx.workspaceId },
-    select: { id: true, type: true, payload: true },
+    select: { id: true, type: true, payload: true, result: true },
   });
   if (!action) return NextResponse.json({ error: "Action not found" }, { status: 404 });
+
+  const previousResult =
+    action.result && typeof action.result === "object" && !Array.isArray(action.result)
+      ? action.result as Record<string, unknown>
+      : {};
+  const nextResult = {
+    ...previousResult,
+    ...(parsed.data.result ?? {}),
+  } as Prisma.InputJsonValue;
 
   await db.bridgeFileAction.update({
     where: { id: action.id },
     data: {
       status: parsed.data.status,
-      result: (parsed.data.result ?? {}) as Prisma.InputJsonValue,
+      result: nextResult,
       error: parsed.data.error ?? null,
       deviceId,
       completedAt: new Date(),

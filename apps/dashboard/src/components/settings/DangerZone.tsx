@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { removeProject } from "@/app/(app)/projects/[name]/settings/actions";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 export function DangerZone({ projectName }: { projectName: string }) {
   const [confirming, setConfirming] = useState(false);
@@ -20,20 +21,25 @@ export function DangerZone({ projectName }: { projectName: string }) {
           <p className="text-sm text-text">Remove project from registry</p>
           <p className="mt-0.5 text-xs text-text-muted">Removes from dashboard only. It does not delete any files on disk.</p>
         </div>
-        {!confirming ? (
-          <button type="button" onClick={() => setConfirming(true)} className="rounded-lg border border-blocked/40 px-4 py-2 text-sm text-blocked transition-colors hover:bg-blocked/10">
-            Remove Project
-          </button>
-        ) : (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-text-muted">Are you sure?</span>
-            <button type="button" onClick={() => setConfirming(false)} className="rounded-lg border border-border px-3 py-1.5 text-xs text-text transition-colors hover:bg-card-hover">Cancel</button>
-            <button type="button" onClick={handleRemove} disabled={pending} className="rounded-lg bg-blocked px-3 py-1.5 text-xs text-white transition-colors hover:bg-blocked/80 disabled:opacity-50">
-              {pending ? "Removing..." : "Confirm Remove"}
-            </button>
-          </div>
-        )}
+        <button type="button" onClick={() => setConfirming(true)} disabled={pending} className="rounded-lg border border-blocked/40 px-4 py-2 text-sm text-blocked transition-colors hover:bg-blocked/10 disabled:opacity-50">
+          {pending ? "Removing..." : "Remove Project"}
+        </button>
       </div>
+      <ConfirmDialog
+        open={confirming}
+        title="Remove project?"
+        description={
+          <>
+            Remove <span className="font-semibold text-text">{projectName}</span> from the dashboard registry. This does not delete files on any local device.
+          </>
+        }
+        confirmLabel="Remove Project"
+        pending={pending}
+        onClose={() => {
+          if (!pending) setConfirming(false);
+        }}
+        onConfirm={handleRemove}
+      />
     </section>
   );
 }

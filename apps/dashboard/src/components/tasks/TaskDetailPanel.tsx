@@ -63,6 +63,7 @@ export function TaskDetailPanel({ task, projectName, completedIds, onClose }: Pr
                 </div>
               </div>
               <h2 className="text-sm font-semibold leading-snug text-text">{task.name}</h2>
+              {task.summary && <p className="mt-2 text-xs leading-relaxed text-text-muted">{task.summary}</p>}
             </div>
 
             <div className="flex flex-wrap items-center gap-2 border-b border-border bg-bg-base/40 px-5 py-3">
@@ -111,6 +112,30 @@ export function TaskDetailPanel({ task, projectName, completedIds, onClose }: Pr
                     {unmetDeps.length} {unmetDeps.length > 1 ? "dependencies" : "dependency"} not yet completed.
                     Complete prerequisite tasks before starting implementation.
                   </p>
+                </div>
+              )}
+
+              {(task.details || task.acceptanceCriteria?.length || task.steps?.length || task.risk) && (
+                <div className="rounded-xl border border-border bg-bg-base/60 p-3.5">
+                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted">Task Detail</p>
+                  {task.details && <p className="text-xs leading-relaxed text-text-muted">{task.details}</p>}
+                  {task.acceptanceCriteria && task.acceptanceCriteria.length > 0 && (
+                    <div className="mt-3">
+                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-accent">Acceptance</p>
+                      <ul className="list-disc space-y-1 pl-4 text-xs leading-relaxed text-text-muted">
+                        {task.acceptanceCriteria.slice(0, 4).map((item) => <li key={item}>{item}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                  {task.steps && task.steps.length > 0 && (
+                    <div className="mt-3">
+                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-accent">Steps</p>
+                      <ol className="list-decimal space-y-1 pl-4 text-xs leading-relaxed text-text-muted">
+                        {task.steps.slice(0, 4).map((item) => <li key={item}>{item}</li>)}
+                      </ol>
+                    </div>
+                  )}
+                  {task.risk && <p className="mt-3 rounded-lg bg-in-progress/10 px-2 py-1.5 text-xs text-in-progress">{task.risk}</p>}
                 </div>
               )}
 
