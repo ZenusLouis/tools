@@ -5,6 +5,7 @@ import { saveSettings } from "@/app/(app)/projects/[name]/settings/actions";
 import { DocumentsSection } from "./DocumentsSection";
 import { EnvSection } from "./EnvSection";
 import { GeneralSection } from "./GeneralSection";
+import { TechStackSection } from "./TechStackSection";
 import { ToolsSection } from "./ToolsSection";
 import type { LocalProjectPath } from "@/lib/settings";
 
@@ -14,6 +15,7 @@ interface Props {
   localPaths: LocalProjectPath[];
   mcpProfile: string;
   profiles: string[];
+  frameworks: string[];
   docs: Record<string, string>;
   tools: Record<string, string>;
   envRequired: string[];
@@ -26,6 +28,7 @@ export function SettingsForm({
   localPaths,
   mcpProfile,
   profiles,
+  frameworks,
   docs,
   tools,
   envRequired,
@@ -36,10 +39,11 @@ export function SettingsForm({
   return (
     <form action={action} className="flex w-full flex-col gap-6">
       <input type="hidden" name="projectName" value={projectName} />
-      <GeneralSection name={projectName} projectPath={projectPath} localPaths={localPaths} mcpProfile={mcpProfile} profiles={profiles} />
-      <DocumentsSection docs={docs} />
-      <ToolsSection tools={tools} />
-      <EnvSection required={envRequired} envFile={envFile} />
+      <div id="general"><GeneralSection name={projectName} projectPath={projectPath} localPaths={localPaths} mcpProfile={mcpProfile} profiles={profiles} /></div>
+      <div id="stack"><TechStackSection frameworks={frameworks} /></div>
+      <div id="documents"><DocumentsSection docs={docs} /></div>
+      <div id="tools"><ToolsSection tools={tools} /></div>
+      <div id="environment"><EnvSection required={envRequired} envFile={envFile} /></div>
 
       <div className="flex items-center gap-4">
         <button type="submit" disabled={pending} className="rounded-lg bg-accent px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-50">

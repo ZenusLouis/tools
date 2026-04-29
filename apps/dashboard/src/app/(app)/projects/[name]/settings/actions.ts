@@ -53,6 +53,13 @@ export async function saveSettings(_prev: unknown, formData: FormData): Promise<
     }
   }
 
+  // Frameworks
+  let frameworks: string[] = project.frameworks;
+  const frameworksRaw = formData.get("frameworks");
+  if (typeof frameworksRaw === "string" && frameworksRaw) {
+    try { frameworks = JSON.parse(frameworksRaw); } catch { /* keep existing */ }
+  }
+
   // Docs
   const docs: Record<string, string> = {};
   for (const [key, val] of formData.entries()) {
@@ -92,6 +99,7 @@ export async function saveSettings(_prev: unknown, formData: FormData): Promise<
     where: { name: projectName },
     data: {
       mcpProfile: updated.mcpProfile ?? null,
+      frameworks,
       docs,
       links: tools,
     },

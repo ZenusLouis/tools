@@ -406,9 +406,11 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
     )
 
     action_id = str(action.get("id") or "")
+    import tempfile
     process = subprocess.Popen(
         ["claude", "-p", prompt, "--output-format", "json"],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
+        cwd=tempfile.gettempdir(),  # neutral dir — avoid loading GCS CLAUDE.md
     )
 
     # Stream stdout and forward chunks to dashboard so UI can show live output

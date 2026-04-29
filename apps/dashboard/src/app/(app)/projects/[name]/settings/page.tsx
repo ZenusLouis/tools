@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { FileText, Link2, Settings, SlidersHorizontal, TerminalSquare, TriangleAlert } from "lucide-react";
+import { Cpu, FileText, Link2, Settings, SlidersHorizontal, TerminalSquare, TriangleAlert } from "lucide-react";
 import { DangerZone } from "@/components/settings/DangerZone";
 import { SettingsForm } from "@/components/settings/SettingsForm";
 import { PageShell } from "@/components/layout/PageShell";
@@ -25,18 +25,19 @@ export default async function ProjectSettingsPage({ params }: Props) {
       <TopBar title={`${ctx.name} Settings`} />
       <PageShell>
         <div className="mx-auto grid max-w-[1200px] grid-cols-1 gap-8 lg:grid-cols-[240px_minmax(0,1fr)]">
-          <aside className="space-y-2 lg:sticky lg:top-24 lg:self-start">
-            <SettingsNavItem icon={SlidersHorizontal} label="General" active />
-            <SettingsNavItem icon={FileText} label="Documents" />
-            <SettingsNavItem icon={Link2} label="Tools & Links" />
-            <SettingsNavItem icon={TerminalSquare} label="Environment" />
-            <SettingsNavItem icon={TriangleAlert} label="Danger Zone" danger />
-            <Link href={`/projects/${ctx.name}`} className="mt-4 block rounded-lg border border-border px-4 py-2 text-sm text-text-muted transition-colors hover:bg-card-hover hover:text-text">
+          <aside className="space-y-1 lg:sticky lg:top-24 lg:self-start">
+            <SettingsNavItem icon={SlidersHorizontal} label="General"      href="#general" />
+            <SettingsNavItem icon={Cpu}               label="Tech Stack"   href="#stack" />
+            <SettingsNavItem icon={FileText}          label="Documents"    href="#documents" />
+            <SettingsNavItem icon={Link2}             label="Tools & Links" href="#tools" />
+            <SettingsNavItem icon={TerminalSquare}    label="Environment"  href="#environment" />
+            <SettingsNavItem icon={TriangleAlert}     label="Danger Zone"  href="#danger" danger />
+            <Link href={`/projects/${encodeURIComponent(ctx.name)}`} className="mt-3 block rounded-lg border border-border px-4 py-2 text-sm text-text-muted transition-colors hover:bg-card-hover hover:text-text">
               Back to project
             </Link>
           </aside>
           <div className="flex flex-col gap-6">
-            <section className="rounded-xl border border-border bg-card p-6">
+            <section id="general" className="rounded-xl border border-border bg-card p-6">
               <div className="mb-6 flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10 text-accent">
                   <Settings size={20} />
@@ -52,13 +53,14 @@ export default async function ProjectSettingsPage({ params }: Props) {
                 localPaths={ctx.localPaths}
                 mcpProfile={ctx.mcpProfile ?? ""}
                 profiles={profiles}
+                frameworks={ctx.frameworks ?? []}
                 docs={ctx.docs ?? {}}
                 tools={ctx.tools ?? {}}
                 envRequired={ctx.env?.required ?? []}
                 envFile={ctx.env?.envFile ?? ""}
               />
             </section>
-            <DangerZone projectName={ctx.name} />
+            <div id="danger"><DangerZone projectName={ctx.name} /></div>
           </div>
         </div>
       </PageShell>
@@ -69,26 +71,23 @@ export default async function ProjectSettingsPage({ params }: Props) {
 function SettingsNavItem({
   icon: Icon,
   label,
-  active,
+  href,
   danger,
 }: {
   icon: typeof Settings;
   label: string;
-  active?: boolean;
+  href: string;
   danger?: boolean;
 }) {
   return (
-    <div
-      className={
-        active
-          ? "flex items-center gap-3 rounded-lg bg-accent/10 px-4 py-2.5 text-accent"
-          : danger
-            ? "flex items-center gap-3 rounded-lg px-4 py-2.5 text-blocked/80"
-            : "flex items-center gap-3 rounded-lg px-4 py-2.5 text-text-muted"
-      }
+    <a
+      href={href}
+      className={`flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-card-hover ${
+        danger ? "text-blocked/80 hover:text-blocked" : "text-text-muted hover:text-text"
+      }`}
     >
       <Icon size={18} />
-      <span className="text-sm font-semibold">{label}</span>
-    </div>
+      <span>{label}</span>
+    </a>
   );
 }
