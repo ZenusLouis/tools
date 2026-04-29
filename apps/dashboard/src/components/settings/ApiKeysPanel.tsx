@@ -170,6 +170,8 @@ function AddKeyForm({ onAdded }: { onAdded: (key: ApiKeyRow) => void }) {
 
 export function ApiKeysPanel({ initialKeys }: { initialKeys: ApiKeyRow[] }) {
   const [keys, setKeys] = useState<ApiKeyRow[]>(initialKeys);
+  const hasOpenAIRuntime = keys.some((key) => key.service === "openai");
+  const hasOpenAIUsage = keys.some((key) => key.service === "openai_admin" || key.service === "openai_usage");
 
   return (
     <div className="space-y-4">
@@ -182,6 +184,12 @@ export function ApiKeysPanel({ initialKeys }: { initialKeys: ApiKeyRow[] }) {
         </div>
         <span className="rounded border border-border bg-card-hover px-2 py-1 text-[10px] text-text-muted">{keys.length} key{keys.length !== 1 ? "s" : ""}</span>
       </div>
+
+      {hasOpenAIRuntime && !hasOpenAIUsage && (
+        <div className="rounded-xl border border-in-progress/30 bg-in-progress/10 px-4 py-3 text-xs text-in-progress">
+          OpenAI Runtime key is configured. Add an OpenAI Usage/Admin key with <span className="font-mono">api.usage.read</span> to sync Token Analytics from OpenAI.
+        </div>
+      )}
 
       {keys.length > 0 && (
         <div className="space-y-2">

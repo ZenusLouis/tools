@@ -202,6 +202,9 @@
 - Split OpenAI keys by purpose in Settings: `openai` is the runtime/model key, while `openai_admin` (or legacy `openai_usage`) is preferred for Token Analytics organization usage/cost sync with `api.usage.read`.
 - Updated `/api/sync/openai-usage` to use OpenAI organization usage completions as the token source and organization costs as the optional USD source. Missing `api.usage.read` now returns a clear error instead of a misleading successful zero-sync response.
 - Added an OpenAI usage key selector on Token Analytics. Sync now sends only the selected `apiKeyId`; the server validates workspace ownership and decrypts the key server-side, so multiple OpenAI/admin keys no longer get chosen implicitly.
+- Replaced the browser `window.confirm` Codex reset prompt with an in-app confirmation modal.
+- Added a Settings warning when an OpenAI runtime key exists but no OpenAI Usage/Admin key is configured.
+- Hardened OpenAI usage sync error handling so upstream non-JSON/failed responses return dashboard JSON errors instead of bubbling into a Cloudflare 502 page.
 - Fixed bridge file sync auth by allowing `/api/bridge/file-actions/*` through the dashboard proxy. Before this, the route returned `401` before bridge-token verification, so local daemon could heartbeat but could not poll/write cloud-to-local file actions.
 - Created a cloud bridge token for this machine, stored it in gitignored `.codex/settings.local.json` under `env.BRIDGE_TOKEN`, restarted the local bridge, manually drained the existing queued OmniBooking file action, wrote `.gcs/context.json`, `.gcs/progress.json`, and `.gcs/code-index.md` to `D:\Code\OmniBooking`, then reported the action as succeeded.
 - Removed bridge-token guidance that suggested Windows environment variables; Chat and Settings now point to `.codex/settings.local.json`.

@@ -74,6 +74,30 @@ function openAIHeaders(apiKey: string) {
   return { Authorization: `Bearer ${apiKey}` };
 }
 
+async function readOpenAIJson<T extends OpenAIError>(res: Response, endpoint: string): Promise<T> {
+  const text = await res.text();
+  let data: T;
+  try {
+    data = JSON.parse(text) as T;
+  } catch {
+    return {
+      error: {
+        message: `OpenAI ${endpoint} returned non-JSON response (${res.status}).`,
+        code: String(res.status),
+      },
+    } as T;
+  }
+
+  if (!res.ok && !data.error) {
+    return {
+      ...data,
+      error: { message: `OpenAI ${endpoint} failed with status ${res.status}.`, code: String(res.status) },
+    };
+  }
+
+  return data;
+}
+
 function permissionMessage(resp: OpenAIError) {
   const message = resp.error?.message ?? "";
   if (!message.toLowerCase().includes("insufficient permissions") && !message.includes("api.usage.read")) return null;
@@ -91,9 +115,9 @@ async function fetchOpenAICompletionsUsage(apiKey: string, startTs: number, endT
 
   const res = await fetch(url, {
     headers: openAIHeaders(apiKey),
-    signal: AbortSignal.timeout(10_000),
+    signal: AbortSignal.timeout(20_000),
   });
-  return res.json() as Promise<CompletionUsageResponse>;
+  return readOpenAIJson<CompletionUsageResponse>(res, "organization usage");
 }
 
 async function fetchOpenAICosts(apiKey: string, startTs: number, endTs: number, page?: string): Promise<CostResponse> {
@@ -106,9 +130,9 @@ async function fetchOpenAICosts(apiKey: string, startTs: number, endTs: number, 
 
   const res = await fetch(url, {
     headers: openAIHeaders(apiKey),
-    signal: AbortSignal.timeout(10_000),
+    signal: AbortSignal.timeout(20_000),
   });
-  return res.json() as Promise<CostResponse>;
+  return readOpenAIJson<CostResponse>(res, "organization costs");
 }
 
 async function collectUsageBuckets(apiKey: string, startTs: number, endTs: number, debug: unknown[]) {
@@ -159,102 +183,107 @@ async function collectCostByDate(apiKey: string, startTs: number, endTs: number,
 }
 
 export async function POST(req: NextRequest) {
-  const user = await requireCurrentUser();
-  const parsed = Schema.safeParse(await req.json().catch(() => ({})));
-  const days = parsed.success ? parsed.data.days : 7;
-  const selectedApiKeyId = parsed.success ? parsed.data.apiKeyId : undefined;
+  try {
+    const user = await requireCurrentUser();
+    const parsed = Schema.safeParse(await req.json().catch(() => ({})));
+    const days = parsed.success ? parsed.data.days : 7;
+    const selectedApiKeyId = parsed.success ? parsed.data.apiKeyId : undefined;
 
-  const apiKey = selectedApiKeyId
-    ? await getApiKeyById(selectedApiKeyId, user.workspaceId)
-    : await getApiKeyByService("openai_admin", user.workspaceId) ??
-      await getApiKeyByService("openai_usage", user.workspaceId) ??
-      await getApiKeyByService("openai", user.workspaceId);
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: selectedApiKeyId ? "Selected API key was not found in this workspace." : "No OpenAI Usage/Admin API key configured. Add service openai_admin in Settings." },
-      { status: 400 },
-    );
-  }
-
-  const debug: unknown[] = [];
-  const warnings: string[] = [];
-  const startTs = Math.floor((Date.now() - days * 86_400_000) / 1000);
-  const endTs = Math.floor(Date.now() / 1000);
-
-  const usage = await collectUsageBuckets(apiKey, startTs, endTs, debug);
-  if (usage.error) {
-    return NextResponse.json({ ok: false, error: usage.error, debug }, { status: usage.status ?? 502 });
-  }
-
-  const costs = await collectCostByDate(apiKey, startTs, endTs, debug);
-  warnings.push(...costs.warnings);
-
-  const results: SyncResult[] = [];
-  let totalSynced = 0;
-
-  for (const bucket of usage.buckets) {
-    const dateStr = new Date(bucket.start_time * 1000).toISOString().slice(0, 10);
-    const totalTokens = bucket.results.reduce(
-      (sum, item) =>
-        sum +
-        (item.input_tokens ?? 0) +
-        (item.input_audio_tokens ?? 0) +
-        (item.output_tokens ?? 0) +
-        (item.output_audio_tokens ?? 0),
-      0,
-    );
-    const cachedTokens = bucket.results.reduce((sum, item) => sum + (item.input_cached_tokens ?? 0), 0);
-    const totalRequests = bucket.results.reduce((sum, item) => sum + (item.num_model_requests ?? 0), 0);
-    if (totalTokens === 0 && totalRequests === 0) continue;
-
-    const models = [...new Set(bucket.results.map((item) => item.model ?? item.model_id).filter(Boolean))].join(", ");
-    const costUSD = costs.costByDate.get(dateStr) ?? (totalTokens * 3.0) / 1_000_000;
-    const notes = [
-      `OpenAI organization usage sync: ${totalRequests} requests.`,
-      `Input/output tokens: ${totalTokens.toLocaleString()}.`,
-      cachedTokens > 0 ? `Cached input tokens included in provider response: ${cachedTokens.toLocaleString()}.` : null,
-      models ? `Models: ${models}.` : null,
-      costs.costByDate.has(dateStr) ? "Cost source: OpenAI organization costs endpoint." : "Cost source: local estimate; costs endpoint unavailable or empty.",
-    ].filter(Boolean).join(" ");
-    const dayDate = new Date(`${dateStr}T00:00:00.000Z`);
-
-    const existing = await db.session.findFirst({
-      where: { workspaceId: user.workspaceId, provider: "chatgpt", type: "openai-sync", date: dayDate },
-      select: { id: true },
-    });
-
-    if (existing) {
-      await db.session.update({
-        where: { id: existing.id },
-        data: { totalTokens, totalCostUSD: costUSD, sessionNotes: notes, model: models || "openai-api" },
-      });
-    } else {
-      await db.session.create({
-        data: {
-          workspaceId: user.workspaceId,
-          provider: "chatgpt",
-          model: models || "openai-api",
-          type: "openai-sync",
-          project: "openai-account",
-          date: dayDate,
-          tasksCompleted: [],
-          totalTokens,
-          totalCostUSD: costUSD,
-          sessionNotes: notes,
-          risks: [],
-        },
-      });
+    const apiKey = selectedApiKeyId
+      ? await getApiKeyById(selectedApiKeyId, user.workspaceId)
+      : await getApiKeyByService("openai_admin", user.workspaceId) ??
+        await getApiKeyByService("openai_usage", user.workspaceId) ??
+        await getApiKeyByService("openai", user.workspaceId);
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: selectedApiKeyId ? "Selected API key was not found in this workspace." : "No OpenAI Usage/Admin API key configured. Add service openai_admin in Settings." },
+        { status: 400 },
+      );
     }
 
-    results.push({ date: dateStr, tokens: totalTokens, cost: costUSD, requests: totalRequests, source: "organization-usage-completions" });
-    totalSynced++;
-  }
+    const debug: unknown[] = [];
+    const warnings: string[] = [];
+    const startTs = Math.floor((Date.now() - days * 86_400_000) / 1000);
+    const endTs = Math.floor(Date.now() / 1000);
 
-  return NextResponse.json({
-    ok: true,
-    synced: totalSynced,
-    results,
-    warnings,
-    debug,
-  });
+    const usage = await collectUsageBuckets(apiKey, startTs, endTs, debug);
+    if (usage.error) {
+      return NextResponse.json({ ok: false, error: usage.error, debug }, { status: usage.status ?? 502 });
+    }
+
+    const costs = await collectCostByDate(apiKey, startTs, endTs, debug);
+    warnings.push(...costs.warnings);
+
+    const results: SyncResult[] = [];
+    let totalSynced = 0;
+
+    for (const bucket of usage.buckets) {
+      const dateStr = new Date(bucket.start_time * 1000).toISOString().slice(0, 10);
+      const totalTokens = bucket.results.reduce(
+        (sum, item) =>
+          sum +
+          (item.input_tokens ?? 0) +
+          (item.input_audio_tokens ?? 0) +
+          (item.output_tokens ?? 0) +
+          (item.output_audio_tokens ?? 0),
+        0,
+      );
+      const cachedTokens = bucket.results.reduce((sum, item) => sum + (item.input_cached_tokens ?? 0), 0);
+      const totalRequests = bucket.results.reduce((sum, item) => sum + (item.num_model_requests ?? 0), 0);
+      if (totalTokens === 0 && totalRequests === 0) continue;
+
+      const models = [...new Set(bucket.results.map((item) => item.model ?? item.model_id).filter(Boolean))].join(", ");
+      const costUSD = costs.costByDate.get(dateStr) ?? (totalTokens * 3.0) / 1_000_000;
+      const notes = [
+        `OpenAI organization usage sync: ${totalRequests} requests.`,
+        `Input/output tokens: ${totalTokens.toLocaleString()}.`,
+        cachedTokens > 0 ? `Cached input tokens included in provider response: ${cachedTokens.toLocaleString()}.` : null,
+        models ? `Models: ${models}.` : null,
+        costs.costByDate.has(dateStr) ? "Cost source: OpenAI organization costs endpoint." : "Cost source: local estimate; costs endpoint unavailable or empty.",
+      ].filter(Boolean).join(" ");
+      const dayDate = new Date(`${dateStr}T00:00:00.000Z`);
+
+      const existing = await db.session.findFirst({
+        where: { workspaceId: user.workspaceId, provider: "chatgpt", type: "openai-sync", date: dayDate },
+        select: { id: true },
+      });
+
+      if (existing) {
+        await db.session.update({
+          where: { id: existing.id },
+          data: { totalTokens, totalCostUSD: costUSD, sessionNotes: notes, model: models || "openai-api" },
+        });
+      } else {
+        await db.session.create({
+          data: {
+            workspaceId: user.workspaceId,
+            provider: "chatgpt",
+            model: models || "openai-api",
+            type: "openai-sync",
+            project: "openai-account",
+            date: dayDate,
+            tasksCompleted: [],
+            totalTokens,
+            totalCostUSD: costUSD,
+            sessionNotes: notes,
+            risks: [],
+          },
+        });
+      }
+
+      results.push({ date: dateStr, tokens: totalTokens, cost: costUSD, requests: totalRequests, source: "organization-usage-completions" });
+      totalSynced++;
+    }
+
+    return NextResponse.json({
+      ok: true,
+      synced: totalSynced,
+      results,
+      warnings,
+      debug,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ ok: false, error: `OpenAI usage sync failed: ${message}` }, { status: 500 });
+  }
 }
