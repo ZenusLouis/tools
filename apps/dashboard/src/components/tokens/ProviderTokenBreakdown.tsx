@@ -1,6 +1,6 @@
 import { Bot, Cpu, MessageSquare } from "lucide-react";
 import type { ProviderBreakdown } from "@/lib/analytics";
-import { formatCompactNumber, formatCurrency } from "@/lib/format";
+import { formatCompactNumber, formatCredits, formatCurrency } from "@/lib/format";
 
 const PROVIDER_META = {
   claude: { label: "Claude", icon: Bot, color: "bg-done", text: "text-done" },
@@ -40,6 +40,16 @@ export function ProviderTokenBreakdown({ breakdown }: { breakdown: ProviderBreak
                 <p>session {item.sessionTokens.toLocaleString()}</p>
                 <p>tool {item.toolTokens.toLocaleString()}</p>
               </div>
+            </div>
+
+            <div className="mt-4 rounded-lg border border-border bg-bg-base p-3">
+              <p className={`text-[10px] font-bold uppercase tracking-widest ${meta.text}`}>{item.meterLabel}</p>
+              <p className="mt-1 text-xs leading-relaxed text-text-muted">{item.meterDescription}</p>
+              {item.credits > 0 && (
+                <p className="mt-2 text-xs font-semibold text-in-progress" title={item.creditNote}>
+                  {formatCredits(item.credits)} / {item.creditBasis.replace("_", " ")}
+                </p>
+              )}
             </div>
 
             <div className="mt-4 h-2 overflow-hidden rounded-full bg-bg-base">

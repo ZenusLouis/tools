@@ -14,7 +14,10 @@ export function HeroMetric({ totalTokens, totalCost }: Props) {
           <h2 className="break-words text-4xl font-black tracking-tight text-text md:text-5xl" title={totalTokens.toLocaleString()}>
             {formatCompactNumber(totalTokens)} <span className="text-2xl font-bold text-accent">tokens</span>
           </h2>
-          <p className="mt-2 text-sm font-medium text-text-muted">{formatCurrency(totalCost)} estimated cost across connected agents</p>
+          <p className="mt-2 text-sm font-medium text-text-muted">{formatCurrency(totalCost)} blended estimate across mixed token meters</p>
+          <p className="mt-2 max-w-3xl text-xs leading-relaxed text-text-muted">
+            Codex credits follow OpenAI&apos;s token-based rate card. Because local Codex currently exposes total thread tokens, rows without token split are shown as input-equivalent credit estimates.
+          </p>
         </div>
 
         <div className="rounded-xl border border-border bg-bg-base px-5 py-4 text-right">

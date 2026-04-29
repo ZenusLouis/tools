@@ -97,6 +97,19 @@
 - `apps/dashboard/src/components/projects/ProjectActionButtons.tsx`
 - `apps/dashboard/src/lib/project-analysis.ts`
 - `apps/dashboard/src/lib/project-operations.ts`
+- `apps/dashboard/src/components/tokens/SyncOpenAIButton.tsx`
+- `apps/dashboard/src/components/dashboard/TokenUsageCard.tsx`
+- `apps/dashboard/src/components/tokens/ProviderTokenBreakdown.tsx`
+- `apps/dashboard/src/components/tokens/HeroMetric.tsx`
+- `apps/dashboard/src/components/tokens/SessionsTable.tsx`
+- `apps/dashboard/src/lib/stats.ts`
+- `apps/dashboard/src/lib/analytics.ts`
+- `apps/dashboard/src/lib/token-accounting.ts`
+- `apps/dashboard/src/lib/token-cleanup.ts`
+- `apps/dashboard/src/app/api/log/route.ts`
+- `apps/dashboard/src/app/api/tokens/reset-usage/route.ts`
+- `apps/dashboard/src/components/tokens/ResetUsageButton.tsx`
+- `apps/dashboard/src/app/api/roles/route.ts`
 - `apps/dashboard/src/app/api/projects/[name]/analyze/route.ts`
 - `apps/dashboard/src/app/api/projects/[name]/deploy/route.ts`
 - `apps/dashboard/src/app/api/projects/[name]/reindex/route.ts`
@@ -152,7 +165,7 @@
 - Reset Task Board pagination automatically when project/module filters change, so server queries do not reuse stale page params.
 - Added per-row time display to Token Analytics sessions and sorted recent sessions by full timestamp instead of date-only.
 - Changed project folder scan so inaccessible local paths no longer block project creation; the wizard now shows a warning and allows creating an empty index for folders only visible to the local bridge machine.
-- Changed Codex bridge sync to backfill today's existing Codex thread total on first detection, then continue with deltas so active IDE chats do not appear as only a tiny post-start delta.
+- Changed Codex bridge sync to baseline existing Codex threads by default and only backfill existing thread totals when `GCS_CODEX_SYNC_EXISTING=1` is explicitly set. This prevents long-running Codex IDE threads from inflating Today with their full historical `tokens_used` total.
 - Made bridge state writes atomic to avoid null/corrupt `.gcs_bridge_state.json` files after interruption.
 - Added `hooks/ensure-gcs-bridge.ps1` and wired Codex settings/docs to use it so a single command starts the bridge in the background only when it is not already running.
 - Added Codex daily token baselines using `thread_id + yyyy-mm-dd` state keys, while keeping legacy thread baselines for migration, so long-running Codex threads can be accounted by day.
@@ -176,6 +189,19 @@
 - Analyze now generates a starter module/feature/task backlog from the linked BRD/PRD, sets the first analysis task active, records a project activity event, and queues `.gcs/progress.json` sync to local devices.
 - Replaced the client-imported Analyze Server Action with a stable `/api/projects/[name]/analyze` endpoint. The Analyze button now calls the API with `fetch`, avoiding Next's `failed-to-find-server-action` error after deploy/client build mismatches.
 - Moved project Deploy/Reindex UI actions to stable `/api/projects/[name]/deploy` and `/api/projects/[name]/reindex` endpoints for the same reason, so project action buttons no longer import Server Actions in client code.
+- Fixed Analyze provider routing: the backend now uses the configured `analysis` role provider as source of truth. ChatGPT roles call the OpenAI credential path and no longer silently queue local Claude; generated sessions are recorded with the selected provider/model.
+- Changed Analyze regeneration order so existing backlog data is only cleared after a direct AI/template result is ready, or immediately before a local bridge action is queued. Missing OpenAI keys no longer wipe current modules/tasks.
+- Updated Analyze status copy to render the selected runner label instead of hard-coded `local Claude`.
+- Deferred the OpenAI usage auto-sync effect with a timer so React lint no longer rejects synchronous state updates inside `useEffect`.
+- Added token meter metadata across Dashboard and Token Analytics. Codex is labeled as `thread meter`, Claude as `hook estimate`, and ChatGPT/OpenAI as `provider reported`, so mixed telemetry is no longer presented as the same exact billing metric.
+- Added OpenAI Codex rate-card credit estimation for Codex rows. GPT-5.5, GPT-5.4, GPT-5.4-Mini, GPT-5.3-Codex, and GPT-5.2 now map to their token-based credits per 1M token rates. Because local Codex SQLite currently exposes only total thread tokens, these rows show `input-equivalent` credits unless exact input/cache/output split exists.
+- Removed automatic Codex spike thresholds. `/api/log`, Dashboard, and Token Analytics no longer ignore or delete rows based on token size; telemetry is kept as received from the bridge/provider.
+- Added a dashboard-run Codex usage reset action at `/api/tokens/reset-usage` and a `Reset Codex` button on Token Analytics. It resets Codex telemetry for the logged-in workspace without touching projects, tasks, skills, Claude, or ChatGPT/OpenAI usage, so cleanup is explicit instead of threshold-based.
+- Normalized ChatGPT roles in `/api/roles`: ChatGPT roles are stored and returned as `dashboard` execution with `openai` credential, and Codex roles remain `local` with no credential. This fixes BA Analyst showing `chatgpt` provider but `local` execution.
+- Analyze now resolves `ba-analyst` first for analysis instead of picking the oldest analysis role, preventing stale Claude analysis roles from being selected when BA was switched to ChatGPT.
+- Split OpenAI keys by purpose in Settings: `openai` is the runtime/model key, while `openai_admin` (or legacy `openai_usage`) is preferred for Token Analytics organization usage/cost sync with `api.usage.read`.
+- Updated `/api/sync/openai-usage` to use OpenAI organization usage completions as the token source and organization costs as the optional USD source. Missing `api.usage.read` now returns a clear error instead of a misleading successful zero-sync response.
+- Added an OpenAI usage key selector on Token Analytics. Sync now sends only the selected `apiKeyId`; the server validates workspace ownership and decrypts the key server-side, so multiple OpenAI/admin keys no longer get chosen implicitly.
 - Fixed bridge file sync auth by allowing `/api/bridge/file-actions/*` through the dashboard proxy. Before this, the route returned `401` before bridge-token verification, so local daemon could heartbeat but could not poll/write cloud-to-local file actions.
 - Created a cloud bridge token for this machine, stored it in gitignored `.codex/settings.local.json` under `env.BRIDGE_TOKEN`, restarted the local bridge, manually drained the existing queued OmniBooking file action, wrote `.gcs/context.json`, `.gcs/progress.json`, and `.gcs/code-index.md` to `D:\Code\OmniBooking`, then reported the action as succeeded.
 - Removed bridge-token guidance that suggested Windows environment variables; Chat and Settings now point to `.codex/settings.local.json`.

@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { estimateProviderCredits, TOKEN_METER_META } from "@/lib/token-accounting";
 
 export type DateRange = "today" | "week" | "month" | "year";
 export type ToolBreakdown = { tool: string; tokens: number; percent: number };
@@ -10,9 +11,15 @@ export type ProviderBreakdown = {
   toolTokens: number;
   percent: number;
   cost: number;
+  meterLabel: string;
+  meterKind: "provider_reported" | "thread_meter" | "hook_estimate";
+  meterDescription: string;
+  credits: number;
+  creditBasis: string;
+  creditNote: string;
 };
 export type DailyUsage = { date: string; label: string; tokens: number; cost: number };
-export type SessionRow = { date: string; time: string; timestamp: string; provider: string; role: string | null; model: string | null; project: string; tasksCompleted: number; tokens: number; cost: number; durationMin: number | null; source: "session" | "tool"; tool?: string };
+export type SessionRow = { date: string; time: string; timestamp: string; provider: string; role: string | null; model: string | null; project: string; tasksCompleted: number; tokens: number; cost: number; credits: number; creditBasis: string; creditNote: string; durationMin: number | null; source: "session" | "tool"; tool?: string };
 export type SessionPagination = { page: number; pageSize: number; total: number; totalPages: number };
 export type AnalyticsData = {
   totalTokens: number;
@@ -68,13 +75,27 @@ export async function getAnalytics(
 
   const providers = ["claude", "codex", "chatgpt"] as const;
   const rawProviderBreakdown = providers.map((provider) => {
-    const sessionTokens = sessions
-      .filter((session) => session.provider === provider && provider !== "codex")
-      .reduce((sum, session) => sum + (session.totalTokens ?? 0), 0);
-    const toolTokens = toolUsage
-      .filter((usage) => usage.provider === provider)
-      .reduce((sum, usage) => sum + usage.tokens, 0);
-    return { provider, sessionTokens, toolTokens, tokens: provider === "codex" ? toolTokens : Math.max(sessionTokens, toolTokens) };
+    const providerSessions = sessions.filter((session) => session.provider === provider);
+    const providerTools = toolUsage.filter((usage) => usage.provider === provider);
+    const sessionTokens = provider === "codex" ? 0 : providerSessions.reduce((sum, session) => sum + (session.totalTokens ?? 0), 0);
+    const toolTokens = providerTools.reduce((sum, usage) => sum + usage.tokens, 0);
+    const credits = [
+      ...providerTools.map((usage) => estimateProviderCredits(provider, usage.tokens, usage.model)),
+      ...(provider === "codex"
+        ? providerSessions.map((session) => estimateProviderCredits(provider, session.totalTokens ?? 0, session.model))
+        : []),
+    ];
+    const firstCredit = credits.find((item) => item.credits > 0) ?? estimateProviderCredits(provider, 0);
+    return {
+      provider,
+      sessionTokens,
+      toolTokens,
+      tokens: provider === "codex" ? toolTokens : Math.max(sessionTokens, toolTokens),
+      credits: credits.reduce((sum, item) => sum + item.credits, 0),
+      creditBasis: firstCredit.basis,
+      creditNote: firstCredit.note,
+      ...TOKEN_METER_META[provider],
+    };
   });
   const totalTokens = rawProviderBreakdown.reduce((sum, row) => sum + row.tokens, 0);
   const totalCost = totalTokens * (COST_PER_MILLION / 1_000_000);
@@ -132,6 +153,10 @@ export async function getAnalytics(
     ...sessions
       .filter((s) => s.provider !== "codex" && (s.totalTokens ?? 0) > 0)
       .map((s) => ({
+        ...(() => {
+          const credit = estimateProviderCredits(s.provider, s.totalTokens ?? 0, s.model);
+          return { credits: credit.credits, creditBasis: credit.basis, creditNote: credit.note };
+        })(),
         date: s.date.toISOString().slice(0, 10),
         time: sessionTime(s.date),
         timestamp: s.date.toISOString(),
@@ -146,6 +171,10 @@ export async function getAnalytics(
         source: "session" as const,
       })),
     ...toolUsage.map((usage) => ({
+      ...(() => {
+        const credit = estimateProviderCredits(usage.provider, usage.tokens, usage.model);
+        return { credits: credit.credits, creditBasis: credit.basis, creditNote: credit.note };
+      })(),
       date: usage.date.toISOString().slice(0, 10),
       time: sessionTime(usage.date),
       timestamp: usage.date.toISOString(),

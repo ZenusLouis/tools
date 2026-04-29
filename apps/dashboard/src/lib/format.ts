@@ -17,3 +17,10 @@ export function formatCurrency(value: number) {
     style: "currency",
   }).format(value);
 }
+
+export function formatCredits(value: number) {
+  return `${formatNumber(value, {
+    maximumFractionDigits: value >= 10 ? 1 : 3,
+    minimumFractionDigits: 0,
+  })} credits`;
+}

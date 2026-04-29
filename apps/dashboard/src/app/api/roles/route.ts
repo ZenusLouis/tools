@@ -21,9 +21,23 @@ const RoleSchema = z.object({
   skillIds: z.array(z.string()).default([]),
 });
 
+function normalizeRoleRuntime(role: z.infer<typeof RoleSchema>) {
+  if (role.provider === "chatgpt") {
+    return { ...role, executionModeDefault: "dashboard" as const, credentialService: "openai" };
+  }
+  if (role.provider === "codex") {
+    return { ...role, executionModeDefault: "local" as const, credentialService: "none" };
+  }
+  return role;
+}
+
 export async function GET() {
   const user = await requireCurrentUser();
   await ensureWorkspaceAgentDefaults(user.workspaceId);
+  await db.agentRole.updateMany({
+    where: { workspaceId: user.workspaceId, provider: "chatgpt" },
+    data: { executionModeDefault: "dashboard", credentialService: "openai" },
+  });
   const roles = await db.agentRole.findMany({
     where: { workspaceId: user.workspaceId },
     include: { skills: true },
@@ -36,44 +50,45 @@ export async function POST(req: NextRequest) {
   const user = await requireCurrentUser();
   const parsed = RoleSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues }, { status: 400 });
+  const data = normalizeRoleRuntime(parsed.data);
 
   const generatedPaths = {
-    shared: `agents/roles/${parsed.data.slug}.json`,
-    claude: `.claude/roles/${parsed.data.slug}.md`,
-    codex: `.codex/skills/${parsed.data.slug}/SKILL.md`,
-    chatgpt: `.agents/providers/chatgpt/roles/${parsed.data.slug}.md`,
+    shared: `agents/roles/${data.slug}.json`,
+    claude: `.claude/roles/${data.slug}.md`,
+    codex: `.codex/skills/${data.slug}/SKILL.md`,
+    chatgpt: `.agents/providers/chatgpt/roles/${data.slug}.md`,
   };
 
   const role = await db.agentRole.upsert({
-    where: { workspaceId_slug: { workspaceId: user.workspaceId, slug: parsed.data.slug } },
+    where: { workspaceId_slug: { workspaceId: user.workspaceId, slug: data.slug } },
     create: {
       workspaceId: user.workspaceId,
-      name: parsed.data.name,
-      slug: parsed.data.slug,
-      description: parsed.data.description,
-      provider: parsed.data.provider,
-      defaultModel: parsed.data.defaultModel,
-      phase: parsed.data.phase,
-      executionModeDefault: parsed.data.executionModeDefault,
-      credentialService: parsed.data.credentialService,
-      roleType: parsed.data.roleType,
-      rulesMarkdown: parsed.data.rulesMarkdown,
-      mcpProfile: parsed.data.mcpProfile,
+      name: data.name,
+      slug: data.slug,
+      description: data.description,
+      provider: data.provider,
+      defaultModel: data.defaultModel,
+      phase: data.phase,
+      executionModeDefault: data.executionModeDefault,
+      credentialService: data.credentialService,
+      roleType: data.roleType,
+      rulesMarkdown: data.rulesMarkdown,
+      mcpProfile: data.mcpProfile,
       generatedPaths,
-      skills: { connect: parsed.data.skillIds.map((id) => ({ id })) },
+      skills: { connect: data.skillIds.map((id) => ({ id })) },
     },
     update: {
-      name: parsed.data.name,
-      description: parsed.data.description,
-      provider: parsed.data.provider,
-      defaultModel: parsed.data.defaultModel,
-      phase: parsed.data.phase,
-      executionModeDefault: parsed.data.executionModeDefault,
-      credentialService: parsed.data.credentialService,
-      roleType: parsed.data.roleType,
-      rulesMarkdown: parsed.data.rulesMarkdown,
-      mcpProfile: parsed.data.mcpProfile,
-      skills: { set: parsed.data.skillIds.map((id) => ({ id })) },
+      name: data.name,
+      description: data.description,
+      provider: data.provider,
+      defaultModel: data.defaultModel,
+      phase: data.phase,
+      executionModeDefault: data.executionModeDefault,
+      credentialService: data.credentialService,
+      roleType: data.roleType,
+      rulesMarkdown: data.rulesMarkdown,
+      mcpProfile: data.mcpProfile,
+      skills: { set: data.skillIds.map((id) => ({ id })) },
     },
     include: { skills: true },
   });

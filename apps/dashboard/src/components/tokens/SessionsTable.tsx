@@ -4,7 +4,13 @@ import { useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Download, Filter, History, X } from "lucide-react";
 import type { SessionPagination, SessionRow } from "@/lib/analytics";
-import { formatCurrency, formatNumber } from "@/lib/format";
+import { formatCredits, formatCurrency, formatNumber } from "@/lib/format";
+
+const SOURCE_LABEL: Record<string, string> = {
+  claude: "hook estimate",
+  codex: "thread meter",
+  chatgpt: "provider reported",
+};
 
 export function SessionsTable({
   sessions,
@@ -113,6 +119,9 @@ export function SessionsTable({
                     <div className="flex flex-col">
                       <span className="text-xs font-bold uppercase text-accent">{session.provider}</span>
                       <span className="max-w-36 truncate text-[10px] text-text-muted">{session.role ?? session.model ?? "--"}</span>
+                      <span className="mt-1 w-fit rounded bg-bg-base px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-text-muted">
+                        {SOURCE_LABEL[session.provider] ?? "tracked"}
+                      </span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -131,7 +140,12 @@ export function SessionsTable({
                     )}
                   </td>
                   <td className="px-6 py-4 font-bold text-accent">{formatNumber(session.tokens)}</td>
-                  <td className="px-6 py-4 text-right text-sm text-text-muted">{formatCurrency(session.cost)}</td>
+                  <td className="px-6 py-4 text-right text-sm text-text-muted">
+                    <span>{formatCurrency(session.cost)}</span>
+                    {session.credits > 0 && (
+                      <span className="block text-[10px] text-in-progress" title={session.creditNote}>{formatCredits(session.credits)}</span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 text-right text-sm text-text-muted">{session.durationMin != null ? `${session.durationMin}m` : "--"}</td>
                 </tr>
               ))}
@@ -152,6 +166,9 @@ export function SessionsTable({
                 <p className="mt-1 text-sm text-text-muted">
                   {selected.date} {selected.time} / {selected.role ?? selected.model ?? "No role/model metadata"}
                 </p>
+                <p className="mt-2 text-xs text-text-muted">
+                  Meter: {SOURCE_LABEL[selected.provider] ?? "tracked"}. Values can differ by provider because each agent exposes different telemetry.
+                </p>
               </div>
               <button
                 type="button"
@@ -170,6 +187,11 @@ export function SessionsTable({
               <div className="rounded-lg border border-border bg-bg-base p-3">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Cost</p>
                 <p className="mt-2 text-2xl font-bold text-text">{formatCurrency(selected.cost)}</p>
+                {selected.credits > 0 && (
+                  <p className="mt-1 text-xs font-semibold text-in-progress" title={selected.creditNote}>
+                    {formatCredits(selected.credits)} / {selected.creditBasis.replace("_", " ")}
+                  </p>
+                )}
               </div>
               <div className="rounded-lg border border-border bg-bg-base p-3">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Source</p>

@@ -8,7 +8,8 @@ const SERVICE_OPTIONS = [
   { value: "stitch", label: "Stitch Design" },
   { value: "figma", label: "Figma" },
   { value: "github", label: "GitHub" },
-  { value: "openai", label: "OpenAI" },
+  { value: "openai", label: "OpenAI Runtime" },
+  { value: "openai_admin", label: "OpenAI Usage/Admin" },
   { value: "anthropic", label: "Anthropic" },
   { value: "custom", label: "Custom" },
 ];
@@ -19,6 +20,7 @@ function ServiceBadge({ service }: { service: string }) {
     figma: "bg-in-progress/10 text-in-progress",
     github: "bg-card-hover text-text-muted",
     openai: "bg-done/10 text-done",
+    openai_admin: "bg-in-progress/10 text-in-progress",
     anthropic: "bg-accent/10 text-accent",
   };
   return <span className={`rounded px-2 py-0.5 font-mono text-[10px] font-bold uppercase ${colors[service] ?? "bg-border text-text-muted"}`}>{service}</span>;
@@ -174,7 +176,9 @@ export function ApiKeysPanel({ initialKeys }: { initialKeys: ApiKeyRow[] }) {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-bold text-text">API Keys</h3>
-          <p className="mt-0.5 text-[11px] text-text-muted">Encrypted with AES-256-GCM. Values are never exposed in plaintext.</p>
+          <p className="mt-0.5 text-[11px] text-text-muted">
+            Encrypted with AES-256-GCM. Use OpenAI Runtime for model calls and OpenAI Usage/Admin for Token Analytics sync.
+          </p>
         </div>
         <span className="rounded border border-border bg-card-hover px-2 py-1 text-[10px] text-text-muted">{keys.length} key{keys.length !== 1 ? "s" : ""}</span>
       </div>

@@ -228,11 +228,7 @@ def _project_from_cwd(cwd: str) -> str:
 
 
 def _should_backfill_existing_codex_thread(updated_at_ms: int) -> bool:
-    if CODEX_SYNC_EXISTING:
-        return True
-    updated_at = datetime.fromtimestamp(updated_at_ms / 1000)
-    now = datetime.now()
-    return updated_at.date() == now.date()
+    return CODEX_SYNC_EXISTING
 
 
 def _codex_token_keys(thread_id: str, updated_at_ms: int) -> tuple[str, str]:

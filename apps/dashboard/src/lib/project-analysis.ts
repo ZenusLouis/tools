@@ -13,6 +13,8 @@ type ProjectWithLatestPath = {
   bridgePaths: { deviceId: string; path: string }[];
 };
 
+type AnalysisProvider = "claude" | "codex" | "chatgpt";
+
 type AiModule = {
   name: string;
   features: Array<{
@@ -152,20 +154,16 @@ Respond ONLY with valid JSON — no markdown, no explanation:
 {"modules":[{"name":"...","features":[{"name":"...","tasks":["task1","task2"]}]}]}`;
 
   let raw = "";
-  try {
-    if (role.credentialService === "anthropic") {
-      const key = await getApiKeyByService("anthropic", workspaceId);
-      if (!key) throw new Error("Anthropic API key not configured");
-      raw = await callAnthropic(key, role.defaultModel ?? "claude-sonnet-4-6", stableBlock, projectBlock);
-    } else if (role.credentialService === "openai") {
-      const key = await getApiKeyByService("openai", workspaceId);
-      if (!key) throw new Error("OpenAI API key not configured");
-      // OpenAI doesn't have explicit cache_control but caches automatically for identical prefixes
-      raw = await callOpenAI(key, role.defaultModel ?? "gpt-4o-mini", stableBlock + "\n\n" + projectBlock);
-    } else {
-      return null;
-    }
-  } catch {
+  if (role.credentialService === "anthropic") {
+    const key = await getApiKeyByService("anthropic", workspaceId);
+    if (!key) throw new Error("Anthropic API key not configured");
+    raw = await callAnthropic(key, role.defaultModel ?? "claude-sonnet-4-6", stableBlock, projectBlock);
+  } else if (role.credentialService === "openai") {
+    const key = await getApiKeyByService("openai", workspaceId);
+    if (!key) throw new Error("OpenAI API key not configured");
+    // OpenAI doesn't have explicit cache_control but caches automatically for identical prefixes
+    raw = await callOpenAI(key, role.defaultModel ?? "gpt-4o-mini", stableBlock + "\n\n" + projectBlock);
+  } else {
     return null;
   }
 
@@ -250,52 +248,103 @@ async function queueProgressSync(project: ProjectWithLatestPath, workspaceId: st
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
+function providerCredential(provider: string, credentialService: string) {
+  if (credentialService !== "none") return credentialService;
+  if (provider === "chatgpt") return "openai";
+  if (provider === "claude") return "anthropic";
+  return "none";
+}
+
+function providerLabel(provider: string) {
+  if (provider === "chatgpt") return "ChatGPT";
+  if (provider === "codex") return "Codex";
+  return "Claude";
+}
+
 export async function analyzeProjectForWorkspace(
   projectName: string,
   workspaceId: string,
-): Promise<{ ok: boolean; error?: string; created?: number; source?: "ai" | "bridge" | "fallback"; pending?: boolean; actionId?: string }> {
+): Promise<{
+  ok: boolean;
+  error?: string;
+  created?: number;
+  source?: "ai" | "bridge" | "fallback";
+  pending?: boolean;
+  actionId?: string;
+  provider?: AnalysisProvider;
+  runnerLabel?: string;
+}> {
   const project = await loadProjectForAnalysis(projectName, workspaceId);
   if (!project) return { ok: false, error: "Project not found" };
 
   const docs = docRecord(project);
   if (!docs.brd && !docs.prd) return { ok: false, error: "Add a BRD or PRD before analysis." };
 
-  // Clear existing tasks/features/modules before re-generating
-  const existingTasks = await db.task.count({ where: { feature: { module: { projectName } }, workspaceId } });
-  if (existingTasks > 0) {
-    await db.task.deleteMany({ where: { feature: { module: { projectName } }, workspaceId } });
-    await db.feature.deleteMany({ where: { module: { projectName } } });
-    await db.module.deleteMany({ where: { projectName } });
-    await db.project.update({ where: { name: projectName }, data: { activeTask: null } });
-  }
-
-  // Find best dashboard-run analysis role (prefer anthropic > openai)
+  // Use the configured analysis role as provider source of truth.
+  const analysisRoleSelect = {
+    id: true,
+    provider: true,
+    defaultModel: true,
+    credentialService: true,
+    executionModeDefault: true,
+    rulesMarkdown: true,
+    skills: { select: { slug: true } },
+  } as const;
   const analysisRole = await db.agentRole.findFirst({
-    where: {
-      workspaceId,
-      executionModeDefault: "dashboard",
-      credentialService: { in: ["anthropic", "openai"] },
-    },
-    orderBy: [{ credentialService: "asc" }, { createdAt: "asc" }],
-    select: { id: true, provider: true, defaultModel: true, credentialService: true, rulesMarkdown: true, skills: { select: { slug: true } } },
+    where: { workspaceId, slug: "ba-analyst", phase: "analysis" },
+    select: analysisRoleSelect,
+  }) ?? await db.agentRole.findFirst({
+    where: { workspaceId, phase: "analysis" },
+    orderBy: { createdAt: "asc" },
+    select: analysisRoleSelect,
   });
+  const selectedProvider = (analysisRole?.provider ?? "claude") as AnalysisProvider;
+  const selectedCredential = analysisRole ? providerCredential(analysisRole.provider, analysisRole.credentialService) : "none";
+  const selectedRunner = providerLabel(selectedProvider);
+  const dashboardRunnable = selectedCredential === "openai" || selectedCredential === "anthropic";
 
   // Try AI generation via direct API
   let modules: AiModule[] | null = null;
   let source: "ai" | "bridge" | "fallback" = "fallback";
 
-  if (analysisRole) {
-    modules = await generateModulesWithAI(projectName, project.frameworks, docs, { ...analysisRole, skillSlugs: analysisRole.skills.map((s) => s.slug) }, workspaceId);
+  if (analysisRole && dashboardRunnable) {
+    try {
+      modules = await generateModulesWithAI(projectName, project.frameworks, docs, {
+        ...analysisRole,
+        credentialService: selectedCredential,
+        skillSlugs: analysisRole.skills.map((s) => s.slug),
+      }, workspaceId);
+    } catch (error) {
+      return {
+        ok: false,
+        error: `${selectedRunner} analysis failed: ${error instanceof Error ? error.message : "unknown error"}`,
+        provider: selectedProvider,
+        runnerLabel: selectedRunner,
+      };
+    }
+    if (!modules && selectedProvider === "chatgpt") {
+      return {
+        ok: false,
+        error: "ChatGPT did not return valid modules.",
+        provider: selectedProvider,
+        runnerLabel: selectedRunner,
+      };
+    }
     if (modules) source = "ai";
   }
 
   // Cách 2: No direct API key → queue via local bridge (claude -p)
-  if (!modules) {
+  if (!modules && selectedProvider === "claude" && (!analysisRole || analysisRole.executionModeDefault === "local")) {
     const bridgeDevice = await db.bridgeDevice.findFirst({
       where: { workspaceId, claudeAvailable: true, lastSeenAt: { gte: new Date(Date.now() - 5 * 60_000) } },
       select: { id: true },
     });
     if (bridgeDevice) {
+      await db.task.deleteMany({ where: { feature: { module: { projectName } }, workspaceId } });
+      await db.feature.deleteMany({ where: { module: { projectName } } });
+      await db.module.deleteMany({ where: { projectName } });
+      await db.project.update({ where: { name: projectName }, data: { activeTask: null } });
+
       const action = await db.bridgeFileAction.create({
         data: {
           workspaceId,
@@ -305,6 +354,8 @@ export async function analyzeProjectForWorkspace(
             projectName,
             frameworks: project.frameworks,
             docs,
+            provider: selectedProvider,
+            runnerLabel: selectedRunner,
             skillSlugs: (await db.agentRole.findFirst({
               where: { workspaceId, phase: "analysis" },
               select: { skills: { select: { slug: true } } },
@@ -313,12 +364,26 @@ export async function analyzeProjectForWorkspace(
           },
         },
       });
-      return { ok: true, pending: true, actionId: action.id, created: 0, source: "bridge" };
+      return { ok: true, pending: true, actionId: action.id, created: 0, source: "bridge", provider: selectedProvider, runnerLabel: selectedRunner };
     }
+  }
+
+  if (!modules && selectedProvider === "chatgpt") {
+    return {
+      ok: false,
+      error: "ChatGPT analysis needs an OpenAI API key in Settings.",
+      provider: selectedProvider,
+      runnerLabel: selectedRunner,
+    };
   }
 
   // Final fallback to template
   if (!modules) modules = FALLBACK_MODULES;
+
+  await db.task.deleteMany({ where: { feature: { module: { projectName } }, workspaceId } });
+  await db.feature.deleteMany({ where: { module: { projectName } } });
+  await db.module.deleteMany({ where: { projectName } });
+  await db.project.update({ where: { name: projectName }, data: { activeTask: null } });
 
   // Find roles to attach to tasks
   const [baRole, devRole, reviewRole] = await Promise.all([
@@ -366,8 +431,9 @@ export async function analyzeProjectForWorkspace(
   await db.session.create({
     data: {
       workspaceId,
-      provider: "claude",
-      role: "ba-analyst",
+      provider: selectedProvider,
+      role: analysisRole ? "ba-analyst" : null,
+      model: analysisRole?.defaultModel ?? null,
       type: "project-event",
       project: projectName,
       date: now,
@@ -404,5 +470,5 @@ export async function analyzeProjectForWorkspace(
   revalidatePath(`/projects/${encodeURIComponent(projectName)}`);
   revalidatePath(`/projects/${encodeURIComponent(projectName)}/detail`);
   revalidatePath("/tasks");
-  return { ok: true, created, source };
+  return { ok: true, created, source, provider: selectedProvider, runnerLabel: selectedRunner };
 }

@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { Zap } from "lucide-react";
+import { formatCredits } from "@/lib/format";
 
 
 type ProviderBreakdown = {
@@ -10,6 +11,12 @@ type ProviderBreakdown = {
   sessionTokens: number;
   toolTokens: number;
   percent: number;
+  meterLabel: string;
+  meterKind: "provider_reported" | "thread_meter" | "hook_estimate";
+  meterDescription: string;
+  credits: number;
+  creditBasis: string;
+  creditNote: string;
 };
 
 const PROVIDER_UI: Record<ProviderBreakdown["provider"], { label: string; color: string; bar: string }> = {
@@ -51,8 +58,8 @@ export function TokenUsageCard({
 
       <div className="mt-4">
         <div className="mb-1 flex justify-between text-[10px] font-semibold">
-          <span className="text-in-progress">Provider split</span>
-          <span className="text-text-muted">no usage limit</span>
+          <span className="text-in-progress">Meter split</span>
+          <span className="text-text-muted">mixed sources</span>
         </div>
         <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-bg-base">
           {breakdown.map((item) => {
@@ -66,16 +73,25 @@ export function TokenUsageCard({
         {(activeBreakdown.length ? activeBreakdown : breakdown.slice(0, 2)).map((item) => {
           const ui = PROVIDER_UI[item.provider];
           return (
-            <div key={item.provider} className="grid grid-cols-[64px_1fr_auto] items-center gap-2 text-[10px]">
+            <div key={item.provider} className="grid grid-cols-[64px_1fr_auto] items-center gap-2 text-[10px]" title={item.meterDescription}>
               <span className={`font-bold uppercase ${ui.color}`}>{ui.label}</span>
               <div className="h-1.5 overflow-hidden rounded-full bg-bg-base">
                 <div className={`h-full rounded-full ${ui.bar}`} style={{ width: `${item.percent}%` }} />
               </div>
               <span className="tabular-nums text-text-muted">{item.tokens.toLocaleString()}</span>
+              <span className="col-span-3 -mt-1 text-[9px] uppercase tracking-wide text-text-muted">{item.meterLabel}</span>
+              {item.credits > 0 && (
+                <span className="col-span-3 -mt-1 text-[9px] uppercase tracking-wide text-in-progress" title={item.creditNote}>
+                  {formatCredits(item.credits)} / {item.creditBasis.replace("_", " ")}
+                </span>
+              )}
             </div>
           );
         })}
       </div>
+      <p className="mt-3 text-[10px] leading-relaxed text-text-muted">
+        Sources differ. Codex credits follow the OpenAI Codex rate card when model metadata exists; total-only Codex rows use input-equivalent credits.
+      </p>
     </motion.div>
   );
 }

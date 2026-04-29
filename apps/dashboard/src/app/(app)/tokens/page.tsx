@@ -9,6 +9,8 @@ import { ProviderTokenBreakdown } from "@/components/tokens/ProviderTokenBreakdo
 import { getAnalytics, type DateRange } from "@/lib/analytics";
 import { requireCurrentUser } from "@/lib/auth";
 import { SyncOpenAIButton } from "@/components/tokens/SyncOpenAIButton";
+import { ResetUsageButton } from "@/components/tokens/ResetUsageButton";
+import { listApiKeys } from "@/lib/api-keys";
 
 const VALID_RANGES = new Set<DateRange>(["today", "week", "month", "year"]);
 
@@ -35,20 +37,24 @@ export default async function TokensPage({ searchParams }: Props) {
     select: { createdAt: true },
   });
 
-  const analytics = await getAnalytics(dateRange, user.workspaceId, {
-    sessionPage,
-    sessionPageSize: 12,
-    sessionProvider,
-    sessionSource,
-  });
+  const [analytics, apiKeys] = await Promise.all([
+    getAnalytics(dateRange, user.workspaceId, {
+      sessionPage,
+      sessionPageSize: 12,
+      sessionProvider,
+      sessionSource,
+    }),
+    listApiKeys(user.workspaceId),
+  ]);
 
   return (
     <>
       <TopBar
         title="Token Analytics"
         actions={
-          <div className="flex items-center gap-4">
-          <SyncOpenAIButton lastSyncedAt={lastSync?.createdAt?.toISOString() ?? null} />
+          <div className="flex flex-wrap items-center gap-3">
+          <ResetUsageButton />
+          <SyncOpenAIButton lastSyncedAt={lastSync?.createdAt?.toISOString() ?? null} apiKeys={apiKeys} />
           <nav className="flex gap-1">
             {(["today", "week", "month", "year"] as const).map((r) => (
               <Link

@@ -52,3 +52,9 @@ export async function getApiKeyByService(service: string, workspaceId?: string):
   if (!row) return null;
   return decrypt(row.encryptedValue, row.iv);
 }
+
+export async function getApiKeyById(id: string, workspaceId?: string): Promise<string | null> {
+  const row = await db.apiKey.findFirst({ where: { id, ...(workspaceId ? { workspaceId } : {}) } });
+  if (!row) return null;
+  return decrypt(row.encryptedValue, row.iv);
+}

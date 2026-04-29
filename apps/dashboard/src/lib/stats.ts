@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { estimateProviderCredits, TOKEN_METER_META } from "@/lib/token-accounting";
 
 const COST_PER_MILLION = 3.0;
 
@@ -16,6 +17,12 @@ export type DashboardStats = {
     sessionTokens: number;
     toolTokens: number;
     percent: number;
+    meterLabel: string;
+    meterKind: "provider_reported" | "thread_meter" | "hook_estimate";
+    meterDescription: string;
+    credits: number;
+    creditBasis: string;
+    creditNote: string;
   }>;
 };
 
@@ -42,12 +49,19 @@ export async function getDashboardStats(workspaceId?: string, range: DashboardRa
   const tasksCompleted = sessions.reduce((sum, session) => sum + session.tasksCompleted.length, 0);
   const providers = ["claude", "codex", "chatgpt"] as const;
   const tokenBreakdown = providers.map((provider) => {
-    const sessionTokens = sessions
-      .filter((session) => session.provider === provider && provider !== "codex")
-      .reduce((sum, session) => sum + (session.totalTokens ?? 0), 0);
-    const toolTokens = toolUsage
-      .filter((usage) => usage.provider === provider)
-      .reduce((sum, usage) => sum + usage.tokens, 0);
+    const providerSessions = sessions.filter((session) => session.provider === provider);
+    const providerTools = toolUsage.filter((usage) => usage.provider === provider);
+    const sessionTokens = provider === "codex" ? 0 : providerSessions.reduce((sum, session) => sum + (session.totalTokens ?? 0), 0);
+    const toolTokens = providerTools.reduce((sum, usage) => sum + usage.tokens, 0);
+    const tokens = provider === "codex" ? toolTokens : Math.max(sessionTokens, toolTokens);
+    const credits = [
+      ...providerTools.map((usage) => estimateProviderCredits(provider, usage.tokens, usage.model)),
+      ...(provider === "codex"
+        ? providerSessions.map((session) => estimateProviderCredits(provider, session.totalTokens ?? 0, session.model))
+        : []),
+    ];
+    const creditTotal = credits.reduce((sum, item) => sum + item.credits, 0);
+    const firstCredit = credits.find((item) => item.credits > 0) ?? estimateProviderCredits(provider, 0);
     return {
       provider,
       sessionTokens,
@@ -57,8 +71,12 @@ export async function getDashboardStats(workspaceId?: string, range: DashboardRa
       // Claude can stream tool usage before Stop emits a session summary.
       // Taking the max keeps today's dashboard live without double-counting
       // when both tool rows and session summaries exist for the same work.
-      tokens: provider === "codex" ? toolTokens : Math.max(sessionTokens, toolTokens),
+      tokens,
       percent: 0,
+      credits: creditTotal,
+      creditBasis: firstCredit.basis,
+      creditNote: firstCredit.note,
+      ...TOKEN_METER_META[provider],
     };
   });
   const tokenCount = tokenBreakdown.reduce((sum, item) => sum + item.tokens, 0);
