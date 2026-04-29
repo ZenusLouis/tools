@@ -21,7 +21,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ name
   if (actionId) {
     const action = await db.bridgeFileAction.findFirst({
       where: { id: actionId, workspaceId: user.workspaceId },
-      select: { result: true, status: true, error: true, updatedAt: true },
+      select: { id: true, result: true, status: true, error: true, updatedAt: true },
     });
     status = action?.status ?? null;
     updatedAt = action?.updatedAt?.toISOString() ?? null;
@@ -35,7 +35,29 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ name
       failed = true;
       errorMsg = action.error ?? "Bridge action failed";
     }
+    return NextResponse.json({ actionId: action?.id ?? actionId, ready: count > 0, created: count, log, failed, error: errorMsg, status, updatedAt, summary });
+  } else {
+    const action = await db.bridgeFileAction.findFirst({
+      where: {
+        workspaceId: user.workspaceId,
+        type: "run_analysis",
+        payload: { path: ["projectName"], equals: projectName },
+      },
+      select: { id: true, result: true, status: true, error: true, updatedAt: true },
+      orderBy: { updatedAt: "desc" },
+    });
+    status = action?.status ?? null;
+    updatedAt = action?.updatedAt?.toISOString() ?? null;
+    const result = action?.result as { log?: string[]; summary?: unknown; runnerLabel?: string } | null;
+    log = result?.log ?? [];
+    summary = result?.summary ?? null;
+    if ((action?.status === "running" || action?.status === "claimed" || action?.status === "pending") && log.length === 0) {
+      log = ["Queued - waiting for local Claude...", "Local bridge will continue even if you leave this page."];
+    }
+    if (action?.status === "failed") {
+      failed = true;
+      errorMsg = action.error ?? "Bridge action failed";
+    }
+    return NextResponse.json({ actionId: action?.id ?? null, ready: count > 0, created: count, log, failed, error: errorMsg, status, updatedAt, summary, runnerLabel: result?.runnerLabel ?? "Claude" });
   }
-
-  return NextResponse.json({ ready: count > 0, created: count, log, failed, error: errorMsg, status, updatedAt, summary });
 }

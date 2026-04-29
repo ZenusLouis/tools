@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { Check, Loader2, Sparkles, Terminal } from "lucide-react";
 
 type AnalyzeResult = {
@@ -51,11 +51,12 @@ export function AnalyzeProjectButton({
     if (pollRef.current) clearInterval(pollRef.current);
   }, []);
 
-  function startPolling(projectEnc: string, actionId: string, labelForRunner = "Claude") {
+  const startPolling = useCallback((projectEnc: string, actionId: string, labelForRunner = "Claude") => {
+    if (pollRef.current) clearInterval(pollRef.current);
     setPolling(true);
     setRunnerLabel(labelForRunner);
-    setLog([`Queued - waiting for local ${labelForRunner}...`]);
-    setSummary(null);
+    setLog((prev) => prev.length > 0 ? prev : [`Queued - waiting for local ${labelForRunner}...`]);
+    setSummary((prev) => prev ?? null);
     let attempts = 0;
     let lastStatus: string | null = null;
 
@@ -102,7 +103,57 @@ export function AnalyzeProjectButton({
         });
       }
     }, 5000);
-  }
+  }, [router]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function resumeLatest() {
+      try {
+        const projectEnc = encodeURIComponent(projectName);
+        const res = await fetch(`/api/projects/${projectEnc}/analyze/status`);
+        if (!res.ok || cancelled) return;
+        const data = await res.json() as {
+          actionId?: string | null;
+          ready: boolean;
+          created?: number;
+          log?: string[];
+          failed?: boolean;
+          error?: string;
+          summary?: AnalyzeSummary;
+          status?: string | null;
+          runnerLabel?: string;
+        };
+        const hasRecentAction = !!data.actionId && !!data.status;
+        if (!hasRecentAction) return;
+        const active = data.status === "pending" || data.status === "claimed" || data.status === "running";
+        const completedWithLog = data.status === "succeeded" && data.log && data.log.length > 0;
+        const failedWithLog = data.status === "failed" && data.log && data.log.length > 0;
+        if (!active && !completedWithLog && !failedWithLog) return;
+
+        const labelForRunner = data.runnerLabel ?? "Claude";
+        setRunnerLabel(labelForRunner);
+        if (data.log && data.log.length > 0) setLog(data.log);
+        if (data.summary) setSummary(data.summary);
+        if (data.failed) {
+          setFeedback(`Failed: ${data.error}`);
+          return;
+        }
+        if (data.ready && !active) {
+          setOk(true);
+          setFeedback(`${data.created ?? "?"} tasks generated (local ${labelForRunner}).`);
+          return;
+        }
+        if (active && data.actionId) {
+          setFeedback("Analysis still running locally.");
+          startPolling(projectEnc, data.actionId, labelForRunner);
+        }
+      } catch {
+        // Resume is best-effort; normal Analyze still works.
+      }
+    }
+    resumeLatest();
+    return () => { cancelled = true; };
+  }, [projectName, startPolling]);
 
   function run() {
     setFeedback(null);
