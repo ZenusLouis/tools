@@ -8,6 +8,7 @@ import { SessionsTable } from "@/components/tokens/SessionsTable";
 import { ProviderTokenBreakdown } from "@/components/tokens/ProviderTokenBreakdown";
 import { getAnalytics, type DateRange } from "@/lib/analytics";
 import { requireCurrentUser } from "@/lib/auth";
+import { SyncOpenAIButton } from "@/components/tokens/SyncOpenAIButton";
 
 const VALID_RANGES = new Set<DateRange>(["today", "week", "month", "year"]);
 
@@ -25,6 +26,15 @@ export default async function TokensPage({ searchParams }: Props) {
   const sessionSource = source ?? "all";
 
   const user = await requireCurrentUser();
+
+  // For auto-sync: find when OpenAI usage was last synced
+  const { db } = await import("@/lib/db");
+  const lastSync = await db.session.findFirst({
+    where: { workspaceId: user.workspaceId, type: "openai-sync" },
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true },
+  });
+
   const analytics = await getAnalytics(dateRange, user.workspaceId, {
     sessionPage,
     sessionPageSize: 12,
@@ -37,6 +47,8 @@ export default async function TokensPage({ searchParams }: Props) {
       <TopBar
         title="Token Analytics"
         actions={
+          <div className="flex items-center gap-4">
+          <SyncOpenAIButton lastSyncedAt={lastSync?.createdAt?.toISOString() ?? null} />
           <nav className="flex gap-1">
             {(["today", "week", "month", "year"] as const).map((r) => (
               <Link
@@ -52,6 +64,7 @@ export default async function TokensPage({ searchParams }: Props) {
               </Link>
             ))}
           </nav>
+        </div>
         }
       />
       <PageShell>

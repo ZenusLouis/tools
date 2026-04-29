@@ -1,36 +1,43 @@
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, GitCommit, History, RefreshCw } from "lucide-react";
+import { AlertTriangle, CheckCircle2, GitCommit, History, RefreshCw, Sparkles, TrendingUp, Database } from "lucide-react";
 import type { ActivityItem } from "@/lib/activity";
 import { timeAgo } from "@/lib/activity";
 
-type ActivityType = "commit" | "complete" | "project" | "index" | "alert";
+type ActivityType = "commit" | "complete" | "analysis" | "index" | "alert" | "openai-sync" | "project";
 
 function detectType(item: ActivityItem): ActivityType {
   const note = (item.note ?? "").toLowerCase();
-  if (!item.taskId) return "project";
+  const sType = item.sessionType ?? "";
   if (item.commitHash) return "commit";
+  if (sType === "openai-sync") return "openai-sync";
+  if (sType === "project-event" && note.includes("analysis")) return "analysis";
+  if (!item.taskId && note.includes("analysis")) return "analysis";
+  if (item.taskId) return "complete";
   if (note.includes("rate limit") || note.includes("error") || note.includes("blocked")) return "alert";
-  if (note.includes("index") || note.includes("indexed") || note.includes("code-index")) return "index";
-  return "complete";
+  if (note.includes("index") || note.includes("indexed")) return "index";
+  return "project";
 }
 
 const TYPE_CONFIG: Record<ActivityType, {
   icon: React.ComponentType<{ size?: number; className?: string }>;
-  iconClass: string;
-  bgClass: string;
-  borderClass: string;
-  label: string;
+  iconClass: string; bgClass: string; borderClass: string; label: string;
 }> = {
-  commit: { icon: GitCommit, iconClass: "text-accent", bgClass: "bg-accent/20", borderClass: "border-accent/30", label: "Commit" },
-  complete: { icon: CheckCircle2, iconClass: "text-done", bgClass: "bg-done/20", borderClass: "border-done/30", label: "Task Completed" },
-  project: { icon: RefreshCw, iconClass: "text-accent", bgClass: "bg-accent/20", borderClass: "border-accent/30", label: "Project Event" },
-  index: { icon: RefreshCw, iconClass: "text-text-muted", bgClass: "bg-card-hover", borderClass: "border-border", label: "Re-indexed" },
-  alert: { icon: AlertTriangle, iconClass: "text-in-progress", bgClass: "bg-in-progress/20", borderClass: "border-in-progress/30", label: "Alert" },
+  commit:      { icon: GitCommit,    iconClass: "text-accent",       bgClass: "bg-accent/20",       borderClass: "border-accent/30",       label: "Commit" },
+  complete:    { icon: CheckCircle2, iconClass: "text-done",         bgClass: "bg-done/20",         borderClass: "border-done/30",         label: "Task Completed" },
+  analysis:    { icon: Sparkles,     iconClass: "text-accent",       bgClass: "bg-accent/20",       borderClass: "border-accent/30",       label: "Analysis" },
+  "openai-sync":{ icon: TrendingUp,  iconClass: "text-emerald-400",  bgClass: "bg-emerald-400/10",  borderClass: "border-emerald-400/20",  label: "OpenAI Sync" },
+  index:       { icon: Database,     iconClass: "text-text-muted",   bgClass: "bg-card-hover",      borderClass: "border-border",          label: "Re-indexed" },
+  alert:       { icon: AlertTriangle,iconClass: "text-in-progress",  bgClass: "bg-in-progress/20",  borderClass: "border-in-progress/30",  label: "Alert" },
+  project:     { icon: RefreshCw,    iconClass: "text-text-muted",   bgClass: "bg-card-hover",      borderClass: "border-border",          label: "Event" },
 };
 
 function ActivityRow({ item }: { item: ActivityItem }) {
   const type = detectType(item);
   const { icon: Icon, iconClass, bgClass, borderClass, label } = TYPE_CONFIG[type];
+  // Show first meaningful sentence of note, skip generic "project event" text
+  const noteDisplay = item.note && !item.note.toLowerCase().includes("project event")
+    ? item.note.split(".")[0].slice(0, 80)
+    : null;
 
   return (
     <div className="relative pl-9">
@@ -38,23 +45,22 @@ function ActivityRow({ item }: { item: ActivityItem }) {
         <Icon size={12} className={iconClass} />
       </div>
       <div className="flex items-start justify-between">
-        <div>
+        <div className="min-w-0 flex-1">
           <div className="text-sm font-medium text-text">
             {label}{" "}
             {item.commitHash && <span className="font-mono text-xs text-accent">{item.commitHash.slice(0, 7)}</span>}
           </div>
           <div className="mt-0.5 text-xs text-text-muted">
-            {item.project}{" "}
-            {item.taskId ? (
-              <>
-                - <Link href={`/tasks/${item.taskId}`} className="font-mono text-accent hover:underline">{item.taskId}</Link>
-              </>
-            ) : (
-              <Link href={`/projects/${item.project}/detail`} className="font-mono text-accent hover:underline">project event</Link>
+            <Link href={`/projects/${encodeURIComponent(item.project)}`} className="hover:text-accent transition-colors">
+              {item.project}
+            </Link>
+            {item.taskId && (
+              <> — <Link href={`/tasks/${item.taskId}`} className="font-mono text-accent hover:underline">{item.taskId}</Link></>
             )}
+            {noteDisplay && <span className="ml-1 italic">— {noteDisplay}</span>}
           </div>
         </div>
-        <span className="ml-2 whitespace-nowrap text-[10px] text-text-muted">{timeAgo(item.date)}</span>
+        <span className="ml-2 shrink-0 whitespace-nowrap text-[10px] text-text-muted">{timeAgo(item.date)}</span>
       </div>
     </div>
   );

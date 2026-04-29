@@ -7,6 +7,8 @@ export type ActivityItem = {
   date: string;
   commitHash: string | null;
   note: string | null;
+  sessionType: string | null;
+  provider: string | null;
 };
 
 export function timeAgo(dateStr: string): string {
@@ -31,14 +33,24 @@ export async function getRecentActivity(limit = 5, workspaceId?: string, since?:
   });
 
   const items: ActivityItem[] = [];
+  const seen = new Set<string>(); // dedup key: type+project+day
+
   for (const s of sessions) {
+    const dedupKey = `${s.type}:${s.project}:${s.date.toISOString().slice(0, 10)}`;
+    if (s.type === "openai-sync" || s.type === "project-event") {
+      if (seen.has(dedupKey)) continue; // show only one per project per day
+      seen.add(dedupKey);
+    }
+
     if (s.tasksCompleted.length === 0) {
       items.push({
         taskId: null,
         project: s.project,
         date: s.date.toISOString(),
         commitHash: s.commitHash,
-        note: s.sessionNotes ?? s.type,
+        note: s.sessionNotes ?? null,
+        sessionType: s.type,
+        provider: s.provider,
       });
       if (items.length >= limit) return items;
       continue;
@@ -50,6 +62,8 @@ export async function getRecentActivity(limit = 5, workspaceId?: string, since?:
         date: s.date.toISOString(),
         commitHash: s.commitHash,
         note: s.sessionNotes,
+        sessionType: s.type,
+        provider: s.provider,
       });
       if (items.length >= limit) return items;
     }

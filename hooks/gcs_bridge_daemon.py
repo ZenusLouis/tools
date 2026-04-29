@@ -382,9 +382,8 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
                 if skill_path.exists():
                     try:
                         raw = skill_path.read_text(encoding="utf-8", errors="replace")
-                        # Strip frontmatter, take first 300 chars
-                        # Load full SKILL.md — local claude -p caches within same session
-                        content = re.sub(r'^---[\s\S]*?---\n', '', raw).strip()
+                        # First 600 chars after frontmatter — enough guidance, not too many tokens
+                        content = re.sub(r'^---[\s\S]*?---\n', '', raw).strip()[:600]
                         skill_lines.append(f"### {slug}\n{content}")
                     except Exception:
                         pass
@@ -408,7 +407,7 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
     action_id = str(action.get("id") or "")
     import tempfile
     process = subprocess.Popen(
-        ["claude", "-p", prompt, "--output-format", "json"],
+        ["claude", "-p", prompt, "--output-format", "json", "--max-turns", "1"],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
         cwd=tempfile.gettempdir(),  # neutral dir — avoid loading GCS CLAUDE.md
     )
@@ -433,7 +432,11 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
         post_json(f"/api/bridge/file-actions/{action_id}/progress",
                   {"lines": pending_lines}, timeout=4)
 
-    process.wait(timeout=10)
+    try:
+        process.wait(timeout=90)  # hard cap at 90s
+    except subprocess.TimeoutExpired:
+        process.kill()
+        raise ValueError("claude -p timed out after 90s")
     if process.returncode != 0:
         stderr = (process.stderr.read() if process.stderr else "")[:300]
         raise ValueError(f"claude -p failed (rc={process.returncode}): {stderr}")
