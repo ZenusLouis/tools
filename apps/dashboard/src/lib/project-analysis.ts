@@ -419,8 +419,8 @@ export async function analyzeProjectForWorkspace(
     data: {
       workspaceId,
       provider: selectedProvider,
-      role: analysisRole ? "ba-analyst" : null,
-      model: analysisRole?.defaultModel ?? null,
+      role: "ba-analyst",
+      model: null,
       type: "project-event",
       project: projectName,
       date: now,
