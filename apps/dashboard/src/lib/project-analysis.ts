@@ -280,54 +280,48 @@ export async function analyzeProjectForWorkspace(
   const docs = docRecord(project);
   if (!docs.brd && !docs.prd) return { ok: false, error: "Add a BRD or PRD before analysis." };
 
-  // Use the configured analysis role as provider source of truth.
-  const analysisRoleSelect = {
-    id: true,
-    provider: true,
-    defaultModel: true,
-    credentialService: true,
-    executionModeDefault: true,
-    rulesMarkdown: true,
+  const roleSelect = {
+    id: true, provider: true, defaultModel: true, credentialService: true,
+    executionModeDefault: true, rulesMarkdown: true, name: true,
     skills: { select: { slug: true } },
   } as const;
-  const analysisRole = await db.agentRole.findFirst({
-    where: { workspaceId, slug: "ba-analyst", phase: "analysis" },
-    select: analysisRoleSelect,
-  }) ?? await db.agentRole.findFirst({
-    where: { workspaceId, phase: "analysis" },
-    orderBy: { createdAt: "asc" },
-    select: analysisRoleSelect,
-  });
-  const selectedProvider = (analysisRole?.provider ?? "claude") as AnalysisProvider;
-  const selectedCredential = analysisRole ? providerCredential(analysisRole.provider, analysisRole.credentialService) : "none";
-  const selectedRunner = providerLabel(selectedProvider);
-  const dashboardRunnable = selectedCredential === "openai" || selectedCredential === "anthropic";
 
-  // Try AI generation via direct API
+  // Collect ALL dashboard-runnable roles, preferred order: ba-analyst first, then any analysis, then any
+  const allRoles = await db.agentRole.findMany({
+    where: { workspaceId },
+    select: roleSelect,
+    orderBy: [{ createdAt: "asc" }],
+  });
+  const prioritized = [
+    ...allRoles.filter((r) => r.slug === "ba-analyst"),
+    ...allRoles.filter((r) => r.phase === "analysis" && r.slug !== "ba-analyst"),
+    ...allRoles.filter((r) => r.phase !== "analysis"),
+  ].filter((r, i, arr) => arr.findIndex((x) => x.id === r.id) === i); // dedup
+
   let modules: AiModule[] | null = null;
   let source: "ai" | "bridge" | "fallback" = "fallback";
+  let selectedProvider: AnalysisProvider = "claude";
+  let selectedRunner = "Claude";
 
-  if (analysisRole && dashboardRunnable) {
+  // Try each dashboard-runnable agent in order until one succeeds
+  for (const role of prioritized) {
+    const cred = providerCredential(role.provider, role.credentialService);
+    if (cred !== "openai" && cred !== "anthropic") continue; // skip local-only
     try {
       modules = await generateModulesWithAI(projectName, project.frameworks, docs, {
-        ...analysisRole,
-        credentialService: selectedCredential,
-        skillSlugs: analysisRole.skills.map((s) => s.slug),
+        ...role, credentialService: cred, skillSlugs: role.skills.map((s) => s.slug),
       }, workspaceId);
-    } catch { /* API key missing or error → fall through to bridge */ }
-    if (!modules && selectedProvider === "chatgpt") {
-      return {
-        ok: false,
-        error: "ChatGPT did not return valid modules.",
-        provider: selectedProvider,
-        runnerLabel: selectedRunner,
-      };
-    }
-    if (modules) source = "ai";
+      if (modules) {
+        source = "ai";
+        selectedProvider = role.provider as AnalysisProvider;
+        selectedRunner = providerLabel(selectedProvider);
+        break;
+      }
+    } catch { /* key missing or API error — try next agent */ }
   }
 
-  // Cách 2: No direct API key → queue via local bridge (claude -p)
-  if (!modules && selectedProvider === "claude" && (!analysisRole || analysisRole.executionModeDefault === "local")) {
+  // Cách 2: No dashboard agent worked → queue via local bridge (claude -p)
+  if (!modules) {
     const bridgeDevice = await db.bridgeDevice.findFirst({
       where: { workspaceId, claudeAvailable: true, lastSeenAt: { gte: new Date(Date.now() - 5 * 60_000) } },
       select: { id: true },
