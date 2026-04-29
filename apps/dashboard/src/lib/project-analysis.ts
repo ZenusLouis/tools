@@ -314,14 +314,7 @@ export async function analyzeProjectForWorkspace(
         credentialService: selectedCredential,
         skillSlugs: analysisRole.skills.map((s) => s.slug),
       }, workspaceId);
-    } catch (error) {
-      return {
-        ok: false,
-        error: `${selectedRunner} analysis failed: ${error instanceof Error ? error.message : "unknown error"}`,
-        provider: selectedProvider,
-        runnerLabel: selectedRunner,
-      };
-    }
+    } catch { /* API key missing or error → fall through to bridge */ }
     if (!modules && selectedProvider === "chatgpt") {
       return {
         ok: false,
