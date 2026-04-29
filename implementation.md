@@ -257,6 +257,8 @@
 - Fixed Analyze queue reuse after reset/regenerate: resetting a backlog now deletes stale `run_analysis` bridge actions for that project, starting a new local analysis clears old analysis actions before queueing, and the bridge pending endpoint prioritizes fresh `run_analysis` jobs ahead of older generic file actions. This prevents the UI from getting stuck at `Queued - waiting for local Claude...` after a reset.
 - Added an Analyze cancel flow: `/api/projects/:name/analyze/cancel` marks pending/claimed/running analysis actions as `cancelled`, the Analyze UI shows a `Cancel` button while polling, stops local polling immediately, and bridge result callbacks ignore cancelled actions so late local-Claude results cannot overwrite the cancelled state.
 - Hardened stuck Analyze recovery: the `Cancel` button now appears whenever an active analysis action exists, not only when the local polling state is true; bridge progress callbacks also ignore cancelled actions; and the status API auto-cancels stale analysis actions after `GCS_ANALYSIS_STALE_MINUTES` (default 30 minutes) without progress.
+- Changed the Dashboard token card back to token/equivalent-token display and moved Codex credits into tooltip/detail-only context, avoiding confusing primary values like fractional `credits` on the dashboard summary card.
+- Added a bridge action status endpoint and made the local bridge cancel-aware while Claude is running. The daemon now checks `/api/bridge/file-actions/:id/status` during local analysis, kills the Claude process when the dashboard action is cancelled, and posts a local cancellation progress line.
 
 ## Checks
 

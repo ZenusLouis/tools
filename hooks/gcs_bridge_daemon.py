@@ -69,10 +69,36 @@ def post_json_data(path: str, payload: dict, timeout: int = 8) -> tuple[bool, di
     return True, data
 
 
+def get_json(path: str, timeout: int = 8) -> tuple[bool, dict[str, Any] | str]:
+    try:
+        req = urllib.request.Request(
+            f"{DASHBOARD_URL}{path}",
+            headers=headers(),
+            method="GET",
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = resp.read().decode("utf-8", errors="replace")
+            if not (200 <= resp.status < 300):
+                return False, body
+            data = json.loads(body)
+            return (True, data) if isinstance(data, dict) else (False, body)
+    except Exception as exc:
+        return False, str(exc)
+
+
 def post_action_progress(action_id: str, lines: list[str], timeout: int = 4) -> None:
     if not action_id or not lines:
         return
     post_json(f"/api/bridge/file-actions/{action_id}/progress", {"lines": lines}, timeout=timeout)
+
+
+def is_action_cancelled(action_id: str, timeout: int = 3) -> bool:
+    if not action_id:
+        return False
+    ok, data = get_json(f"/api/bridge/file-actions/{action_id}/status", timeout=timeout)
+    if not ok or not isinstance(data, dict):
+        return False
+    return bool(data.get("cancelled") or data.get("status") == "cancelled")
 
 
 def collect_project_paths() -> list[dict[str, str]]:
@@ -450,31 +476,71 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
         cwd=tempfile.gettempdir(),  # neutral dir — avoid loading GCS CLAUDE.md
     )
 
-    # Stream stdout and forward chunks to dashboard so UI can show live output
+    # Stream stdout and forward chunks to dashboard so UI can show live output.
+    # Use reader threads so the bridge can still notice dashboard-side cancellation while Claude is running.
+    import queue
+    import threading
     raw_chunks: list[str] = []
+    stderr_chunks: list[str] = []
     pending_lines: list[str] = []
     flush_every = 3  # send every N lines
+    output_queue: "queue.Queue[tuple[str, str | None]]" = queue.Queue()
+
+    def _reader(name: str, stream: Any) -> None:
+        try:
+            for stream_line in stream:
+                output_queue.put((name, stream_line))
+        finally:
+            output_queue.put((name, None))
 
     assert process.stdout is not None
-    for line in process.stdout:
-        raw_chunks.append(line)
-        display = line.rstrip()
-        if display:
-            pending_lines.append(display)
-        if len(pending_lines) >= flush_every:
+    assert process.stderr is not None
+    threading.Thread(target=_reader, args=("stdout", process.stdout), daemon=True).start()
+    threading.Thread(target=_reader, args=("stderr", process.stderr), daemon=True).start()
+
+    deadline = time.time() + analyze_timeout
+    next_cancel_check = 0.0
+    open_streams = {"stdout", "stderr"}
+    while open_streams:
+        try:
+            stream_name, line = output_queue.get(timeout=0.5)
+            if line is None:
+                open_streams.discard(stream_name)
+            elif stream_name == "stdout":
+                raw_chunks.append(line)
+                display = line.rstrip()
+                if display:
+                    pending_lines.append(display)
+            else:
+                stderr_chunks.append(line)
+        except queue.Empty:
+            pass
+
+        if pending_lines and (len(pending_lines) >= flush_every or process.poll() is not None):
             post_action_progress(action_id, pending_lines)
             pending_lines = []
+
+        now = time.time()
+        if now >= next_cancel_check:
+            next_cancel_check = now + 2
+            if is_action_cancelled(action_id):
+                process.kill()
+                post_action_progress(action_id, ["Cancelled locally."])
+                raise ValueError("Analysis cancelled by user")
+
+        if now > deadline:
+            process.kill()
+            raise ValueError(f"claude -p timed out after {analyze_timeout}s")
+
+        if process.poll() is not None and not open_streams:
+            break
 
     if pending_lines:
         post_action_progress(action_id, pending_lines)
 
-    try:
-        process.wait(timeout=analyze_timeout)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        raise ValueError(f"claude -p timed out after {analyze_timeout}s")
+    process.wait(timeout=5)
     if process.returncode != 0:
-        stderr = (process.stderr.read() if process.stderr else "")[:300]
+        stderr = "".join(stderr_chunks).strip()[:300]
         stdout_tail = "".join(raw_chunks).strip()[-600:]
         detail = stderr or stdout_tail
         raise ValueError(f"claude -p failed (rc={process.returncode}): {detail}")

@@ -26,15 +26,11 @@ const PROVIDER_UI: Record<ProviderBreakdown["provider"], { label: string; color:
 };
 
 function displayValue(item: ProviderBreakdown) {
-  if (item.provider === "codex" && item.credits > 0) {
-    return {
-      value: formatCredits(item.credits),
-      rawTitle: `${formatNumber(item.tokens)} raw thread tokens`,
-    };
-  }
   return {
     value: `${formatNumber(item.tokens)} tokens`,
-    rawTitle: formatNumber(item.tokens),
+    rawTitle: item.provider === "codex" && item.credits > 0
+      ? `${formatNumber(item.tokens)} token equivalent; ${formatCredits(item.credits)}`
+      : formatNumber(item.tokens),
   };
 }
 
@@ -51,9 +47,8 @@ export function TokenUsageCard({
   const topProvider = [...breakdown].sort((a, b) => b.tokens - a.tokens)[0];
   const topLabel = topProvider && topProvider.tokens > 0 ? PROVIDER_UI[topProvider.provider].label : "No usage";
   const totalCredits = breakdown.reduce((sum, item) => sum + item.credits, 0);
-  const codexDominant = topProvider?.provider === "codex" && totalCredits > 0;
-  const primaryValue = codexDominant ? formatCredits(totalCredits) : formatNumber(total);
-  const primaryLabel = codexDominant ? `${rangeLabel} Codex credits` : `Tokens ${rangeLabel}`;
+  const primaryValue = formatNumber(total);
+  const primaryLabel = `Tokens ${rangeLabel}`;
 
   return (
     <motion.div
@@ -68,13 +63,10 @@ export function TokenUsageCard({
         <span className="text-[10px] font-bold text-in-progress">{topLabel}</span>
       </div>
 
-      <p className="break-words text-3xl font-black tracking-tight text-white sm:text-4xl" title={codexDominant ? `${formatNumber(total)} raw thread tokens` : formatNumber(total)}>
+      <p className="break-words text-3xl font-black tracking-tight text-white sm:text-4xl" title={totalCredits > 0 ? `${formatNumber(total)} token equivalent; ${formatCredits(totalCredits)}` : formatNumber(total)}>
         {primaryValue}
       </p>
       <p className="mt-1 text-xs font-medium text-text-muted">{primaryLabel}</p>
-      {!codexDominant && totalCredits > 0 && (
-        <p className="mt-1 text-xs font-semibold text-in-progress">{formatCredits(totalCredits)}</p>
-      )}
 
       <div className="mt-4">
         <div className="mb-1 flex justify-between text-[10px] font-semibold">
