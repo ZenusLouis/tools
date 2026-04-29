@@ -4,6 +4,7 @@
 
 - Added `Task.reqIds` with Prisma migration `20260429121500_task_req_ids`, and threaded requirement IDs through analyze result parsing, task creation, task board cards, task detail panels, project detail, and generated backlog review.
 - Updated local bridge analysis to extract PDF text with `pdftotext -layout`, log extracted character/page estimates, detect `CORE-*`, `CIN-*`, `HOT-*`, `CROSS-*`, and `UI-*` requirement groups, and stop with a clear error if PDF extraction fails instead of inventing a filename-based backlog.
+- Changed local Claude analysis to attach the extracted document context through stdin instead of passing the full prompt as a Windows command-line argument, fixing `[WinError 206] The filename or extension is too long` for full BRDs.
 - Updated the Claude analysis prompt to require BRD-traceable modules/tasks and `reqIds`, with OmniBooking domains such as Core Platform, Cinema Booking, Hotel Booking, Cross-domain Payment/Refund/State, and UI/Operations when those IDs exist in the BRD.
 - Changed dashboard analysis to prefer the local bridge for local document paths, so the local machine hands full extracted BRD context to Claude instead of the hosted dashboard trying to read a Windows path.
 - Added `/api/models` for provider-aware model discovery: curated static models are always available, and OpenAI/Anthropic model lists are fetched when the workspace has the matching encrypted API key.
@@ -12,6 +13,7 @@
 ## Checks
 
 - `pdftotext -layout D:\Code\OmniBooking\docx\BRD_OmniBooking_Requirement_Deep_Dive_FINAL6.pdf -` detected `CORE-*`, `CIN-*`, `HOT-*`, `CROSS-*`, and UI/cross-domain requirement content.
+- `claude -p --input-format text` with a 100k-character stdin prompt returned successfully.
 - `python -m py_compile hooks/gcs_bridge_daemon.py`
 - `npx prisma generate`
 - `npx prisma migrate deploy`

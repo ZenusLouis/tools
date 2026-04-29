@@ -503,15 +503,23 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
         f"Detected requirement groups: {', '.join(req_groups) if req_groups else 'none'}",
         f"Detected requirement IDs: {len(req_ids)}",
         f"Stack: {fw}",
+        "Attached extracted document context to local Claude via stdin.",
     ])
     import tempfile
     max_turns = os.environ.get("GCS_CLAUDE_ANALYZE_MAX_TURNS", "8")
     analyze_timeout = int(os.environ.get("GCS_CLAUDE_ANALYZE_TIMEOUT_SEC", "600"))
     process = subprocess.Popen(
-        ["claude", "-p", prompt, "--output-format", "json", "--max-turns", max_turns, "--allowedTools", ""],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
+        ["claude", "-p", "--input-format", "text", "--output-format", "json", "--max-turns", max_turns, "--allowedTools", ""],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
         cwd=tempfile.gettempdir(),  # neutral dir — avoid loading GCS CLAUDE.md
     )
+    try:
+        assert process.stdin is not None
+        process.stdin.write(prompt)
+        process.stdin.close()
+    except Exception as exc:
+        process.kill()
+        raise ValueError(f"Failed to attach analysis prompt to Claude stdin: {exc}") from exc
 
     # Stream stdout and forward chunks to dashboard so UI can show live output.
     # Use reader threads so the bridge can still notice dashboard-side cancellation while Claude is running.
