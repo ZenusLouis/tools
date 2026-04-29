@@ -443,6 +443,7 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
     ])
     import tempfile
     max_turns = os.environ.get("GCS_CLAUDE_ANALYZE_MAX_TURNS", "8")
+    analyze_timeout = int(os.environ.get("GCS_CLAUDE_ANALYZE_TIMEOUT_SEC", "600"))
     process = subprocess.Popen(
         ["claude", "-p", prompt, "--output-format", "json", "--max-turns", max_turns, "--allowedTools", ""],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
@@ -468,10 +469,10 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
         post_action_progress(action_id, pending_lines)
 
     try:
-        process.wait(timeout=90)  # hard cap at 90s
+        process.wait(timeout=analyze_timeout)
     except subprocess.TimeoutExpired:
         process.kill()
-        raise ValueError("claude -p timed out after 90s")
+        raise ValueError(f"claude -p timed out after {analyze_timeout}s")
     if process.returncode != 0:
         stderr = (process.stderr.read() if process.stderr else "")[:300]
         stdout_tail = "".join(raw_chunks).strip()[-600:]

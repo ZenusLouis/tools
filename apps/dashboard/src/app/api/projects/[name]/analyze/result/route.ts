@@ -5,6 +5,8 @@ import { db } from "@/lib/db";
 import { bridgeTokenFromHeaders, verifyBridgeRequest } from "@/lib/bridge-auth";
 
 const HOOK_SECRET = process.env.HOOK_SECRET;
+const NullableString = z.preprocess((value) => value == null ? undefined : value, z.string().optional());
+const NullableStringArray = z.preprocess((value) => Array.isArray(value) ? value.filter((item) => item != null).map(String) : value == null ? undefined : value, z.array(z.string()).optional());
 
 const ModuleSchema = z.object({
   name: z.string(),
@@ -14,14 +16,14 @@ const ModuleSchema = z.object({
       z.string(),
       z.object({
         name: z.string(),
-        summary: z.string().optional(),
-        details: z.string().optional(),
-        acceptanceCriteria: z.array(z.string()).optional(),
-        steps: z.array(z.string()).optional(),
-        priority: z.string().optional(),
-        estimate: z.string().optional(),
-        risk: z.string().optional(),
-        deps: z.array(z.string()).optional(),
+        summary: NullableString,
+        details: NullableString,
+        acceptanceCriteria: NullableStringArray,
+        steps: NullableStringArray,
+        priority: NullableString,
+        estimate: NullableString,
+        risk: NullableString,
+        deps: NullableStringArray,
       }),
     ])),
   })),
@@ -30,7 +32,7 @@ const ModuleSchema = z.object({
 const ResultSchema = z.object({
   actionId: z.string(),
   projectName: z.string(),
-  modules: z.array(ModuleSchema).min(1).max(20),
+  modules: z.array(ModuleSchema).min(1).max(30),
 });
 
 type ParsedTask = z.infer<typeof ModuleSchema>["features"][number]["tasks"][number];

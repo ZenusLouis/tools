@@ -57,13 +57,15 @@ export function AnalyzeProjectButton({
     setLog([`Queued - waiting for local ${labelForRunner}...`]);
     setSummary(null);
     let attempts = 0;
+    let lastStatus: string | null = null;
 
     pollRef.current = setInterval(async () => {
       attempts += 1;
       try {
         const res = await fetch(`/api/projects/${projectEnc}/analyze/status?actionId=${actionId}`);
         if (res.ok) {
-          const data = await res.json() as { ready: boolean; created?: number; log?: string[]; failed?: boolean; error?: string; summary?: AnalyzeSummary };
+          const data = await res.json() as { ready: boolean; created?: number; log?: string[]; failed?: boolean; error?: string; summary?: AnalyzeSummary; status?: string | null };
+          lastStatus = data.status ?? lastStatus;
           if (data.log && data.log.length > 0) setLog(data.log);
           if (data.summary) setSummary(data.summary);
           if (data.failed) {
@@ -88,11 +90,16 @@ export function AnalyzeProjectButton({
         // Keep polling; transient network errors are normal during deploys.
       }
 
-      if (attempts >= 120) {
+      if (attempts >= 120 && lastStatus !== "running" && lastStatus !== "claimed") {
         clearInterval(pollRef.current!);
         setPolling(false);
         setFeedback("Timed out. Check bridge daemon.");
         setLog((prev) => [...prev, "Timed out after 10 minutes."]);
+      } else if (attempts >= 120 && attempts % 12 === 0) {
+        setLog((prev) => {
+          const line = "Still running locally. Waiting for bridge result...";
+          return prev[prev.length - 1] === line ? prev : [...prev, line];
+        });
       }
     }, 5000);
   }

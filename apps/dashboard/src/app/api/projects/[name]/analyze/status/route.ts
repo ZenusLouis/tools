@@ -28,7 +28,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ name
     const result = action?.result as { log?: string[]; summary?: unknown } | null;
     log = result?.log ?? [];
     summary = result?.summary ?? null;
-    if (action?.status === "running" && log.length === 0) {
+    if ((action?.status === "running" || action?.status === "claimed") && log.length === 0) {
       log = ["Local bridge picked up the analysis action.", "Claude is generating modules and tasks..."];
     }
     if (action?.status === "failed") {
