@@ -349,6 +349,31 @@ def _safe_local_target(project_path: str, relative_path: str) -> Path:
     return target
 
 
+def _analysis_document_context(document_path: str) -> str:
+    """Return a small local document excerpt so claude -p does not spend turns searching files."""
+    if not document_path:
+        return "No document path configured."
+
+    path = Path(document_path).expanduser()
+    if not path.exists():
+        return f"Document path configured but not accessible on this device: {document_path}"
+
+    suffix = path.suffix.lower()
+    try:
+        if suffix in {".md", ".txt", ".json", ".yaml", ".yml"}:
+            text = path.read_text(encoding="utf-8", errors="replace")
+            return text[:8000]
+        if suffix == ".pdf":
+            return (
+                f"PDF exists locally at: {path}\n"
+                "Do not search Desktop or Downloads. Infer modules from the project name and PDF filename if direct PDF text extraction is unavailable."
+            )
+    except Exception as exc:
+        return f"Document path is present but could not be read: {path} ({exc})"
+
+    return f"Document exists locally at: {path}. Infer modules from the project name and filename."
+
+
 def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
     """Run `claude -p` to generate project modules/tasks and POST result to dashboard."""
     import re
@@ -361,6 +386,7 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
 
     brd_path = docs.get("brd") or docs.get("prd") or ""
     brd_filename = Path(brd_path).name if brd_path else "no document"
+    document_context = _analysis_document_context(str(brd_path))
     fw = ", ".join(f for f in frameworks if f != "unknown") or "unknown stack"
 
     # Load skill summaries from local SKILL.md files
@@ -391,20 +417,22 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
         f"You are a senior BA/Product Analyst. Generate a structured implementation plan.\n\n"
         f"## Project Context\n"
         f"- Name: {project_name}\n- Stack: {fw}\n- Document: {brd_filename}"
+        f"\n\n## Document Context\n{document_context}"
         f"{skill_block}\n\n"
         f"## Output Requirements\n"
         f"Generate 3-6 modules, each with 1-4 features, each 2-5 atomic tasks.\n"
         f"Infer domain from project name + document. Tasks must be specific and actionable.\n"
         f"Apply MoSCoW: must-have tasks first. Flag high-risk: payments, real-time, auth.\n\n"
+        f"Do not use shell commands or search the filesystem. Use only the context in this prompt.\n"
         f"Respond ONLY with valid JSON:\n"
         f'{{"modules":[{{"name":"...","features":[{{"name":"...","tasks":["task1","task2"]}}]}}]}}'
     )
 
     action_id = str(action.get("id") or "")
     import tempfile
-    max_turns = os.environ.get("GCS_CLAUDE_ANALYZE_MAX_TURNS", "4")
+    max_turns = os.environ.get("GCS_CLAUDE_ANALYZE_MAX_TURNS", "8")
     process = subprocess.Popen(
-        ["claude", "-p", prompt, "--output-format", "json", "--max-turns", max_turns],
+        ["claude", "-p", prompt, "--output-format", "json", "--max-turns", max_turns, "--allowedTools", ""],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
         cwd=tempfile.gettempdir(),  # neutral dir — avoid loading GCS CLAUDE.md
     )
