@@ -40,10 +40,11 @@ function usageBucket(date: Date, range: DateRange): { key: string; label: string
     return { key, label: date.toLocaleString("en", { month: "short" }) };
   }
   if (range === "today") {
-    // Hourly buckets for today
+    // Per-minute buckets for today
     const h = date.getHours().toString().padStart(2, "0");
-    const key = `${date.toISOString().slice(0, 10)}T${h}`;
-    return { key, label: `${h}:00` };
+    const m = date.getMinutes().toString().padStart(2, "0");
+    const key = `${date.toISOString().slice(0, 10)}T${h}:${m}`;
+    return { key, label: `${h}:${m}` };
   }
   const key = date.toISOString().slice(0, 10);
   return { key, label: date.toLocaleDateString("en", { month: "short", day: "numeric" }) };
@@ -93,22 +94,38 @@ export async function getAnalytics(
     .map(([tool, tokens]) => ({ tool, tokens, percent: Math.round((tokens / totalToolTokens) * 100) }))
     .sort((a, b) => b.tokens - a.tokens);
 
-  // Daily usage
-  const dayMap = new Map<string, number>();
-  const labelMap = new Map<string, string>();
-  for (const s of sessions.filter((session) => session.provider !== "codex")) {
-    const bucket = usageBucket(s.date, range);
-    dayMap.set(bucket.key, (dayMap.get(bucket.key) ?? 0) + (s.totalTokens ?? 0));
-    labelMap.set(bucket.key, bucket.label);
+  // Daily usage — for "today" use exact response timestamps, not time buckets
+  let dailyUsage: DailyUsage[];
+  if (range === "today") {
+    // Each tool call = 1 data point at its actual timestamp
+    const points = toolUsage.map((u) => {
+      const h = u.date.getHours().toString().padStart(2, "0");
+      const m = u.date.getMinutes().toString().padStart(2, "0");
+      return {
+        date: u.date.toISOString(),
+        label: `${h}:${m}`,
+        tokens: u.tokens,
+        cost: u.tokens * (COST_PER_MILLION / 1_000_000),
+      };
+    }).sort((a, b) => a.date.localeCompare(b.date));
+    dailyUsage = points;
+  } else {
+    const dayMap = new Map<string, number>();
+    const labelMap = new Map<string, string>();
+    for (const s of sessions.filter((session) => session.provider !== "codex")) {
+      const bucket = usageBucket(s.date, range);
+      dayMap.set(bucket.key, (dayMap.get(bucket.key) ?? 0) + (s.totalTokens ?? 0));
+      labelMap.set(bucket.key, bucket.label);
+    }
+    for (const usage of toolUsage) {
+      const bucket = usageBucket(usage.date, range);
+      dayMap.set(bucket.key, (dayMap.get(bucket.key) ?? 0) + usage.tokens);
+      labelMap.set(bucket.key, bucket.label);
+    }
+    dailyUsage = [...dayMap.entries()]
+      .map(([date, tokens]) => ({ date, label: labelMap.get(date) ?? date, tokens, cost: tokens * (COST_PER_MILLION / 1_000_000) }))
+      .sort((a, b) => a.date.localeCompare(b.date));
   }
-  for (const usage of toolUsage) {
-    const bucket = usageBucket(usage.date, range);
-    dayMap.set(bucket.key, (dayMap.get(bucket.key) ?? 0) + usage.tokens);
-    labelMap.set(bucket.key, bucket.label);
-  }
-  const dailyUsage: DailyUsage[] = [...dayMap.entries()]
-    .map(([date, tokens]) => ({ date, label: labelMap.get(date) ?? date, tokens, cost: tokens * (COST_PER_MILLION / 1_000_000) }))
-    .sort((a, b) => a.date.localeCompare(b.date));
 
   // Session rows
   const allSessionRows: SessionRow[] = [

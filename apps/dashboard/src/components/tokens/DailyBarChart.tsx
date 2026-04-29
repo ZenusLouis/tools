@@ -42,8 +42,8 @@ function LineChart({ data }: { data: { label: string; tokens: number }[] }) {
     label: fmt(Math.round(f * max)),
   }));
 
-  // Show every Nth label to avoid crowding
-  const step = data.length <= 12 ? 1 : data.length <= 24 ? 2 : 4;
+  // Show every Nth label to avoid crowding (aim for ~8 labels max)
+  const step = Math.max(1, Math.ceil(data.length / 8));
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 140 }}>
@@ -133,7 +133,7 @@ export function DailyBarChart({ dailyUsage, isToday = false }: Props) {
           Usage history
         </h3>
         <div className="text-[10px] text-text-muted font-bold uppercase tracking-widest px-2 py-1 bg-bg-base rounded border border-border">
-          {isToday ? "Tokens/Hour" : "Tokens/Day"}
+          {isToday ? "Tokens/Min" : "Tokens/Day"}
         </div>
       </div>
 
