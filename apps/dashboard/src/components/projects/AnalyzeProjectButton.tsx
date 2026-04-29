@@ -39,8 +39,15 @@ export function AnalyzeProjectButton({
       try {
         const res = await fetch(`/api/projects/${projectEnc}/analyze/status?actionId=${aid}`);
         if (res.ok) {
-          const data = await res.json() as { ready: boolean; created?: number; log?: string[] };
+          const data = await res.json() as { ready: boolean; created?: number; log?: string[]; failed?: boolean; error?: string };
           if (data.log && data.log.length > 0) setLog(data.log);
+          if (data.failed) {
+            clearInterval(pollRef.current!);
+            setPolling(false);
+            setFeedback(`Failed: ${data.error}`);
+            setLog((prev) => [...prev, `❌ ${data.error}`]);
+            return;
+          }
           if (data.ready) {
             clearInterval(pollRef.current!);
             setPolling(false);

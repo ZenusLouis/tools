@@ -13,13 +13,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ name
   });
 
   let log: string[] = [];
+  let failed = false;
+  let errorMsg = "";
   if (actionId) {
     const action = await db.bridgeFileAction.findFirst({
       where: { id: actionId, workspaceId: user.workspaceId },
-      select: { result: true, status: true },
+      select: { result: true, status: true, error: true },
     });
     log = (action?.result as { log?: string[] } | null)?.log ?? [];
+    if (action?.status === "failed") {
+      failed = true;
+      errorMsg = action.error ?? "Bridge action failed";
+    }
   }
 
-  return NextResponse.json({ ready: count > 0, created: count, log });
+  return NextResponse.json({ ready: count > 0, created: count, log, failed, error: errorMsg });
 }

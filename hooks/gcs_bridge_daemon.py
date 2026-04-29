@@ -563,12 +563,27 @@ def main() -> int:
     next_file_action_poll = 0.0
     from_end = not args.from_start
 
+    # Auto-reload: track own script mtime
+    _self = Path(__file__).resolve()
+    _self_mtime = _self.stat().st_mtime
+
     print("GCS bridge daemon started. Press Ctrl+C to stop.", flush=True)
     print(f"Dashboard: {DASHBOARD_URL}", flush=True)
 
     try:
         while True:
             now = time.time()
+
+            # Self-reload check every 10s
+            try:
+                new_mtime = _self.stat().st_mtime
+                if new_mtime != _self_mtime:
+                    print("[auto-reload] Script changed — restarting daemon...", flush=True)
+                    save_state(state)
+                    os.execv(sys.executable, [sys.executable] + sys.argv)
+            except Exception:
+                pass
+
             if now >= next_heartbeat:
                 heartbeat(verbose=args.verbose)
                 next_heartbeat = now + max(5, args.heartbeat_interval)
@@ -579,7 +594,7 @@ def main() -> int:
             if now >= next_codex_sync:
                 sync_codex_threads(state)
                 save_state(state)
-                next_codex_sync = now + 15  # poll Codex SQLite every 15s
+                next_codex_sync = now + 15
             if now >= next_file_action_poll:
                 poll_file_actions()
                 next_file_action_poll = now + 5
