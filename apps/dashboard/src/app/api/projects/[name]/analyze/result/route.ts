@@ -40,6 +40,8 @@ const ResultSchema = z.object({
 
 type ParsedTask = z.infer<typeof ModuleSchema>["features"][number]["tasks"][number];
 
+type AnalysisTranscript = Record<string, unknown>;
+
 function normalizeTask(task: ParsedTask, fallbackName: string) {
   if (typeof task === "string") {
     return {
@@ -70,6 +72,93 @@ function normalizeTask(task: ParsedTask, fallbackName: string) {
   };
 }
 
+function numberField(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function extractTokenTotalFromUsage(usage: unknown) {
+  if (!usage || typeof usage !== "object") return 0;
+  const row = usage as Record<string, unknown>;
+  return (
+    numberField(row.input_tokens) +
+    numberField(row.cache_creation_input_tokens) +
+    numberField(row.cache_read_input_tokens) +
+    numberField(row.output_tokens)
+  );
+}
+
+function extractTokenTotalFromModelUsage(modelUsage: unknown) {
+  if (!modelUsage || typeof modelUsage !== "object") return 0;
+  return Object.values(modelUsage as Record<string, unknown>).reduce<number>((sum, value) => {
+    if (!value || typeof value !== "object") return sum;
+    const row = value as Record<string, unknown>;
+    return sum +
+      numberField(row.inputTokens) +
+      numberField(row.cacheCreationInputTokens) +
+      numberField(row.cacheReadInputTokens) +
+      numberField(row.outputTokens);
+  }, 0);
+}
+
+function modelFromTranscript(transcript: AnalysisTranscript) {
+  const modelUsage = transcript.modelUsage;
+  if (!modelUsage || typeof modelUsage !== "object") return typeof transcript.model === "string" ? transcript.model : null;
+  const rows = Object.entries(modelUsage as Record<string, unknown>)
+    .map(([model, value]) => {
+      const cost = value && typeof value === "object" ? numberField((value as Record<string, unknown>).costUSD) : 0;
+      return { model, cost };
+    })
+    .sort((a, b) => b.cost - a.cost);
+  return rows[0]?.model ?? (typeof transcript.model === "string" ? transcript.model : null);
+}
+
+async function recordAnalysisSession(params: {
+  workspaceId: string;
+  deviceId: string | null;
+  projectName: string;
+  actionId: string;
+  transcript?: AnalysisTranscript;
+  createdTasks?: number;
+}) {
+  const { workspaceId, deviceId, projectName, actionId, transcript, createdTasks } = params;
+  if (!transcript) return;
+
+  const modelUsageTokens = extractTokenTotalFromModelUsage(transcript.modelUsage);
+  const usageTokens = extractTokenTotalFromUsage(transcript.usage);
+  const totalTokens = modelUsageTokens || usageTokens;
+  const totalCostUSD = numberField(transcript.totalCostUsd) || numberField(transcript.totalCostUSD);
+  const durationMs = numberField(transcript.durationMs);
+  const transcriptPath = `bridge-action:${actionId}`;
+
+  if (!totalTokens && !totalCostUSD) return;
+
+  const existing = await db.session.findFirst({
+    where: { workspaceId, provider: "claude", transcriptPath },
+    select: { id: true },
+  });
+  if (existing) return;
+
+  await db.session.create({
+    data: {
+      workspaceId,
+      deviceId,
+      provider: "claude",
+      role: "ba-analyst",
+      model: modelFromTranscript(transcript),
+      transcriptPath,
+      type: "analysis",
+      project: projectName,
+      date: new Date(),
+      tasksCompleted: [],
+      sessionNotes: `Local Claude analysis${createdTasks ? ` generated ${createdTasks} tasks` : ""}.`,
+      totalTokens: totalTokens || null,
+      totalCostUSD: totalCostUSD || null,
+      durationMin: durationMs ? durationMs / 60_000 : null,
+      risks: [],
+    },
+  });
+}
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ name: string }> }) {
   let ctx = await verifyBridgeRequest(bridgeTokenFromHeaders(req.headers));
   if (!ctx && HOOK_SECRET && req.headers.get("x-hook-secret") === HOOK_SECRET) {
@@ -88,6 +177,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ nam
     return NextResponse.json({ error: "Project name mismatch" }, { status: 400 });
   }
 
+  const transcript = parsed.data.analysisTranscript as AnalysisTranscript | undefined;
   const action = await db.bridgeFileAction.findFirst({
     where: { id: parsed.data.actionId, workspaceId: ctx.workspaceId },
     select: { id: true, status: true },
@@ -103,8 +193,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ nam
       data: {
         status: "succeeded",
         completedAt: new Date(),
-        result: parsed.data.analysisTranscript
-          ? { analysisTranscript: parsed.data.analysisTranscript } as Prisma.InputJsonValue
+        result: transcript
+          ? { analysisTranscript: transcript } as Prisma.InputJsonValue
           : undefined,
       },
     }).catch(() => null);
@@ -112,7 +202,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ nam
 
   // Check no tasks exist yet (idempotent guard)
   const existing = await db.task.count({ where: { feature: { module: { projectName } }, workspaceId: ctx.workspaceId } });
-  if (existing > 0) return NextResponse.json({ ok: true, skipped: true });
+  if (existing > 0) {
+    await recordAnalysisSession({
+      workspaceId: ctx.workspaceId,
+      deviceId: ctx.deviceId,
+      projectName,
+      actionId: parsed.data.actionId,
+      transcript,
+    });
+    revalidatePath("/");
+    revalidatePath("/tokens");
+    return NextResponse.json({ ok: true, skipped: true });
+  }
 
   const [baRole, devRole, reviewRole] = await Promise.all([
     db.agentRole.findFirst({ where: { workspaceId: ctx.workspaceId, phase: "analysis" }, select: { id: true } }),
@@ -160,7 +261,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ nam
     data: { activeTask: firstTaskId, lastIndexed: new Date() },
   });
 
+  await recordAnalysisSession({
+    workspaceId: ctx.workspaceId,
+    deviceId: ctx.deviceId,
+    projectName,
+    actionId: parsed.data.actionId,
+    transcript,
+    createdTasks: created,
+  });
+
   revalidatePath("/");
+  revalidatePath("/tokens");
   revalidatePath(`/projects/${encodeURIComponent(projectName)}`);
   revalidatePath(`/projects/${encodeURIComponent(projectName)}/detail`);
   revalidatePath("/tasks");
