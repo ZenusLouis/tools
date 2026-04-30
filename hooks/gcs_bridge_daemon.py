@@ -432,6 +432,32 @@ def _requirement_ids(text: str) -> list[str]:
     return sorted(set(re.findall(r"\b(?:CORE-[A-Z]+|CIN-[A-Z]+|HOT-[A-Z]+|CROSS-[A-Z]+|UI-[A-Z]+)-\d{3}\b", text)))
 
 
+def _analysis_requirement_excerpt(text: str, max_chars: int | None = None) -> str:
+    """Compact long BRDs to requirement-bearing lines plus nearby context."""
+    import re
+    limit = max_chars or int(os.environ.get("GCS_ANALYZE_REQ_CONTEXT_MAX_CHARS", "36000"))
+    req_pattern = re.compile(r"\b(?:CORE-[A-Z]+|CIN-[A-Z]+|HOT-[A-Z]+|CROSS-[A-Z]+|UI-[A-Z]+)-\d{3}\b")
+    lines = [line.rstrip() for line in text.splitlines()]
+    keep: set[int] = set()
+    for index, line in enumerate(lines):
+        if req_pattern.search(line):
+            keep.update(range(max(0, index - 2), min(len(lines), index + 4)))
+    if not keep:
+        return text[:limit]
+
+    chunks: list[str] = []
+    last = -10
+    for index in sorted(keep):
+        if index != last + 1:
+            chunks.append("\n---\n")
+        line = lines[index].strip()
+        if line:
+            chunks.append(line)
+        last = index
+    excerpt = "\n".join(chunks)
+    return excerpt[:limit]
+
+
 def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
     """Run `claude -p` to generate project modules/tasks and POST result to dashboard."""
     import re
@@ -445,6 +471,7 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
     brd_path = docs.get("brd") or docs.get("prd") or ""
     brd_filename = Path(brd_path).name if brd_path else "no document"
     document_context = _analysis_document_context(str(brd_path))
+    requirement_context = _analysis_requirement_excerpt(document_context)
     req_groups = _requirement_groups(document_context)
     req_ids = _requirement_ids(document_context)
     page_estimate = document_context.count("\f") + 1 if document_context else 0
@@ -478,13 +505,13 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
         f"You are a senior BA/Product Analyst. Generate a structured implementation plan.\n\n"
         f"## Project Context\n"
         f"- Name: {project_name}\n- Stack: {fw}\n- Document: {brd_filename}"
-        f"\n\n## Document Context\n{document_context}"
+        f"\n\n## Requirement-Focused Document Context\n{requirement_context}"
         f"{skill_block}\n\n"
         f"## Output Requirements\n"
         f"Generate modules from the BRD requirement groups, not from generic booking app assumptions.\n"
         f"Use these domain modules when supported by the BRD: Core Platform, Cinema Booking, Hotel Booking, Cross-domain Payment/Refund/State, Global UI/Reporting/Operations.\n"
         f"Do not create generic modules such as Listing & Inventory unless they map directly to BRD requirement IDs.\n"
-        f"Each module should have 1-5 features, each feature 1-6 atomic tasks.\n"
+        f"Each module should have 1-4 features, each feature 1-4 atomic tasks. Keep the first generation concise; the UI can expand details later.\n"
         f"Tasks must be specific and actionable (real BRD entities, screens, actions, state rules).\n"
         f"Each task must be an object with developer-ready detail: summary, details, acceptanceCriteria, steps, priority, estimate, risk, deps.\n"
         f"Each task MUST include reqIds: string[] containing the BRD requirement IDs it implements, e.g. CORE-AUTH-001 or CIN-SHOW-003.\n"
@@ -500,6 +527,7 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
         f"Started local Claude analysis for {project_name}.",
         f"Document path: {brd_path or 'none'}",
         f"Extracted document text: {len(document_context):,} chars, ~{page_estimate} pages.",
+        f"Attached requirement excerpt: {len(requirement_context):,} chars.",
         f"Detected requirement groups: {', '.join(req_groups) if req_groups else 'none'}",
         f"Detected requirement IDs: {len(req_ids)}",
         f"Stack: {fw}",
@@ -507,7 +535,7 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
     ])
     import tempfile
     max_turns = os.environ.get("GCS_CLAUDE_ANALYZE_MAX_TURNS", "8")
-    analyze_timeout = int(os.environ.get("GCS_CLAUDE_ANALYZE_TIMEOUT_SEC", "600"))
+    analyze_timeout = int(os.environ.get("GCS_CLAUDE_ANALYZE_TIMEOUT_SEC", "900"))
     claude_command = [
         "claude", "-p",
         "--input-format", "text",
@@ -635,6 +663,7 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
         "projectName": project_name,
         "documentPath": str(brd_path or ""),
         "documentContext": document_context,
+        "documentExcerpt": requirement_context,
         "detectedRequirementGroups": req_groups,
         "detectedRequirementIds": req_ids[:500],
         "frameworks": fw,

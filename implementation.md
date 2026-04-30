@@ -43,6 +43,17 @@
 - `npm run lint`
 - `npm run build`
 
+## Latest Update - Claude Analysis Context Compaction
+
+- Added a requirement-focused BRD excerpt builder for local Claude analysis. The bridge now extracts full PDF text, detects all requirement IDs/groups, then attaches only requirement-bearing lines plus nearby context to Claude.
+- Reduced first-pass generation scope to 1-4 features and 1-4 tasks per feature so Claude can return JSON reliably instead of timing out on oversized BRD/output combinations.
+- Increased the default local analysis timeout from 600s to 900s.
+- OmniBooking BRD test: full extract `74,299` chars, attached excerpt `26,319` chars, all 21 requirement groups and 139 requirement IDs still detected.
+
+## Checks
+
+- `python -m py_compile hooks/gcs_bridge_daemon.py`
+
 ## Latest Update - Confirmation Popups
 
 - Added `apps/dashboard/src/components/ui/ConfirmDialog.tsx` as the shared in-app confirmation modal.
