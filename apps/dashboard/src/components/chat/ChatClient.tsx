@@ -20,10 +20,10 @@ type Diagnostics = {
   onlineDevices: Array<{ name: string; claudeAvailable: boolean; codexAvailable: boolean; lastSeenAt: string | null }>;
 };
 
-export function ChatClient() {
+export function ChatClient({ initialSessionId }: { initialSessionId?: string }) {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(initialSessionId ?? null);
   const [input, setInput] = useState("");
   const [diagnostics, setDiagnostics] = useState<Diagnostics | null>(null);
   const [pending, startTransition] = useTransition();

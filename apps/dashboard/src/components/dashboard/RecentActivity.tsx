@@ -3,12 +3,13 @@ import { AlertTriangle, CheckCircle2, GitCommit, History, RefreshCw, Sparkles, T
 import type { ActivityItem } from "@/lib/activity";
 import { timeAgo } from "@/lib/activity";
 
-type ActivityType = "commit" | "complete" | "analysis" | "index" | "alert" | "openai-sync" | "project";
+type ActivityType = "commit" | "complete" | "analysis" | "index" | "alert" | "openai-sync" | "chat" | "project";
 
 function detectType(item: ActivityItem): ActivityType {
   const note = (item.note ?? "").toLowerCase();
   const sType = item.sessionType ?? "";
   if (item.commitHash) return "commit";
+  if (sType === "chat") return "chat";
   if (sType === "openai-sync") return "openai-sync";
   if (sType === "project-event" && note.includes("analysis")) return "analysis";
   if (!item.taskId && note.includes("analysis")) return "analysis";
@@ -26,6 +27,7 @@ const TYPE_CONFIG: Record<ActivityType, {
   complete:    { icon: CheckCircle2, iconClass: "text-done",         bgClass: "bg-done/20",         borderClass: "border-done/30",         label: "Task Completed" },
   analysis:    { icon: Sparkles,     iconClass: "text-accent",       bgClass: "bg-accent/20",       borderClass: "border-accent/30",       label: "Analysis" },
   "openai-sync":{ icon: TrendingUp,  iconClass: "text-emerald-400",  bgClass: "bg-emerald-400/10",  borderClass: "border-emerald-400/20",  label: "OpenAI Sync" },
+  chat:        { icon: Sparkles,     iconClass: "text-accent",       bgClass: "bg-accent/20",       borderClass: "border-accent/30",       label: "Chat" },
   index:       { icon: Database,     iconClass: "text-text-muted",   bgClass: "bg-card-hover",      borderClass: "border-border",          label: "Re-indexed" },
   alert:       { icon: AlertTriangle,iconClass: "text-in-progress",  bgClass: "bg-in-progress/20",  borderClass: "border-in-progress/30",  label: "Alert" },
   project:     { icon: RefreshCw,    iconClass: "text-text-muted",   bgClass: "bg-card-hover",      borderClass: "border-border",          label: "Event" },
@@ -51,7 +53,7 @@ function ActivityRow({ item }: { item: ActivityItem }) {
             {item.commitHash && <span className="font-mono text-xs text-accent">{item.commitHash.slice(0, 7)}</span>}
           </div>
           <div className="mt-0.5 text-xs text-text-muted">
-            <Link href={`/projects/${encodeURIComponent(item.project)}`} className="hover:text-accent transition-colors">
+            <Link href={item.href} className="hover:text-accent transition-colors">
               {item.project}
             </Link>
             {item.taskId && (

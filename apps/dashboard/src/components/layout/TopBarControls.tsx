@@ -8,9 +8,12 @@ import { Bell, LogOut, Settings, UserRound } from "lucide-react";
 type ActivityItem = {
   taskId: string | null;
   project: string;
+  projectExists: boolean;
+  href: string;
   date: string;
   note: string | null;
   commitHash: string | null;
+  sessionType: string | null;
 };
 
 function timeAgo(date: string) {
@@ -99,12 +102,14 @@ export function TopBarControls() {
               activity.map((item, index) => (
                 <Link
                   key={`${item.taskId ?? "project"}-${index}`}
-                  href={item.taskId ? `/tasks/${item.taskId}` : `/projects/${item.project}`}
+                  href={item.href}
                   onClick={() => setOpen(null)}
                   className="block rounded-lg px-3 py-2 transition-colors hover:bg-bg-base"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-text">{item.taskId ? "Task update" : "Project event"}</span>
+                    <span className="text-sm font-semibold text-text">
+                      {item.taskId ? "Task update" : item.sessionType === "chat" ? "Chat" : item.projectExists ? "Project event" : "Workspace log"}
+                    </span>
                     <span className="text-[10px] text-text-muted">{timeAgo(item.date)}</span>
                   </div>
                   <p className="mt-0.5 truncate text-xs text-text-muted">

@@ -20,6 +20,18 @@
 - `npm run lint`
 - `npm run build`
 
+## Latest Update - Projectless Chat/Log Activity
+
+- Activity rows now know whether their `project` value maps to a real dashboard project.
+- Dashboard Activity Log and top-bar notifications no longer link projectless sessions/logs to `/projects/<name>`, preventing 404s for values such as `GlobalClaudeSkills`.
+- Projectless session/log activity links to `/tokens?source=session`; chat activity links to `/chat?sessionId=<id>`.
+- Chat page accepts `sessionId` from the URL so notification/activity links can open the matching conversation.
+
+## Checks
+
+- `npm run lint`
+- `npm run build`
+
 ## Latest Update - Confirmation Popups
 
 - Added `apps/dashboard/src/components/ui/ConfirmDialog.tsx` as the shared in-app confirmation modal.
