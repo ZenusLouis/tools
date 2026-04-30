@@ -432,28 +432,44 @@ def _requirement_ids(text: str) -> list[str]:
     return sorted(set(re.findall(r"\b(?:CORE-[A-Z]+|CIN-[A-Z]+|HOT-[A-Z]+|CROSS-[A-Z]+|UI-[A-Z]+)-\d{3}\b", text)))
 
 
+def _analysis_pages(text: str) -> list[tuple[int, str]]:
+    pages = [page.strip() for page in text.split("\f")]
+    if len(pages) <= 1:
+        return [(1, text.strip())]
+    return [(index + 1, page) for index, page in enumerate(pages) if page.strip()]
+
+
 def _analysis_requirement_excerpt(text: str, max_chars: int | None = None) -> str:
-    """Compact long BRDs to requirement-bearing lines plus nearby context."""
+    """Compact long BRDs to page-tagged requirement-bearing lines plus nearby context."""
     import re
     limit = max_chars or int(os.environ.get("GCS_ANALYZE_REQ_CONTEXT_MAX_CHARS", "36000"))
     req_pattern = re.compile(r"\b(?:CORE-[A-Z]+|CIN-[A-Z]+|HOT-[A-Z]+|CROSS-[A-Z]+|UI-[A-Z]+)-\d{3}\b")
-    lines = [line.rstrip() for line in text.splitlines()]
-    keep: set[int] = set()
-    for index, line in enumerate(lines):
-        if req_pattern.search(line):
-            keep.update(range(max(0, index - 2), min(len(lines), index + 4)))
-    if not keep:
-        return text[:limit]
-
     chunks: list[str] = []
-    last = -10
-    for index in sorted(keep):
-        if index != last + 1:
-            chunks.append("\n---\n")
-        line = lines[index].strip()
-        if line:
-            chunks.append(line)
-        last = index
+
+    for page_number, page_text in _analysis_pages(text):
+        lines = [line.rstrip() for line in page_text.splitlines()]
+        keep: set[int] = set()
+        page_req_ids: list[str] = []
+        for index, line in enumerate(lines):
+            ids = req_pattern.findall(line)
+            if ids:
+                page_req_ids.extend(ids)
+                keep.update(range(max(0, index - 2), min(len(lines), index + 4)))
+        if not keep:
+            continue
+
+        chunks.append(f"\n\n## Page {page_number} | Req IDs: {', '.join(sorted(set(page_req_ids)))}")
+        last = -10
+        for index in sorted(keep):
+            if index != last + 1:
+                chunks.append("---")
+            line = lines[index].strip()
+            if line:
+                chunks.append(line)
+            last = index
+
+    if not chunks:
+        return text[:limit]
     excerpt = "\n".join(chunks)
     return excerpt[:limit]
 
@@ -472,9 +488,10 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
     brd_filename = Path(brd_path).name if brd_path else "no document"
     document_context = _analysis_document_context(str(brd_path))
     requirement_context = _analysis_requirement_excerpt(document_context)
+    page_count = len(_analysis_pages(document_context))
     req_groups = _requirement_groups(document_context)
     req_ids = _requirement_ids(document_context)
-    page_estimate = document_context.count("\f") + 1 if document_context else 0
+    page_estimate = page_count if document_context else 0
     fw = ", ".join(f for f in frameworks if f != "unknown") or "unknown stack"
 
     # Load skill summaries from local SKILL.md files
@@ -505,7 +522,7 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
         f"You are a senior BA/Product Analyst. Generate a structured implementation plan.\n\n"
         f"## Project Context\n"
         f"- Name: {project_name}\n- Stack: {fw}\n- Document: {brd_filename}"
-        f"\n\n## Requirement-Focused Document Context\n{requirement_context}"
+        f"\n\n## Page-Tagged Requirement Context\n{requirement_context}"
         f"{skill_block}\n\n"
         f"## Output Requirements\n"
         f"Generate modules from the BRD requirement groups, not from generic booking app assumptions.\n"
@@ -515,6 +532,7 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
         f"Tasks must be specific and actionable (real BRD entities, screens, actions, state rules).\n"
         f"Each task must be an object with developer-ready detail: summary, details, acceptanceCriteria, steps, priority, estimate, risk, deps.\n"
         f"Each task MUST include reqIds: string[] containing the BRD requirement IDs it implements, e.g. CORE-AUTH-001 or CIN-SHOW-003.\n"
+        f"When useful, mention source page numbers in details/risk using the Page N markers from the context.\n"
         f"If a task comes from a BRD section without a clear Req ID, keep reqIds empty and put the assumption in risk.\n"
         f"Apply MoSCoW: must-have tasks first. Flag high-risk: payments, real-time, auth.\n\n"
         f"Do not use shell commands or search the filesystem. Use only the context in this prompt.\n"
@@ -527,7 +545,7 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
         f"Started local Claude analysis for {project_name}.",
         f"Document path: {brd_path or 'none'}",
         f"Extracted document text: {len(document_context):,} chars, ~{page_estimate} pages.",
-        f"Attached requirement excerpt: {len(requirement_context):,} chars.",
+        f"Attached page-tagged requirement excerpt: {len(requirement_context):,} chars across {page_count} pages.",
         f"Detected requirement groups: {', '.join(req_groups) if req_groups else 'none'}",
         f"Detected requirement IDs: {len(req_ids)}",
         f"Stack: {fw}",

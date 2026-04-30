@@ -46,9 +46,10 @@
 ## Latest Update - Claude Analysis Context Compaction
 
 - Added a requirement-focused BRD excerpt builder for local Claude analysis. The bridge now extracts full PDF text, detects all requirement IDs/groups, then attaches only requirement-bearing lines plus nearby context to Claude.
+- The excerpt is now page-tagged (`## Page N | Req IDs: ...`) so Claude reads the BRD page-by-page and can reference source pages in task details/risk notes.
 - Reduced first-pass generation scope to 1-4 features and 1-4 tasks per feature so Claude can return JSON reliably instead of timing out on oversized BRD/output combinations.
 - Increased the default local analysis timeout from 600s to 900s.
-- OmniBooking BRD test: full extract `74,299` chars, attached excerpt `26,319` chars, all 21 requirement groups and 139 requirement IDs still detected.
+- OmniBooking BRD test: full extract `74,299` chars, page count `28`, attached page-tagged excerpt `28,743` chars, all 21 requirement groups and 139 requirement IDs still detected.
 
 ## Checks
 
