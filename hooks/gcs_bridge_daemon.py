@@ -474,6 +474,52 @@ def _analysis_requirement_excerpt(text: str, max_chars: int | None = None) -> st
     return excerpt[:limit]
 
 
+def _extract_analysis_modules(content: str) -> list[dict[str, Any]]:
+    """Parse Claude output into modules, tolerating fenced JSON or a single module object."""
+    import re
+
+    decoder = json.JSONDecoder()
+    candidates: list[str] = []
+    for match in re.finditer(r"```(?:json)?\s*([\s\S]*?)```", content, flags=re.IGNORECASE):
+        candidates.append(match.group(1).strip())
+    candidates.append(content.strip())
+
+    # Also try each object start. raw_decode handles trailing text that json.loads rejects as Extra data.
+    for start in [match.start() for match in re.finditer(r"\{", content)]:
+        candidates.append(content[start:].strip())
+
+    parsed_values: list[Any] = []
+    for candidate in candidates:
+        if not candidate:
+            continue
+        try:
+            parsed_values.append(json.loads(candidate))
+            continue
+        except Exception:
+            pass
+        try:
+            value, _ = decoder.raw_decode(candidate)
+            parsed_values.append(value)
+        except Exception:
+            continue
+
+    for value in parsed_values:
+        if isinstance(value, dict) and isinstance(value.get("modules"), list):
+            return [module for module in value["modules"] if isinstance(module, dict)]
+
+    for value in parsed_values:
+        if isinstance(value, dict) and isinstance(value.get("features"), list):
+            return [value]
+
+    for value in parsed_values:
+        if isinstance(value, list):
+            modules = [module for module in value if isinstance(module, dict) and isinstance(module.get("features"), list)]
+            if modules:
+                return modules
+
+    raise ValueError(f"No valid modules JSON found in claude output: {content[:300]}")
+
+
 def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
     """Run `claude -p` to generate project modules/tasks and POST result to dashboard."""
     import re
@@ -667,12 +713,7 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
     except Exception:
         content = raw
 
-    json_match = re.search(r'\{[\s\S]*\}', content)
-    if not json_match:
-        raise ValueError(f"No JSON found in claude output: {content[:200]}")
-
-    modules_data = json.loads(json_match.group())
-    modules = modules_data.get("modules", [])
+    modules = _extract_analysis_modules(str(content))
     if not modules:
         raise ValueError("Empty modules in claude output")
     total_features = sum(len(module.get("features", [])) for module in modules if isinstance(module, dict))

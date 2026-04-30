@@ -65,6 +65,17 @@
 
 - `python -m py_compile hooks/gcs_bridge_daemon.py`
 
+## Latest Update - Robust Claude JSON Parsing
+
+- Replaced the fragile greedy `{...}` parser with a tolerant Claude output parser.
+- The bridge now accepts fenced JSON, JSON with trailing text, root `{ modules: [...] }`, or a single module object with `features`.
+- This fixes failures such as `Extra data: line ...` after Claude successfully completes but wraps or fragments the JSON response.
+
+## Checks
+
+- `python -m py_compile hooks/gcs_bridge_daemon.py`
+- Local parser smoke test for fenced module JSON and trailing-text root JSON.
+
 ## Latest Update - Confirmation Popups
 
 - Added `apps/dashboard/src/components/ui/ConfirmDialog.tsx` as the shared in-app confirmation modal.
