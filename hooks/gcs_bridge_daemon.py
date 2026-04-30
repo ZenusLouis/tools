@@ -508,8 +508,19 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
     import tempfile
     max_turns = os.environ.get("GCS_CLAUDE_ANALYZE_MAX_TURNS", "8")
     analyze_timeout = int(os.environ.get("GCS_CLAUDE_ANALYZE_TIMEOUT_SEC", "600"))
+    claude_command = [
+        "claude", "-p",
+        "--input-format", "text",
+        "--output-format", "json",
+        "--max-turns", max_turns,
+        "--allowedTools", "",
+    ]
+    claude_command_display = (
+        'type "<attached-analysis-prompt.txt>" | '
+        f'claude -p --input-format text --output-format json --max-turns {max_turns} --allowedTools ""'
+    )
     process = subprocess.Popen(
-        ["claude", "-p", "--input-format", "text", "--output-format", "json", "--max-turns", max_turns, "--allowedTools", ""],
+        claude_command,
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
         cwd=tempfile.gettempdir(),  # neutral dir — avoid loading GCS CLAUDE.md
     )
@@ -628,6 +639,7 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
         "detectedRequirementIds": req_ids[:500],
         "frameworks": fw,
         "skillSlugs": skill_slugs,
+        "command": claude_command_display,
         "prompt": prompt,
         "responseText": str(content),
         "rawOutput": raw[-20000:],

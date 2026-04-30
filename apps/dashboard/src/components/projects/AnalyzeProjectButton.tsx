@@ -30,6 +30,7 @@ type AnalysisTranscript = {
   projectName?: string;
   documentPath?: string;
   frameworks?: string;
+  command?: string;
   prompt?: string;
   responseText?: string;
   rawOutput?: string;
@@ -287,6 +288,15 @@ export function AnalyzeProjectButton({
           <div className="flex items-center gap-2 border-b border-border bg-card px-3 py-1.5">
             <Terminal size={11} className="text-text-muted" />
             <span className="font-mono text-[10px] text-text-muted">local {runnerLabel.toLowerCase()} output</span>
+            {transcript?.command && (
+              <button
+                type="button"
+                onClick={() => navigator.clipboard.writeText(transcript.command ?? "")}
+                className="rounded border border-border px-2 py-0.5 text-[10px] font-semibold text-text-muted transition-colors hover:bg-card-hover hover:text-text"
+              >
+                Copy cmd
+              </button>
+            )}
             {transcript && (
               <button
                 type="button"
@@ -323,6 +333,7 @@ export function AnalyzeProjectButton({
               </button>
             </div>
             <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-5 lg:grid-cols-2">
+              <TranscriptBlock title="Command" value={transcript.command} />
               <TranscriptBlock title="Prompt / Context" value={transcript.prompt} />
               <TranscriptBlock title="Claude Response" value={transcript.responseText} />
               <TranscriptBlock title="Usage" value={JSON.stringify({
