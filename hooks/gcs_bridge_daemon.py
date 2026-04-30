@@ -554,6 +554,7 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
     import tempfile
     max_turns = os.environ.get("GCS_CLAUDE_ANALYZE_MAX_TURNS", "8")
     analyze_timeout = int(os.environ.get("GCS_CLAUDE_ANALYZE_TIMEOUT_SEC", "900"))
+    post_action_progress(action_id, [f"Local Claude timeout guard: {analyze_timeout // 60}m {analyze_timeout % 60}s."])
     claude_command = [
         "claude", "-p",
         "--input-format", "text",
@@ -602,6 +603,8 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
 
     deadline = time.time() + analyze_timeout
     next_cancel_check = 0.0
+    next_heartbeat = 0.0
+    next_running_progress = time.time() + 60
     open_streams = {"stdout", "stderr"}
     while open_streams:
         try:
@@ -623,6 +626,15 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
             pending_lines = []
 
         now = time.time()
+        if now >= next_heartbeat:
+            next_heartbeat = now + 30
+            heartbeat(False)
+
+        if now >= next_running_progress:
+            next_running_progress = now + 60
+            remaining = max(0, int(deadline - now))
+            post_action_progress(action_id, [f"Claude still running locally... timeout in ~{remaining // 60}m {remaining % 60}s."])
+
         if now >= next_cancel_check:
             next_cancel_check = now + 2
             if is_action_cancelled(action_id):

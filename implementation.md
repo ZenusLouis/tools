@@ -55,6 +55,16 @@
 
 - `python -m py_compile hooks/gcs_bridge_daemon.py`
 
+## Latest Update - Bridge Heartbeat During Local Claude Analysis
+
+- Local analysis now sends bridge heartbeat every 30 seconds while Claude is running, so the dashboard no longer marks the device offline during long BRD analysis.
+- Local analysis now posts a `Claude still running locally...` progress line every minute with remaining timeout, so the action timestamp stays fresh and the UI shows real liveness.
+- The analysis timeout guard is logged at startup and remains a hard cap (`GCS_CLAUDE_ANALYZE_TIMEOUT_SEC`, default 900 seconds).
+
+## Checks
+
+- `python -m py_compile hooks/gcs_bridge_daemon.py`
+
 ## Latest Update - Confirmation Popups
 
 - Added `apps/dashboard/src/components/ui/ConfirmDialog.tsx` as the shared in-app confirmation modal.
