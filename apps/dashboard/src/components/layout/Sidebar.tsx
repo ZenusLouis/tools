@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils/cn";
+import { formatDateTime } from "@/lib/utils/format";
 
 const icons = { LayoutDashboard, FolderKanban, CheckSquare, BarChart2, BookOpen, Server, Settings2, MessageSquare, Wand2, Library };
 
@@ -42,7 +43,7 @@ export function Sidebar() {
             </div>
             {process.env.NEXT_PUBLIC_BUILD_TIME && (
               <div className="text-[9px] text-text-muted/50 tracking-wide">
-                {new Date(process.env.NEXT_PUBLIC_BUILD_TIME).toLocaleDateString("en", { month: "short", day: "numeric", year: "numeric" })}
+                {formatDateTime(process.env.NEXT_PUBLIC_BUILD_TIME)}
               </div>
             )}
           </div>

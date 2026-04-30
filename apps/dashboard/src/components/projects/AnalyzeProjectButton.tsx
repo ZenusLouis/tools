@@ -47,10 +47,12 @@ export function AnalyzeProjectButton({
   projectName,
   label = "Analyze BRD",
   size = "md",
+  showOutput = true,
 }: {
   projectName: string;
   label?: string;
   size?: "sm" | "md";
+  showOutput?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -134,6 +136,7 @@ export function AnalyzeProjectButton({
   }, [router]);
 
   useEffect(() => {
+    if (!showOutput) return;
     let cancelled = false;
     async function resumeLatest() {
       try {
@@ -184,7 +187,7 @@ export function AnalyzeProjectButton({
     }
     resumeLatest();
     return () => { cancelled = true; };
-  }, [projectName, startPolling]);
+  }, [projectName, showOutput, startPolling]);
 
   function run() {
     setFeedback(null);
@@ -201,7 +204,12 @@ export function AnalyzeProjectButton({
         const labelForRunner = result.runnerLabel ?? "AI";
 
         if (result.pending && result.actionId) {
-          startPolling(encodeURIComponent(projectName), result.actionId, labelForRunner);
+          if (showOutput) {
+            startPolling(encodeURIComponent(projectName), result.actionId, labelForRunner);
+          } else {
+            setFeedback(`Queued for local ${labelForRunner}. Track progress in Module Progress.`);
+            router.refresh();
+          }
         } else if (result.ok) {
           setOk(true);
           const src = result.source === "ai" ? `${labelForRunner} generated` : "template";
@@ -254,7 +262,7 @@ export function AnalyzeProjectButton({
           {isLoading ? <Loader2 size={size === "sm" ? 10 : 13} className="animate-spin" /> : <Sparkles size={size === "sm" ? 10 : 13} />}
           {polling ? "Analyzing..." : label}
         </button>
-        {canCancel && (
+        {showOutput && canCancel && (
           <button
             type="button"
             onClick={cancelAnalysis}
@@ -274,7 +282,7 @@ export function AnalyzeProjectButton({
         )}
       </span>
 
-      {log.length > 0 && (
+      {showOutput && log.length > 0 && (
         <div className="w-full overflow-hidden rounded-lg border border-border bg-bg-base">
           <div className="flex items-center gap-2 border-b border-border bg-card px-3 py-1.5">
             <Terminal size={11} className="text-text-muted" />
@@ -299,7 +307,7 @@ export function AnalyzeProjectButton({
         </div>
       )}
 
-      {detailsOpen && transcript && (
+      {showOutput && detailsOpen && transcript && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm" role="dialog" aria-modal="true">
           <div className="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
             <div className="flex items-center gap-3 border-b border-border px-5 py-4">
@@ -334,7 +342,7 @@ export function AnalyzeProjectButton({
         </div>
       )}
 
-      {ok && summary?.modules && summary.modules.length > 0 && (
+      {showOutput && ok && summary?.modules && summary.modules.length > 0 && (
         <div className="w-full rounded-lg border border-border bg-bg-base p-3 text-left">
           <div className="mb-2 flex items-center justify-between gap-3">
             <span className="text-[11px] font-bold uppercase tracking-wider text-text-muted">Generated Backlog Review</span>

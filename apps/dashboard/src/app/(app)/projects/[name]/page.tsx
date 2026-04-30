@@ -74,7 +74,7 @@ export default async function ProjectOverviewPage({
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 {hasDocs && (
-                  <AnalyzeProjectButton projectName={project.name} label="Analyze BRD" />
+                  <AnalyzeProjectButton projectName={project.name} label="Analyze BRD" showOutput={false} />
                 )}
                 <Link href={`/projects/${encodedName}/settings`} className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs text-text-muted hover:text-text hover:bg-card-hover transition-colors">
                   <Settings size={13} /> Settings
@@ -126,7 +126,7 @@ export default async function ProjectOverviewPage({
                   </h2>
                   {project.modules.length > 0 && hasDocs && (
                     <div className="flex items-center gap-2">
-                      <AnalyzeProjectButton projectName={project.name} label="Regenerate" size="sm" />
+                      <AnalyzeProjectButton projectName={project.name} label="Regenerate" size="sm" showOutput={false} />
                       <ResetTasksButton projectName={project.name} />
                     </div>
                   )}
@@ -340,7 +340,7 @@ function DocRow({ projectName, label, path, canAnalyze }: { projectName?: string
         <span className="text-[11px] text-text-muted font-bold">{label}</span>
         <span className="text-[11px] text-text truncate font-mono" title={path}>{path.split(/[\\/]/).pop()}</span>
       </div>
-      {canAnalyze && projectName && <AnalyzeProjectButton projectName={projectName} label="Analyze" size="sm" />}
+      {canAnalyze && projectName && <AnalyzeProjectButton projectName={projectName} label="Analyze" size="sm" showOutput={false} />}
     </div>
   );
 }

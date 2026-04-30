@@ -32,6 +32,17 @@
 - `npm run lint`
 - `npm run build`
 
+## Latest Update - Project Analyze UI Deduplication
+
+- Added a compact mode to `AnalyzeProjectButton` so only the main Module Progress instance resumes polling and renders local Claude logs/transcript.
+- Converted the onboarding banner, regenerate header action, and document-card Analyze action to compact triggers. They queue analysis and point users back to Module Progress instead of duplicating terminal output across the page.
+- This removes the repeated analysis console blocks that appeared in the banner, module panel, and Documents card at the same time.
+
+## Checks
+
+- `npm run lint`
+- `npm run build`
+
 ## Latest Update - Confirmation Popups
 
 - Added `apps/dashboard/src/components/ui/ConfirmDialog.tsx` as the shared in-app confirmation modal.
