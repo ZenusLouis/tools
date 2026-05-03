@@ -337,6 +337,8 @@
 - Added a bridge action status endpoint and made the local bridge cancel-aware while Claude is running. The daemon now checks `/api/bridge/file-actions/:id/status` during local analysis, kills the Claude process when the dashboard action is cancelled, and posts a local cancellation progress line.
 - Recorded local Claude Analyze telemetry as a real `Session` row when `/api/projects/:name/analyze/result` receives `analysisTranscript`. Dashboard and Token Analytics now include analysis token/cost/model data instead of only showing the generated backlog.
 - Added Dashboard fallback accounting for older completed Analyze actions that already have `analysisTranscript` but were created before session telemetry existed, so Claude analysis tokens show without rerunning the BRD analysis.
+- Added local task execution: task detail can queue a `run_task` bridge action, poll progress, and show local agent output. The bridge now runs Claude/Codex in the registered local project path, writes `.gcs/tasks/<taskId>/implementation.md`, posts artifacts/task events/log telemetry, and marks non-zero exits as failed.
+- Task runs now show the actual local command preview (`CMD: ...`), persist the task prompt to `.gcs/tasks/<taskId>/prompt.txt`, stream `stdout>`/`stderr>` lines to the dashboard progress panel, and tee the same output to the bridge terminal while the process is running.
 
 ## Checks
 
@@ -351,6 +353,7 @@
 - `npx tsc --noEmit`
 - `npm run lint`
 - `npm run build`
+- `python -m py_compile hooks/gcs_bridge_daemon.py`
 
 ## Gaps
 

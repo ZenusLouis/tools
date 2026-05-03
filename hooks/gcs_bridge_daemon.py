@@ -9,9 +9,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import queue
 import shutil
 import sqlite3
+import subprocess
 import sys
+import threading
 import time
 import urllib.request
 from datetime import datetime
@@ -809,12 +812,376 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if item is not None]
+
+
+def _build_task_prompt(payload: dict[str, Any]) -> str:
+    task = payload.get("task") if isinstance(payload.get("task"), dict) else {}
+    project_name = str(payload.get("projectName") or "local")
+    phase = str(payload.get("phase") or "implementation")
+    provider = str(payload.get("provider") or "claude")
+    skills = _string_list(payload.get("skills"))
+    acceptance = _string_list(task.get("acceptanceCriteria"))
+    steps = _string_list(task.get("steps"))
+    req_ids = _string_list(task.get("reqIds"))
+    deps = _string_list(task.get("deps"))
+    return "\n".join([
+        f"You are running a GCS local task as provider={provider}, phase={phase}.",
+        "Work inside the current local project folder. Preserve unrelated user changes.",
+        "Implement only the scoped task. After finishing, write a concise implementation summary.",
+        "",
+        f"Project: {project_name}",
+        f"Task ID: {task.get('id') or payload.get('taskId')}",
+        f"Task: {task.get('name') or 'Untitled task'}",
+        f"Module: {task.get('moduleName') or ''}",
+        f"Feature: {task.get('featureName') or ''}",
+        f"Priority: {task.get('priority') or ''}",
+        f"Estimate: {task.get('estimate') or ''}",
+        f"Requirement IDs: {', '.join(req_ids) if req_ids else 'none'}",
+        f"Skills: {', '.join(skills) if skills else 'default'}",
+        "",
+        "Summary:",
+        str(task.get("summary") or ""),
+        "",
+        "Details:",
+        str(task.get("details") or ""),
+        "",
+        "Acceptance Criteria:",
+        *[f"- {item}" for item in acceptance],
+        "",
+        "Suggested Steps:",
+        *[f"{index + 1}. {item}" for index, item in enumerate(steps)],
+        "",
+        "Dependencies:",
+        *[f"- {item}" for item in deps],
+        "",
+        "Risk note:",
+        str(task.get("risk") or ""),
+        "",
+        "Required output:",
+        "- Modify local source files if needed.",
+        "- Include changed files and verification commands in your final answer.",
+        "- Do not claim success unless you actually performed the implementation or clearly explain the blocker.",
+    ])
+
+
+def _extract_cli_result(text: str) -> dict[str, Any]:
+    for raw in reversed([line.strip() for line in text.splitlines() if line.strip()]):
+        if not raw.startswith("{"):
+            continue
+        try:
+            data = json.loads(raw)
+        except Exception:
+            continue
+        if isinstance(data, dict) and data.get("type") == "result":
+            return data
+    return {}
+
+
+def _safe_artifact_path(project_path: str, task_id: str, phase: str) -> Path:
+    safe_task = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "-" for ch in task_id)[:160] or "task"
+    filename = "review.md" if phase == "review" else "brief.md" if phase == "analysis" else "implementation.md"
+    return _safe_local_target(project_path, f".gcs/tasks/{safe_task}/{filename}")
+
+
+def _safe_task_file(project_path: str, task_id: str, filename: str) -> Path:
+    safe_task = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "-" for ch in task_id)[:160] or "task"
+    return _safe_local_target(project_path, f".gcs/tasks/{safe_task}/{filename}")
+
+
+def _quote_cmd_arg(value: str) -> str:
+    if not value:
+        return '""'
+    if any(ch.isspace() for ch in value) or any(ch in value for ch in ['"', "&", "|", "(", ")"]):
+        return '"' + value.replace('"', '\\"') + '"'
+    return value
+
+
+def _drain_process_output(
+    proc: subprocess.Popen[str],
+    action_id: str,
+    task_id: str,
+    stdout_lines: list[str],
+    stderr_lines: list[str],
+    out_queue: "queue.Queue[tuple[str, str]]",
+    pending_lines: list[str],
+) -> None:
+    while True:
+        try:
+            stream_name, line = out_queue.get_nowait()
+        except queue.Empty:
+            break
+        clean = line.rstrip("\r\n")
+        if not clean:
+            continue
+        if stream_name == "stderr":
+            stderr_lines.append(clean)
+        else:
+            stdout_lines.append(clean)
+        rendered = f"{stream_name}> {clean}"
+        pending_lines.append(rendered)
+        print(f"[task {task_id}] {rendered}", flush=True)
+    if (proc.poll() is not None and pending_lines) or len(pending_lines) >= 8:
+        post_action_progress(action_id, pending_lines[-40:])
+        pending_lines.clear()
+
+
+def _pipe_reader(pipe: Any, stream_name: str, out_queue: "queue.Queue[tuple[str, str]]") -> None:
+    try:
+        for line in iter(pipe.readline, ""):
+            out_queue.put((stream_name, line))
+    finally:
+        try:
+            pipe.close()
+        except Exception:
+            pass
+
+
+def _post_task_event(task_id: str, phase: str, status: str, provider: str, role: str, note: str) -> None:
+    post_json_data(
+        "/api/bridge/task-event",
+        {
+            "taskId": task_id,
+            "phase": phase,
+            "status": status,
+            "provider": provider,
+            "role": role or None,
+            "note": note,
+        },
+        timeout=8,
+    )
+
+
+def _post_task_artifact(project: str, task_id: str, kind: str, path: str, content: str) -> None:
+    post_json_data(
+        "/api/bridge/artifact",
+        {
+            "project": project,
+            "taskId": task_id,
+            "kind": kind,
+            "path": path,
+            "content": content[:200000],
+        },
+        timeout=8,
+    )
+
+
+def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
+    action_id = str(action.get("id") or "")
+    payload = action.get("payload") if isinstance(action.get("payload"), dict) else {}
+    project_name = str(payload.get("projectName") or "local")
+    project_path = str(payload.get("projectPath") or "")
+    task_id = str(payload.get("taskId") or "")
+    provider = str(payload.get("provider") or "claude").lower()
+    role = str(payload.get("role") or ("dev-implementer" if provider == "codex" else "run-task"))
+    phase = str(payload.get("phase") or "implementation")
+    model = payload.get("model") if isinstance(payload.get("model"), str) else ""
+    if not project_path or not task_id:
+        raise ValueError("run_task requires projectPath and taskId")
+
+    cwd = Path(project_path).expanduser()
+    if not cwd.exists():
+        raise ValueError(f"projectPath is not accessible on this device: {project_path}")
+
+    prompt = _build_task_prompt(payload)
+    post_action_progress(action_id, [
+        f"Starting local {provider} task run for {task_id}.",
+        f"Project path: {project_path}",
+        f"Role: {role}",
+    ])
+    _post_task_event(task_id, phase, "in_progress", provider, role, f"Local {provider} started {phase} for {task_id}.")
+
+    started = time.time()
+    timeout_sec = int(os.environ.get("GCS_TASK_RUN_TIMEOUT_SEC", "1800"))
+    stdout = ""
+    stderr = ""
+    returncode = 1
+    env = os.environ.copy()
+    env.update({
+        "GCS_PROJECT": project_name,
+        "GCS_TASK_ID": task_id,
+        "GCS_PROVIDER": provider,
+        "GCS_ROLE": role,
+    })
+    if model:
+        env["GCS_MODEL"] = model
+
+    prompt_path = _safe_task_file(project_path, task_id, "prompt.txt")
+    prompt_path.parent.mkdir(parents=True, exist_ok=True)
+    prompt_path.write_text(prompt, encoding="utf-8")
+    rel_prompt = str(prompt_path.relative_to(cwd)) if prompt_path.is_relative_to(cwd) else str(prompt_path)
+
+    prompt_handle = None
+    if provider == "claude":
+        binary = os.environ.get("GCS_CLAUDE_BIN") or shutil.which("claude")
+        if not binary:
+            raise ValueError("claude executable not found in PATH")
+        cmd = [binary, "-p"]
+        if model:
+            cmd.extend(["--model", model])
+        prompt_handle = prompt_path.open("r", encoding="utf-8", errors="replace")
+        display_cmd = f"cd /d {_quote_cmd_arg(str(cwd))} && type {_quote_cmd_arg(str(prompt_path))} | {' '.join(_quote_cmd_arg(part) for part in cmd)}"
+        post_action_progress(action_id, [f"CMD: {display_cmd}", f"Prompt file: {rel_prompt}"])
+        proc = subprocess.Popen(cmd, cwd=str(cwd), env=env, stdin=prompt_handle, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
+    elif provider == "codex":
+        binary = os.environ.get("GCS_CODEX_BIN") or shutil.which("codex")
+        if not binary:
+            raise ValueError("codex executable not found in PATH")
+        cmd = [binary, *os.environ.get("GCS_CODEX_TASK_ARGS", "exec").split(), prompt]
+        display_cmd = f"cd /d {_quote_cmd_arg(str(cwd))} && {' '.join(_quote_cmd_arg(part) for part in cmd[:-1])} <task-prompt>"
+        post_action_progress(action_id, [f"CMD: {display_cmd}", f"Prompt file: {rel_prompt}"])
+        proc = subprocess.Popen(cmd, cwd=str(cwd), env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
+    else:
+        raise ValueError(f"unsupported run_task provider: {provider}")
+
+    out_queue: "queue.Queue[tuple[str, str]]" = queue.Queue()
+    stdout_lines: list[str] = []
+    stderr_lines: list[str] = []
+    stream_threads: list[threading.Thread] = []
+    if proc.stdout:
+        thread = threading.Thread(target=_pipe_reader, args=(proc.stdout, "stdout", out_queue), daemon=True)
+        thread.start()
+        stream_threads.append(thread)
+    if proc.stderr:
+        thread = threading.Thread(target=_pipe_reader, args=(proc.stderr, "stderr", out_queue), daemon=True)
+        thread.start()
+        stream_threads.append(thread)
+
+    pending_output_lines: list[str] = []
+    next_output_flush = time.time() + 3
+    next_progress = time.time() + 30
+    deadline = time.time() + timeout_sec
+    while proc.poll() is None or not out_queue.empty():
+        _drain_process_output(proc, action_id, task_id, stdout_lines, stderr_lines, out_queue, pending_output_lines)
+        if pending_output_lines and time.time() >= next_output_flush:
+            post_action_progress(action_id, pending_output_lines[-40:])
+            pending_output_lines.clear()
+            next_output_flush = time.time() + 3
+        if proc.poll() is not None:
+            time.sleep(0.1)
+            continue
+        if is_action_cancelled(action_id):
+            proc.kill()
+            if prompt_handle:
+                prompt_handle.close()
+            post_action_progress(action_id, ["Task run cancelled from dashboard."])
+            _post_task_event(task_id, "blocked", "blocked", provider, role, "Task run cancelled from dashboard.")
+            return {"cancelled": True, "exitCode": -1, "log": ["Task run cancelled from dashboard."]}
+        if time.time() >= deadline:
+            proc.kill()
+            if prompt_handle:
+                prompt_handle.close()
+            raise ValueError(f"{provider} task run timed out after {timeout_sec}s")
+        if time.time() >= next_progress:
+            remaining = max(0, int(deadline - time.time()))
+            post_action_progress(action_id, [f"Local {provider} still running... timeout in ~{remaining // 60}m {remaining % 60}s."])
+            heartbeat(False)
+            next_progress = time.time() + 60
+        time.sleep(0.5)
+
+    for thread in stream_threads:
+        thread.join(timeout=1)
+    _drain_process_output(proc, action_id, task_id, stdout_lines, stderr_lines, out_queue, pending_output_lines)
+    if pending_output_lines:
+        post_action_progress(action_id, pending_output_lines[-40:])
+        pending_output_lines.clear()
+    if prompt_handle:
+        prompt_handle.close()
+    returncode = int(proc.returncode or 0)
+    duration_min = round((time.time() - started) / 60, 3)
+    stdout = "\n".join(stdout_lines)
+    stderr = "\n".join(stderr_lines)
+    combined = "\n".join(part for part in [stdout.strip(), stderr.strip()] if part)
+    cli_result = _extract_cli_result(combined)
+    usage = cli_result.get("usage") if isinstance(cli_result.get("usage"), dict) else {}
+    model_usage = cli_result.get("modelUsage") if isinstance(cli_result.get("modelUsage"), dict) else {}
+    total_tokens = 0
+    if isinstance(usage, dict):
+        total_tokens += int(usage.get("input_tokens") or 0)
+        total_tokens += int(usage.get("cache_creation_input_tokens") or 0)
+        total_tokens += int(usage.get("cache_read_input_tokens") or 0)
+        total_tokens += int(usage.get("output_tokens") or 0)
+    if not total_tokens and isinstance(model_usage, dict):
+        for row in model_usage.values():
+            if isinstance(row, dict):
+                total_tokens += int(row.get("inputTokens") or 0)
+                total_tokens += int(row.get("cacheCreationInputTokens") or 0)
+                total_tokens += int(row.get("cacheReadInputTokens") or 0)
+                total_tokens += int(row.get("outputTokens") or 0)
+    if provider == "codex" and not total_tokens:
+        total_tokens = max(1, round(len(prompt) / 4)) + min(4000, max(0, round(duration_min * 180)))
+    total_cost = cli_result.get("total_cost_usd") if isinstance(cli_result.get("total_cost_usd"), (int, float)) else round(total_tokens * 3.0 / 1_000_000, 6)
+
+    artifact = _safe_artifact_path(project_path, task_id, phase)
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    content = "\n".join([
+        f"# {task_id} {phase.title()}",
+        "",
+        f"- Provider: {provider}",
+        f"- Role: {role}",
+        f"- Model: {model or 'default'}",
+        f"- Exit code: {returncode}",
+        f"- Duration: {duration_min} min",
+        "",
+        "## Output",
+        "",
+        combined or "(no output)",
+    ])
+    artifact.write_text(content, encoding="utf-8")
+    kind = "review" if phase == "review" else "brief" if phase == "analysis" else "implementation"
+    rel_artifact = str(artifact.relative_to(cwd)) if artifact.is_relative_to(cwd) else str(artifact)
+    _post_task_artifact(project_name, task_id, kind, rel_artifact, content)
+
+    status = "completed" if returncode == 0 else "blocked"
+    db_phase = "done" if returncode == 0 else "blocked"
+    _post_task_event(
+        task_id,
+        db_phase,
+        status,
+        provider,
+        role,
+        f"Local {provider} {phase} finished with exit code {returncode}.",
+    )
+    post_json_data(
+        "/api/log",
+        {
+            "type": "session",
+            "project": project_name,
+            "provider": provider,
+            "role": role,
+            "model": model or None,
+            "date": datetime.now().isoformat(),
+            "tasksCompleted": [task_id] if returncode == 0 else [],
+            "cwd": str(cwd),
+            "durationMin": duration_min,
+            "totalTokens": total_tokens,
+            "totalCostUSD": float(total_cost or 0),
+            "sessionNotes": f"Local {provider} {phase} run for {task_id} exited with code {returncode}.",
+            "risks": [] if returncode == 0 else [f"{provider} exit code {returncode}"],
+        },
+        timeout=8,
+    )
+    log_lines = [
+        f"Finished local {provider} task run with exit code {returncode}.",
+        f"Artifact: {rel_artifact}",
+        f"Tokens: {total_tokens}",
+    ]
+    post_action_progress(action_id, log_lines)
+    return {"exitCode": returncode, "artifactPath": rel_artifact, "durationMin": duration_min, "tokens": total_tokens, "log": log_lines}
+
+
 def execute_file_action(action: dict[str, Any]) -> dict[str, Any]:
     action_type = str(action.get("type") or "")
     payload = action.get("payload") if isinstance(action.get("payload"), dict) else {}
 
     if action_type == "run_analysis":
         return execute_analysis_action(action)
+
+    if action_type == "run_task":
+        return execute_task_action(action)
 
     if action_type != "sync_project_metadata":
         raise ValueError(f"unsupported file action type: {action_type}")
@@ -860,9 +1227,10 @@ def poll_file_actions() -> int:
         action_id = str(action["id"])
         try:
             result = execute_file_action(action)
+            action_status = "failed" if isinstance(result, dict) and int(result.get("exitCode") or 0) != 0 else "succeeded"
             ok, detail = post_json_data(
                 "/api/bridge/file-actions/result",
-                {"id": action_id, "status": "succeeded", "deviceKey": device_key, "result": result},
+                {"id": action_id, "status": action_status, "deviceKey": device_key, "result": result},
                 timeout=8,
             )
             if ok:

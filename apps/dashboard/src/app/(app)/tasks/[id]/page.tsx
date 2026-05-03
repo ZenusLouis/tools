@@ -8,6 +8,7 @@ import { LessonLinkCard } from "@/components/tasks/detail/LessonLinkCard";
 import { DiffCard } from "@/components/tasks/detail/DiffCard";
 import { ArtifactsCard } from "@/components/tasks/detail/ArtifactsCard";
 import { CommitComposerButton } from "@/components/tasks/detail/CommitComposerButton";
+import { RunTaskButton } from "@/components/tasks/detail/RunTaskButton";
 import { findTaskDetail, getTaskLogEntry } from "@/lib/task-detail";
 import { getProjectContext } from "@/lib/settings";
 
@@ -50,6 +51,7 @@ export default async function TaskDetailPage({ params }: Props) {
             <FilesChangedCard files={log?.filesChanged ?? []} projectPath={projectPath} />
           </div>
           <div className="flex flex-col gap-4">
+            <RunTaskButton taskId={task.id} disabled={task.status === "completed"} />
             <RisksCard risks={log?.risks ?? []} />
             <LessonLinkCard lessonSaved={log?.lessonSaved ?? null} />
             <DiffCard files={log?.filesChanged ?? []} />
