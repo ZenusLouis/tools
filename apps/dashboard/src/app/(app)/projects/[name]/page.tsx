@@ -11,6 +11,9 @@ import { ProjectActionButtons } from "@/components/projects/ProjectActionButtons
 import { LocalDevicePathsCard } from "@/components/projects/LocalDevicePathsCard";
 import { AnalyzeProjectButton } from "@/components/projects/AnalyzeProjectButton";
 import { ResetTasksButton } from "@/components/projects/ResetTasksButton";
+import { RunProjectTaskButton } from "@/components/projects/RunProjectTaskButton";
+import { RunProjectBatchButton } from "@/components/projects/RunProjectBatchButton";
+import { RunQueueCard } from "@/components/projects/RunQueueCard";
 import { getProjectDetail } from "@/lib/projects";
 import { getRecentActivity, timeAgo } from "@/lib/activity";
 import { requireCurrentUser } from "@/lib/auth";
@@ -49,6 +52,8 @@ export default async function ProjectOverviewPage({
             <Link href={`/projects/${encodedName}/settings`} className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs text-text-muted hover:text-text hover:bg-card-hover transition-colors">
               <Settings size={13} /> Settings
             </Link>
+            <RunProjectTaskButton projectName={project.name} compact queue />
+            <RunProjectBatchButton projectName={project.name} limit={3} />
             <ProjectActionButtons projectName={project.name} projectPath={project.projectPath} />
           </div>
         }
@@ -219,14 +224,19 @@ export default async function ProjectOverviewPage({
               {project.activeTask && (
                 <section className="bg-card border border-border rounded-xl p-5">
                   <h2 className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-3">Active Task</h2>
-                  <div className="flex items-center gap-2">
-                    <Zap size={14} className="text-accent shrink-0" />
-                    <Link href={`/tasks/${project.activeTask}`} className="font-mono text-sm text-accent hover:underline">{project.activeTask}</Link>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Zap size={14} className="text-accent shrink-0" />
+                      <Link href={`/tasks/${project.activeTask}`} className="truncate font-mono text-sm text-accent hover:underline">{project.activeTask}</Link>
+                    </div>
+                    <RunProjectTaskButton projectName={project.name} compact queue />
                   </div>
                 </section>
               )}
 
               <LocalDevicePathsCard paths={project.localPaths} />
+
+              <RunQueueCard projectName={project.name} />
 
               {/* External Links */}
               <section className="bg-card border border-border rounded-xl p-5">

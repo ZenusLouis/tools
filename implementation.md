@@ -339,6 +339,21 @@
 - Added Dashboard fallback accounting for older completed Analyze actions that already have `analysisTranscript` but were created before session telemetry existed, so Claude analysis tokens show without rerunning the BRD analysis.
 - Added local task execution: task detail can queue a `run_task` bridge action, poll progress, and show local agent output. The bridge now runs Claude/Codex in the registered local project path, writes `.gcs/tasks/<taskId>/implementation.md`, posts artifacts/task events/log telemetry, and marks non-zero exits as failed.
 - Task runs now show the actual local command preview (`CMD: ...`), persist the task prompt to `.gcs/tasks/<taskId>/prompt.txt`, stream `stdout>`/`stderr>` lines to the dashboard progress panel, and tee the same output to the bridge terminal while the process is running.
+- Added task-run cancellation and command ergonomics: task detail now has `Cancel` for active local runs, `Copy CMD` once the bridge reports the command, and `/api/tasks/:id/run/cancel` marks pending/running task actions as cancelled so the bridge kills the local process on its next status check.
+- Expanded task runs with selectable phase/provider controls. Task Detail can now queue `Prepare Brief`, `Implement`, or `Review` against `Auto`, `Claude local`, or `Codex local`, and shows the resolved command in a dedicated command strip before the streaming log.
+- Added quick-run access from the Task Board drawer by embedding the same Local Agent Run controls directly in the selected task panel, and made the Dashboard `Run Task` action open the current active task when one exists.
+- Added project-level run navigation: `/api/projects/:name/run-next` resolves the active task or next pending task, and Project Overview now exposes quick `Run` buttons in the top actions and Active Task card to jump straight into the executable task flow.
+- Upgraded project-level `Run` buttons to queue the active/next task immediately before opening the task detail page, so the user lands directly on the live command/output stream instead of needing a second click.
+- Upgraded the Dashboard `Run Task` button as well: it now chooses the active project/task (or first incomplete project), queues the task run, and navigates straight to the live task stream.
+- Added chain-running support after a successful task: `/api/tasks/:id/next` resolves the next pending task in the same project, and the Local Agent Run panel shows `Run Next` to queue it with the same phase/provider settings and open its stream.
+- Added small batch chaining: `/api/tasks/:id/next-batch?limit=3` resolves the next pending tasks in project order, and the Local Agent Run panel shows `Run Next 3` after success to queue several bridge task runs sequentially.
+- Added project-level task run observability: `/api/projects/:name/run-queue` returns recent local `run_task` actions for the project, and Project Overview now shows a polling `Run Queue` card with status, provider/phase, device, latest log line, and links back to each task stream.
+- Expanded the project Run Queue into a control surface: queue rows now include the task name, `Cancel` for pending/running local runs, and `Retry` for failed/cancelled runs using the same phase/provider settings.
+- Added expandable process details to Project Run Queue rows. Each row can now show the latest captured command/output tail, artifact path, and a `Copy CMD` action when the bridge has emitted the local command.
+- Added project-level batch queueing: Project Overview now has `Run Next 3`, which queues the active/next task plus the following pending tasks without navigating away, then refreshes the Run Queue in place.
+- Added Run Queue header bulk controls: `Cancel Live` cancels visible pending/running task runs, and `Retry Failed` requeues visible failed/cancelled task runs without opening each task detail.
+- Added backend-backed Run Queue expansion. `/api/projects/:name/run-queue` now returns `total` and up to 80 log lines per action, while the Project Overview queue shows `visible/total` and a `Show more runs` control instead of hiding older runs permanently.
+- Added backend Run Queue status filtering. The API accepts `status=all|live|failed|done`, and Project Overview now has segmented filters that reset pagination and make it easier to focus on live, failed/cancelled, or completed task runs.
 
 ## Checks
 
@@ -354,6 +369,27 @@
 - `npm run lint`
 - `npm run build`
 - `python -m py_compile hooks/gcs_bridge_daemon.py`
+- `npm run lint`
+- `npx tsc --noEmit`
+- `npm run build`
+- `npm run lint`
+- `npx tsc --noEmit`
+- `npm run build`
+- `npm run lint`
+- `npx tsc --noEmit`
+- `npm run build`
+- `npm run lint`
+- `npx tsc --noEmit`
+- `npm run build`
+- `npm run lint`
+- `npx tsc --noEmit`
+- `npm run build`
+- `npm run lint`
+- `npx tsc --noEmit`
+- `npm run build`
+- `npm run lint`
+- `npx tsc --noEmit`
+- `npm run build`
 
 ## Gaps
 

@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, CheckCircle, Clock, ExternalLink, GitCommit, Lock, Share2, X } from "lucide-react";
 import { markTaskStatus } from "@/app/actions/tasks";
 import { CommitComposerModal } from "@/components/tasks/CommitComposerModal";
+import { RunTaskButton } from "@/components/tasks/detail/RunTaskButton";
 import type { KanbanTask } from "@/lib/tasks";
 
 const STATUS_CONFIG: Record<string, { label: string; cls: string }> = {
@@ -159,6 +160,8 @@ export function TaskDetailPanel({ task, projectName, completedIds, onClose }: Pr
                   )}
                 </div>
               </div>
+
+              <RunTaskButton taskId={task.id} disabled={task.status === "completed"} />
 
               {feedback && <p className="rounded-lg bg-blocked/10 px-3 py-2 text-xs text-blocked">{feedback}</p>}
             </div>

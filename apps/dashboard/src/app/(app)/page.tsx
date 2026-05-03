@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bot, MessageSquare, Play, Plus } from "lucide-react";
+import { Bot, MessageSquare, Plus } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { PageShell } from "@/components/layout/PageShell";
 import { StatCard } from "@/components/dashboard/StatCard";
@@ -8,6 +8,7 @@ import { ActiveProjectsList } from "@/components/dashboard/ActiveProjectsList";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { KnowledgeNuggets } from "@/components/dashboard/KnowledgeNuggets";
 import { AutoRefresh } from "@/components/dashboard/AutoRefresh";
+import { RunDashboardTaskButton } from "@/components/dashboard/RunDashboardTaskButton";
 import { OnboardingEmptyState } from "@/components/projects/OnboardingEmptyState";
 import { getDashboardStats } from "@/lib/stats";
 import { getActiveProjects } from "@/lib/projects";
@@ -96,10 +97,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   <Plus size={17} />
                   New Project
                 </Link>
-                <Link href="/tasks" className="inline-flex items-center gap-2 rounded-xl border border-border px-5 py-2.5 text-sm font-bold text-text transition-colors hover:border-text-muted hover:bg-card-hover">
-                  <Play size={16} fill="currentColor" />
-                  Run Task
-                </Link>
+                <RunDashboardTaskButton projects={projects.map((project) => ({
+                  name: project.name,
+                  activeTask: project.activeTask,
+                  totalTasks: project.totalTasks,
+                  completedTasks: project.completedTasks,
+                }))} />
                 <Link href="/chat" className="inline-flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold text-text-muted transition-colors hover:text-text">
                   <MessageSquare size={16} />
                   Chat
