@@ -38,14 +38,14 @@ GCS_MODEL     = os.environ.get("GCS_MODEL", "")
 GCS_DEVICE_KEY = local_device_identity()["deviceKey"]
 
 TOOL_ESTIMATES = {
-    "Read":    lambda inp: max(200, len(str(inp.get("content", ""))) // 4 + 100),
-    "Write":   lambda inp: max(150, len(str(inp.get("content", ""))) // 4 + 80),
-    "Edit":    lambda inp: max(100, (len(str(inp.get("old_string", ""))) + len(str(inp.get("new_string", "")))) // 4 + 80),
+    "Read":    lambda inp: max(200, len(str(inp.get("content", ""))) // 3 + 100),
+    "Write":   lambda inp: max(150, len(str(inp.get("content", ""))) // 3 + 80),
+    "Edit":    lambda inp: max(100, (len(str(inp.get("old_string", ""))) + len(str(inp.get("new_string", "")))) // 3 + 80),
     "Bash":    lambda inp: 150,
     "Grep":    lambda inp: 120,
     "Glob":    lambda inp: 100,
-    "Agent":   lambda inp: 2000,
-    "default": lambda inp: 100,
+    "Agent":   lambda inp: 50000,
+    "default": lambda inp: 150,
 }
 
 

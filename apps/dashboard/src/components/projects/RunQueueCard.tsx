@@ -133,7 +133,7 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
     }
 
     const initialTimer = window.setTimeout(() => void loadQueue(active), 0);
-    const timer = window.setInterval(() => void loadQueue(active), hasLiveAction ? 3000 : 10000);
+    const timer = window.setInterval(() => void loadQueue(active), hasLiveAction ? 10000 : 20000);
     window.addEventListener("gcs-run-queue-refresh", refreshQueue);
     return () => {
       active = false;

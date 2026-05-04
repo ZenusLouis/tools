@@ -154,6 +154,7 @@ model Workspace {
   chatSessions  ChatSession[]
   sessions      Session[]
   toolUsages    ToolUsage[]
+  commandTemplates CommandTemplate[]
   bridgeFileActions BridgeFileAction[]
   bridgeProjectPaths BridgeProjectPath[]
   createdAt     DateTime @default(now())
@@ -256,6 +257,7 @@ model SkillDefinition {
   slug                  String
   category              String
   sourcePath            String?
+  content               String?  @db.Text
   description           String
   providerCompatibility String[] @default([])
   roleCompatibility     String[] @default([])
@@ -301,6 +303,20 @@ model AgentRole {
   @@index([workspaceId])
   @@index([provider])
   @@index([phase])
+}
+
+model CommandTemplate {
+  id          String   @id @default(cuid())
+  workspaceId String?
+  slug        String   
+  description String?
+  content     String   @db.Text
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId])
 }
 
 model ChatSession {

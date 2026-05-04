@@ -69,8 +69,8 @@ export async function getAnalytics(
   const since = rangeStart(range);
 
   const [sessions, toolUsage] = await Promise.all([
-    db.session.findMany({ where: { date: { gte: since }, ...(workspaceId ? { workspaceId } : {}) }, orderBy: { date: "desc" } }),
-    db.toolUsage.findMany({ where: { date: { gte: since }, ...(workspaceId ? { workspaceId } : {}) }, orderBy: { date: "asc" } }),
+    db.session.findMany({ where: { date: { gte: since }, ...(workspaceId ? { workspaceId } : {}) }, orderBy: { date: "desc" }, take: 5000 }),
+    db.toolUsage.findMany({ where: { date: { gte: since }, ...(workspaceId ? { workspaceId } : {}) }, orderBy: { date: "asc" }, take: 10000 }),
   ]);
 
   const providers = ["claude", "codex", "chatgpt"] as const;

@@ -133,7 +133,7 @@ export function AnalyzeProjectButton({
           return prev[prev.length - 1] === line ? prev : [...prev, line];
         });
       }
-    }, 5000);
+    }, 10000);
   }, [router]);
 
   useEffect(() => {

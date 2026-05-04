@@ -828,14 +828,13 @@ def _string_list(value: Any) -> list[str]:
     return [str(item) for item in value if item is not None]
 
 
-def _load_role_skills(role: str) -> list[str]:
-    """Return skill slugs defined in the role JSON file, or empty list."""
-    role_path = ROOT / "agents" / "roles" / f"{role}.json"
-    try:
-        data = json.loads(role_path.read_text(encoding="utf-8"))
-        return [str(s) for s in data.get("skills") or []]
-    except Exception:
-        return []
+def _fetch_task_prompt(task_id: str, phase: str, role: str) -> str:
+    ok, res = post_json_data("/api/bridge/prompt-context", {"taskId": task_id, "phase": phase, "role": role}, timeout=30)
+    if ok and isinstance(res, dict) and "promptText" in res:
+        return str(res["promptText"])
+    if isinstance(res, dict) and "error" in res:
+        raise ValueError(f"Failed to fetch prompt context: {res['error']}")
+    return "You are running a GCS local task. Please check the dashboard for details."
 
 
 def _load_skill_content(slugs: list[str]) -> str:
@@ -858,63 +857,6 @@ def _load_skill_content(slugs: list[str]) -> str:
     if not skill_lines:
         return ""
     return "\n\n## Skill Guidance\n" + "\n\n".join(skill_lines)
-
-
-def _build_task_prompt(payload: dict[str, Any]) -> str:
-    task = payload.get("task") if isinstance(payload.get("task"), dict) else {}
-    project_name = str(payload.get("projectName") or "local")
-    phase = str(payload.get("phase") or "implementation")
-    provider = str(payload.get("provider") or "claude")
-    role = str(payload.get("role") or ("dev-implementer" if provider == "codex" else "run-task"))
-    skills = _string_list(payload.get("skills")) or _load_role_skills(role)
-    skill_block = _load_skill_content(skills)
-    acceptance = _string_list(task.get("acceptanceCriteria"))
-    steps = _string_list(task.get("steps"))
-    req_ids = _string_list(task.get("reqIds"))
-    deps = _string_list(task.get("deps"))
-    lines = [
-        f"You are running a GCS local task as provider={provider}, role={role}, phase={phase}.",
-        "Work inside the current local project folder. Preserve unrelated user changes.",
-        "Implement only the scoped task. After finishing, write a concise implementation summary.",
-        "",
-        f"Project: {project_name}",
-        f"Task ID: {task.get('id') or payload.get('taskId')}",
-        f"Task: {task.get('name') or 'Untitled task'}",
-        f"Module: {task.get('moduleName') or ''}",
-        f"Feature: {task.get('featureName') or ''}",
-        f"Priority: {task.get('priority') or ''}",
-        f"Estimate: {task.get('estimate') or ''}",
-        f"Requirement IDs: {', '.join(req_ids) if req_ids else 'none'}",
-        f"Active Skills: {', '.join(skills) if skills else 'default'}",
-        "",
-        "Summary:",
-        str(task.get("summary") or ""),
-        "",
-        "Details:",
-        str(task.get("details") or ""),
-        "",
-        "Acceptance Criteria:",
-        *[f"- {item}" for item in acceptance],
-        "",
-        "Suggested Steps:",
-        *[f"{index + 1}. {item}" for index, item in enumerate(steps)],
-        "",
-        "Dependencies:",
-        *[f"- {item}" for item in deps],
-        "",
-        "Risk note:",
-        str(task.get("risk") or ""),
-    ]
-    if skill_block:
-        lines.append(skill_block)
-    lines += [
-        "",
-        "Required output:",
-        "- Modify local source files if needed.",
-        "- Include changed files and verification commands in your final answer.",
-        "- Do not claim success unless you actually performed the implementation or clearly explain the blocker.",
-    ]
-    return "\n".join(lines)
 
 
 def _extract_cli_result(text: str) -> dict[str, Any]:
@@ -1139,7 +1081,7 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
     if not cwd.exists():
         raise ValueError(f"projectPath is not accessible on this device: {project_path}")
 
-    prompt = _build_task_prompt(payload)
+    prompt = _fetch_task_prompt(task_id, phase, role)
     post_action_progress(action_id, [
         f"Starting local {provider} task run for {task_id}.",
         f"Project path: {project_path}",
@@ -1172,7 +1114,14 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
         binary = os.environ.get("GCS_CLAUDE_BIN") or shutil.which("claude")
         if not binary:
             raise ValueError("claude executable not found in PATH")
-        cmd = [binary, "-p", "--output-format", "stream-json", "--verbose", "--dangerously-skip-permissions"]
+        cmd = [
+            binary, "-p", 
+            "--output-format", "stream-json", 
+            "--verbose", 
+            "--dangerously-skip-permissions",
+            "--max-turns", "15",
+            "--allowedTools", "Bash,Glob,Grep,Read,Write,Edit,Notebook,Sticker"
+        ]
         if model:
             cmd.extend(["--model", model])
         prompt_handle = prompt_path.open("r", encoding="utf-8", errors="replace")
