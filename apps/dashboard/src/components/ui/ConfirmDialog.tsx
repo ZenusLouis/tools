@@ -33,16 +33,27 @@ export function ConfirmDialog({
     : "bg-accent text-white hover:bg-accent-hover";
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/65 px-4 backdrop-blur-sm" role="dialog" aria-modal="true">
+    <div
+      className="fixed inset-0 z-[9999] flex items-start justify-center bg-black/65 px-4 pt-[10vh] backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+    >
       <div className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
         <div className="flex items-start gap-3 border-b border-border px-5 py-4">
-          <div className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${destructive ? "bg-blocked/10 text-blocked" : "bg-accent/10 text-accent"}`}>
+          <div
+            className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${destructive ? "bg-blocked/10 text-blocked" : "bg-accent/10 text-accent"
+              }`}
+          >
             <AlertTriangle size={18} />
           </div>
+
           <div className="min-w-0 flex-1">
             <h3 className="text-base font-bold text-text">{title}</h3>
-            <div className="mt-1 text-sm leading-6 text-text-muted">{description}</div>
+            <div className="mt-1 text-sm leading-6 text-text-muted">
+              {description}
+            </div>
           </div>
+
           <button
             type="button"
             onClick={onClose}
@@ -53,6 +64,7 @@ export function ConfirmDialog({
             <X size={16} />
           </button>
         </div>
+
         <div className="flex justify-end gap-2 px-5 py-4">
           <button
             type="button"
@@ -62,6 +74,7 @@ export function ConfirmDialog({
           >
             {cancelLabel}
           </button>
+
           <button
             type="button"
             onClick={onConfirm}
