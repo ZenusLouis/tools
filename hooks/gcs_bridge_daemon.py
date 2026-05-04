@@ -920,6 +920,30 @@ def _extract_cli_result(text: str) -> dict[str, Any]:
     return {}
 
 
+def _extract_text_from_stream(text: str) -> str:
+    """Extract assistant text content from claude stream-json JSONL output."""
+    parts: list[str] = []
+    for raw in [line.strip() for line in text.splitlines() if line.strip()]:
+        if not raw.startswith("{"):
+            continue
+        try:
+            data = json.loads(raw)
+        except Exception:
+            continue
+        if not isinstance(data, dict):
+            continue
+        # stream-json: assistant message content blocks
+        if data.get("type") == "assistant":
+            message = data.get("message") if isinstance(data.get("message"), dict) else data
+            for block in (message.get("content") or []):
+                if isinstance(block, dict) and block.get("type") == "text":
+                    parts.append(str(block.get("text") or ""))
+        # fallback: text event
+        elif data.get("type") == "text":
+            parts.append(str(data.get("text") or ""))
+    return "\n".join(p for p in parts if p).strip()
+
+
 def _safe_artifact_path(project_path: str, task_id: str, phase: str) -> Path:
     safe_task = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "-" for ch in task_id)[:160] or "task"
     filename = "review.md" if phase == "review" else "brief.md" if phase == "analysis" else "implementation.md"
@@ -1058,7 +1082,7 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
         binary = os.environ.get("GCS_CLAUDE_BIN") or shutil.which("claude")
         if not binary:
             raise ValueError("claude executable not found in PATH")
-        cmd = [binary, "-p"]
+        cmd = [binary, "-p", "--output-format", "stream-json", "--verbose", "--dangerously-skip-permissions"]
         if model:
             cmd.extend(["--model", model])
         prompt_handle = prompt_path.open("r", encoding="utf-8", errors="replace")
@@ -1152,7 +1176,11 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
                 total_tokens += int(row.get("outputTokens") or 0)
     if provider == "codex" and not total_tokens:
         total_tokens = max(1, round(len(prompt) / 4)) + min(4000, max(0, round(duration_min * 180)))
-    total_cost = cli_result.get("total_cost_usd") if isinstance(cli_result.get("total_cost_usd"), (int, float)) else round(total_tokens * 3.0 / 1_000_000, 6)
+    total_cost = cli_result.get("total_cost_usd") if isinstance(cli_result.get("total_cost_usd"), (int, float)) else None
+
+    # For stream-json output, cli_result["result"] contains the actual text response.
+    # Fall back to raw combined output (plain-text or non-JSON mode).
+    output_text = cli_result.get("result") or _extract_text_from_stream(combined) or combined or "(no output)"
 
     artifact = _safe_artifact_path(project_path, task_id, phase)
     artifact.parent.mkdir(parents=True, exist_ok=True)
@@ -1161,13 +1189,14 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
         "",
         f"- Provider: {provider}",
         f"- Role: {role}",
-        f"- Model: {model or 'default'}",
+        f"- Model: {model or cli_result.get('model') or 'default'}",
         f"- Exit code: {returncode}",
         f"- Duration: {duration_min} min",
+        f"- Tokens: {total_tokens}",
         "",
         "## Output",
         "",
-        combined or "(no output)",
+        output_text,
     ])
     artifact.write_text(content, encoding="utf-8")
     kind = "review" if phase == "review" else "brief" if phase == "analysis" else "implementation"
