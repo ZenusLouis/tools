@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle, Loader2, X } from "lucide-react";
 
 type ConfirmDialogProps = {
@@ -26,15 +27,15 @@ export function ConfirmDialog({
   onConfirm,
   onClose,
 }: ConfirmDialogProps) {
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
   const confirmClass = destructive
     ? "bg-blocked text-white hover:bg-blocked/90"
     : "bg-accent text-white hover:bg-accent-hover";
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-[9999] grid place-items-center bg-black/75 px-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
     >
@@ -87,6 +88,7 @@ export function ConfirmDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
