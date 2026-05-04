@@ -384,6 +384,30 @@ def _safe_local_target(project_path: str, relative_path: str) -> Path:
     return target
 
 
+def _extract_pdf_text(path: "Path") -> str:
+    """Extract text from a PDF. Tries pdftotext first, falls back to pypdf."""
+    if shutil.which("pdftotext"):
+        try:
+            proc = subprocess.run(
+                ["pdftotext", "-layout", str(path), "-"],
+                capture_output=True, text=True, encoding="utf-8", errors="replace",
+                timeout=int(os.environ.get("GCS_PDFTOTEXT_TIMEOUT_SEC", "60")),
+            )
+            if proc.returncode == 0 and proc.stdout.strip():
+                return proc.stdout.strip()
+        except Exception:
+            pass
+    try:
+        import pypdf  # type: ignore
+        reader = pypdf.PdfReader(str(path))
+        pages = [page.extract_text() or "" for page in reader.pages]
+        return "\n\n".join(p for p in pages if p.strip())
+    except ImportError:
+        raise ValueError("pypdf is not installed. Run: pip install pypdf")
+    except Exception as exc:
+        raise ValueError(f"PDF extraction failed: {exc}") from exc
+
+
 def _analysis_document_context(document_path: str) -> str:
     """Return extracted document text so claude -p does not spend turns searching files."""
     if not document_path:
@@ -399,23 +423,9 @@ def _analysis_document_context(document_path: str) -> str:
             text = path.read_text(encoding="utf-8", errors="replace")
             return text[: int(os.environ.get("GCS_ANALYZE_DOC_MAX_CHARS", "140000"))]
         if suffix == ".pdf":
-            if shutil.which("pdftotext") is None:
-                raise ValueError("pdftotext is required to analyze PDF BRDs, but it is not available in PATH.")
-            import subprocess
-            proc = subprocess.run(
-                ["pdftotext", "-layout", str(path), "-"],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=int(os.environ.get("GCS_PDFTOTEXT_TIMEOUT_SEC", "60")),
-            )
-            if proc.returncode != 0:
-                detail = (proc.stderr or proc.stdout or "").strip()[:500]
-                raise ValueError(f"pdftotext failed for {path}: {detail}")
-            text = proc.stdout.strip()
+            text = _extract_pdf_text(path)
             if not text:
-                raise ValueError(f"pdftotext produced no text for {path}")
+                raise ValueError(f"PDF extraction produced no text for {path}")
             max_chars = int(os.environ.get("GCS_ANALYZE_DOC_MAX_CHARS", "140000"))
             return text[:max_chars]
     except Exception as exc:
@@ -963,6 +973,79 @@ def _quote_cmd_arg(value: str) -> str:
     return value
 
 
+def _format_stream_line(raw: str) -> str | None:
+    """Convert a stream-json stdout line to a human-readable string, or None to skip."""
+    if not raw.startswith("{"):
+        return raw  # plain-text output, keep as-is
+    try:
+        data = json.loads(raw)
+    except Exception:
+        return raw  # not JSON, keep
+    if not isinstance(data, dict):
+        return None
+    event_type = data.get("type")
+
+    # Assistant text or thinking
+    if event_type == "assistant":
+        message = data.get("message") if isinstance(data.get("message"), dict) else {}
+        parts: list[str] = []
+        for block in (message.get("content") or []):
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") == "text":
+                text = (block.get("text") or "").strip()
+                if text:
+                    parts.append(text[:300])
+            elif block.get("type") == "tool_use":
+                name = block.get("name") or "tool"
+                inp = block.get("input") or {}
+                hint = ""
+                if isinstance(inp, dict):
+                    hint = (
+                        inp.get("command") or inp.get("pattern") or inp.get("file_path")
+                        or inp.get("prompt") or inp.get("description") or ""
+                    )
+                    if hint:
+                        hint = f": {str(hint)[:120]}"
+                parts.append(f"[{name}{hint}]")
+        return "\n".join(parts) if parts else None
+
+    # Sub-agent progress
+    if event_type == "system":
+        subtype = data.get("subtype")
+        if subtype == "task_started":
+            return f"→ Agent: {data.get('description') or 'sub-task started'}"
+        if subtype == "task_progress":
+            desc = data.get("description") or ""
+            tokens = (data.get("usage") or {}).get("total_tokens")
+            suffix = f" ({tokens:,} tokens)" if tokens else ""
+            return f"  {desc}{suffix}" if desc else None
+        if subtype == "task_complete":
+            return f"✓ Agent done: {data.get('description') or ''}"
+        return None  # skip init, rate_limit, etc.
+
+    # Tool results (user role): only show errors
+    if event_type == "user":
+        message = data.get("message") if isinstance(data.get("message"), dict) else {}
+        for block in (message.get("content") or []):
+            if isinstance(block, dict) and block.get("is_error"):
+                err = block.get("content") or ""
+                if isinstance(err, list):
+                    err = " ".join(str(e.get("text", "")) if isinstance(e, dict) else str(e) for e in err)
+                return f"✗ Tool error: {str(err)[:200]}"
+        return None  # skip successful tool results
+
+    # Result event
+    if event_type == "result":
+        cost = data.get("total_cost_usd")
+        cost_str = f" | cost ${cost:.4f}" if isinstance(cost, (int, float)) else ""
+        usage = data.get("usage") or {}
+        tokens = sum(usage.get(k, 0) or 0 for k in ["input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"])
+        return f"✓ Done — {tokens:,} tokens{cost_str}"
+
+    return None  # skip everything else (rate_limit, system/init, etc.)
+
+
 def _drain_process_output(
     proc: subprocess.Popen[str],
     action_id: str,
@@ -982,11 +1065,18 @@ def _drain_process_output(
             continue
         if stream_name == "stderr":
             stderr_lines.append(clean)
+            rendered = f"stderr> {clean}"
+            pending_lines.append(rendered)
+            print(f"[task {task_id}] {rendered}", flush=True)
         else:
             stdout_lines.append(clean)
-        rendered = f"{stream_name}> {clean}"
-        pending_lines.append(rendered)
-        print(f"[task {task_id}] {rendered}", flush=True)
+            formatted = _format_stream_line(clean)
+            if formatted:
+                for part in formatted.splitlines():
+                    part = part.strip()
+                    if part:
+                        pending_lines.append(part)
+                        print(f"[task {task_id}] {part}", flush=True)
     if (proc.poll() is not None and pending_lines) or len(pending_lines) >= 8:
         post_action_progress(action_id, pending_lines[-40:])
         pending_lines.clear()
