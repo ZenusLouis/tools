@@ -1064,6 +1064,47 @@ def _post_task_artifact(project: str, task_id: str, kind: str, path: str, conten
     )
 
 
+def ensure_global_ignore(project_path: Path) -> None:
+    """Ensure a standard .claudeignore file exists in the project to save tokens."""
+    ignore_path = project_path / ".claudeignore"
+    patterns = [
+        "# GCS Global Ignore Patterns",
+        "node_modules/",
+        "dist/",
+        "build/",
+        ".next/",
+        "out/",
+        "target/",
+        "bin/",
+        "obj/",
+        "*.log",
+        ".turbo/",
+        ".cache/",
+        "npm-debug.log*",
+        ".env*",
+        "*.pem",
+        "*.key",
+        ".gcs/tasks/",
+    ]
+    
+    if not ignore_path.exists():
+        try:
+            ignore_path.write_text("\n".join(patterns) + "\n", encoding="utf-8")
+            print(f"[bridge] Created global .claudeignore at {ignore_path}", flush=True)
+        except Exception as e:
+            print(f"[bridge] Warning: failed to create .claudeignore: {e}", flush=True)
+    else:
+        # Check if our marker is present, if not, append.
+        try:
+            content = ignore_path.read_text(encoding="utf-8", errors="replace")
+            if "node_modules/" not in content:
+                with ignore_path.open("a", encoding="utf-8") as f:
+                    f.write("\n\n# GCS Global Additions\n" + "\n".join(patterns[1:]) + "\n")
+                print(f"[bridge] Appended global ignore patterns to {ignore_path}", flush=True)
+        except Exception:
+            pass
+
+
 def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
     action_id = str(action.get("id") or "")
     payload = action.get("payload") if isinstance(action.get("payload"), dict) else {}
@@ -1080,6 +1121,9 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
     cwd = Path(project_path).expanduser()
     if not cwd.exists():
         raise ValueError(f"projectPath is not accessible on this device: {project_path}")
+
+    # Enforce global ignore rules before starting the agent
+    ensure_global_ignore(cwd)
 
     prompt = _fetch_task_prompt(task_id, phase, role)
     post_action_progress(action_id, [

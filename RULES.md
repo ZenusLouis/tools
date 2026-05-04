@@ -46,5 +46,14 @@
 - No mock of DB unless explicitly requested (prefer real test DB)
 - Test file next to source: `foo.test.ts` beside `foo.ts`
 
+## Token Saving & File Ignoring
+- Every project **MUST** have a `.claudeignore` file to prevent massive context bloat.
+- The following patterns are **globally ignored** by the GCS Bridge:
+  - Dependencies: `node_modules/`, `dist/`, `build/`, `.next/`, `out/`, `target/`, `bin/`, `obj/`
+  - Logs/Cache: `*.log`, `.turbo/`, `.cache/`, `npm-debug.log*`
+  - Secrets: `.env*`, `*.pem`, `*.key`
+  - Internal: `.gcs/tasks/`
+- The Bridge will automatically enforce these patterns if the file is missing.
+
 ## Per-Framework Rules
 See: `d:\GlobalClaudeSkills\skills\frameworks\<name>\SKILL.md`
