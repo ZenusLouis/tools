@@ -818,18 +818,52 @@ def _string_list(value: Any) -> list[str]:
     return [str(item) for item in value if item is not None]
 
 
+def _load_role_skills(role: str) -> list[str]:
+    """Return skill slugs defined in the role JSON file, or empty list."""
+    role_path = ROOT / "agents" / "roles" / f"{role}.json"
+    try:
+        data = json.loads(role_path.read_text(encoding="utf-8"))
+        return [str(s) for s in data.get("skills") or []]
+    except Exception:
+        return []
+
+
+def _load_skill_content(slugs: list[str]) -> str:
+    """Load up to 6 SKILL.md files and return a combined guidance block."""
+    if not slugs:
+        return ""
+    skill_lines: list[str] = []
+    skill_dirs = ["analysis", "workflow", "frameworks", "imported/github-sources"]
+    for slug in slugs[:6]:
+        for subdir in skill_dirs:
+            skill_path = ROOT / "skills" / subdir / slug / "SKILL.md"
+            if skill_path.exists():
+                try:
+                    raw = skill_path.read_text(encoding="utf-8", errors="replace")
+                    content = re.sub(r'^---[\s\S]*?---\n', '', raw).strip()[:600]
+                    skill_lines.append(f"### {slug}\n{content}")
+                except Exception:
+                    pass
+                break
+    if not skill_lines:
+        return ""
+    return "\n\n## Skill Guidance\n" + "\n\n".join(skill_lines)
+
+
 def _build_task_prompt(payload: dict[str, Any]) -> str:
     task = payload.get("task") if isinstance(payload.get("task"), dict) else {}
     project_name = str(payload.get("projectName") or "local")
     phase = str(payload.get("phase") or "implementation")
     provider = str(payload.get("provider") or "claude")
-    skills = _string_list(payload.get("skills"))
+    role = str(payload.get("role") or ("dev-implementer" if provider == "codex" else "run-task"))
+    skills = _string_list(payload.get("skills")) or _load_role_skills(role)
+    skill_block = _load_skill_content(skills)
     acceptance = _string_list(task.get("acceptanceCriteria"))
     steps = _string_list(task.get("steps"))
     req_ids = _string_list(task.get("reqIds"))
     deps = _string_list(task.get("deps"))
-    return "\n".join([
-        f"You are running a GCS local task as provider={provider}, phase={phase}.",
+    lines = [
+        f"You are running a GCS local task as provider={provider}, role={role}, phase={phase}.",
         "Work inside the current local project folder. Preserve unrelated user changes.",
         "Implement only the scoped task. After finishing, write a concise implementation summary.",
         "",
@@ -841,7 +875,7 @@ def _build_task_prompt(payload: dict[str, Any]) -> str:
         f"Priority: {task.get('priority') or ''}",
         f"Estimate: {task.get('estimate') or ''}",
         f"Requirement IDs: {', '.join(req_ids) if req_ids else 'none'}",
-        f"Skills: {', '.join(skills) if skills else 'default'}",
+        f"Active Skills: {', '.join(skills) if skills else 'default'}",
         "",
         "Summary:",
         str(task.get("summary") or ""),
@@ -860,12 +894,17 @@ def _build_task_prompt(payload: dict[str, Any]) -> str:
         "",
         "Risk note:",
         str(task.get("risk") or ""),
+    ]
+    if skill_block:
+        lines.append(skill_block)
+    lines += [
         "",
         "Required output:",
         "- Modify local source files if needed.",
         "- Include changed files and verification commands in your final answer.",
         "- Do not claim success unless you actually performed the implementation or clearly explain the blocker.",
-    ])
+    ]
+    return "\n".join(lines)
 
 
 def _extract_cli_result(text: str) -> dict[str, Any]:

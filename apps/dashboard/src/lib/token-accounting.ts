@@ -6,13 +6,14 @@ export type TokenCreditEstimate = {
   note: string;
 };
 
-type CodexRate = {
+type ProviderRate = {
   input: number;
   cachedInput: number;
   output: number;
 };
 
-const CODEX_RATE_CARD: Record<string, CodexRate> = {
+// All rates in USD per 1M tokens
+const CODEX_RATE_CARD: Record<string, ProviderRate> = {
   "gpt-5.5": { input: 125, cachedInput: 12.5, output: 750 },
   "gpt-5.4": { input: 62.5, cachedInput: 6.25, output: 375 },
   "gpt-5.4-mini": { input: 18.75, cachedInput: 1.875, output: 113 },
@@ -21,6 +22,18 @@ const CODEX_RATE_CARD: Record<string, CodexRate> = {
   "gpt-image-2.0-image": { input: 200, cachedInput: 50, output: 750 },
   "gpt-image-2.0-text": { input: 125, cachedInput: 31.25, output: 250 },
 };
+
+const CLAUDE_RATE_CARD: Record<string, ProviderRate> = {
+  "claude-opus-4":     { input: 15,   cachedInput: 1.5,  output: 75  },
+  "claude-sonnet-4":   { input: 3,    cachedInput: 0.3,  output: 15  },
+  "claude-haiku-4":    { input: 0.8,  cachedInput: 0.08, output: 4   },
+  "claude-haiku-3.5":  { input: 0.8,  cachedInput: 0.08, output: 4   },
+  "claude-sonnet-3.7": { input: 3,    cachedInput: 0.3,  output: 15  },
+  "claude-sonnet-3.5": { input: 3,    cachedInput: 0.3,  output: 15  },
+  "claude-opus-3":     { input: 15,   cachedInput: 1.5,  output: 75  },
+};
+
+const CLAUDE_DEFAULT_RATE: ProviderRate = { input: 3, cachedInput: 0.3, output: 15 };
 
 export const TOKEN_METER_META = {
   claude: {
@@ -44,7 +57,40 @@ function normalizeModel(model?: string | null) {
   return (model ?? "").toLowerCase().replace(/^openai\//, "");
 }
 
-export function codexRateForModel(model?: string | null): CodexRate {
+export function claudeRateForModel(model?: string | null): ProviderRate {
+  const normalized = normalizeModel(model);
+  for (const [key, rate] of Object.entries(CLAUDE_RATE_CARD)) {
+    if (normalized.includes(key)) return rate;
+  }
+  return CLAUDE_DEFAULT_RATE;
+}
+
+export function estimateClaudeCredits(
+  tokens: number,
+  model?: string | null,
+  split?: { inputTokens?: number | null; cachedInputTokens?: number | null; outputTokens?: number | null },
+): TokenCreditEstimate {
+  const rate = claudeRateForModel(model);
+  const inputTokens = split?.inputTokens ?? null;
+  const cachedInputTokens = split?.cachedInputTokens ?? null;
+  const outputTokens = split?.outputTokens ?? null;
+
+  if (inputTokens != null || cachedInputTokens != null || outputTokens != null) {
+    const credits =
+      ((inputTokens ?? 0) / 1_000_000) * rate.input +
+      ((cachedInputTokens ?? 0) / 1_000_000) * rate.cachedInput +
+      ((outputTokens ?? 0) / 1_000_000) * rate.output;
+    return { credits, basis: "exact_split", note: "Calculated from Claude token split using Anthropic rate card." };
+  }
+
+  return {
+    credits: (tokens / 1_000_000) * rate.input,
+    basis: "input_equivalent",
+    note: "Claude usage is hook-estimated (activity tokens only); cost uses input rate as conservative estimate.",
+  };
+}
+
+export function codexRateForModel(model?: string | null): ProviderRate {
   const normalized = normalizeModel(model);
   if (normalized.includes("gpt-5.5")) return CODEX_RATE_CARD["gpt-5.5"];
   if (normalized.includes("gpt-5.4-mini")) return CODEX_RATE_CARD["gpt-5.4-mini"];
@@ -85,11 +131,10 @@ export function estimateCodexCredits(
 
 export function estimateProviderCredits(provider: "claude" | "codex" | "chatgpt", tokens: number, model?: string | null): TokenCreditEstimate {
   if (provider === "codex") return estimateCodexCredits(tokens, model);
+  if (provider === "claude") return estimateClaudeCredits(tokens, model);
   return {
     credits: 0,
     basis: "not_applicable",
-    note: provider === "chatgpt"
-      ? "Use OpenAI usage/cost sync for provider-reported ChatGPT/API usage."
-      : "Claude usage is currently hook-estimated and does not use the Codex credit rate card.",
+    note: "Use OpenAI usage/cost sync for provider-reported ChatGPT/API usage.",
   };
 }

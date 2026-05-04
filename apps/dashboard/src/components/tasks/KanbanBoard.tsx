@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useOptimistic, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { KanbanTask, TaskPagination, TaskStatus } from "@/lib/tasks";
 import { AddTaskForm } from "./AddTaskForm";
@@ -27,6 +28,10 @@ function KanbanColumn({
   selectedTaskId,
   onTaskClick,
   addTaskConfig,
+  isDragOver,
+  onDragOver,
+  onDragLeave,
+  onDrop,
 }: {
   status: TaskStatus;
   label: string;
@@ -40,6 +45,10 @@ function KanbanColumn({
   selectedTaskId?: string | null;
   onTaskClick?: (task: KanbanTask) => void;
   addTaskConfig?: AddTaskConfig;
+  isDragOver: boolean;
+  onDragOver: (e: React.DragEvent) => void;
+  onDragLeave: () => void;
+  onDrop: (e: React.DragEvent, targetStatus: TaskStatus) => void;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -63,7 +72,12 @@ function KanbanColumn({
   }
 
   return (
-    <div className={`flex min-h-96 max-h-[calc(100dvh-18rem)] flex-col rounded-xl border border-t-2 bg-card ${accentClass}`}>
+    <div
+      className={`flex min-h-96 max-h-[calc(100dvh-18rem)] flex-col rounded-xl border border-t-2 bg-card transition-colors ${accentClass} ${isDragOver ? "border-accent/60 bg-accent/5 ring-1 ring-accent/30" : ""}`}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={(e) => onDrop(e, status)}
+    >
       <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
         <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} />
         <span className="text-[11px] font-bold uppercase tracking-widest text-text-muted">{label}</span>
@@ -74,17 +88,29 @@ function KanbanColumn({
 
       <div className="min-h-0 flex-1 overflow-y-auto p-2.5">
         {tasks.length === 0 && !addTaskConfig && (
-          <p className="mt-6 text-center text-xs text-text-muted opacity-40">--</p>
+          <p className={`mt-6 text-center text-xs text-text-muted ${isDragOver ? "opacity-60" : "opacity-40"}`}>
+            {isDragOver ? "Drop here" : "--"}
+          </p>
         )}
         <div className="flex flex-col gap-2">
           {tasks.map((task) => (
-            <TaskCard
+            <div
               key={task.id}
-              task={task}
-              completedIds={completedIds}
-              isSelected={selectedTaskId === task.id}
-              onClick={() => onTaskClick?.(task)}
-            />
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData("taskId", task.id);
+                e.dataTransfer.setData("fromStatus", task.status);
+                e.dataTransfer.effectAllowed = "move";
+              }}
+              className="cursor-grab active:cursor-grabbing"
+            >
+              <TaskCard
+                task={task}
+                completedIds={completedIds}
+                isSelected={selectedTaskId === task.id}
+                onClick={() => onTaskClick?.(task)}
+              />
+            </div>
           ))}
         </div>
         {pageInfo && pageInfo.total > pageInfo.pageSize && (
@@ -154,12 +180,66 @@ export function KanbanBoard({
   addTaskConfig?: AddTaskConfig;
   pagination?: TaskPagination;
 }) {
-  const byStatus = (status: TaskStatus) => tasks.filter((task) => task.status === status);
+  const router = useRouter();
+  const [, startTransition] = useTransition();
+  const [dragOverStatus, setDragOverStatus] = useState<TaskStatus | null>(null);
+  const [optimisticTasks, applyOptimistic] = useOptimistic(
+    tasks,
+    (prev, { taskId, newStatus }: { taskId: string; newStatus: TaskStatus }) =>
+      prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)),
+  );
+  const dragCounter = useRef<Partial<Record<TaskStatus, number>>>({});
+
+  const handleDragOver = useCallback((e: React.DragEvent, status: TaskStatus) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverStatus(status);
+  }, []);
+
+  const handleDragEnter = useCallback((status: TaskStatus) => {
+    dragCounter.current[status] = (dragCounter.current[status] ?? 0) + 1;
+    setDragOverStatus(status);
+  }, []);
+
+  const handleDragLeave = useCallback((status: TaskStatus) => {
+    dragCounter.current[status] = Math.max(0, (dragCounter.current[status] ?? 1) - 1);
+    if (dragCounter.current[status] === 0) {
+      setDragOverStatus((prev) => (prev === status ? null : prev));
+    }
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent, targetStatus: TaskStatus) => {
+      e.preventDefault();
+      setDragOverStatus(null);
+      dragCounter.current = {};
+      const taskId = e.dataTransfer.getData("taskId");
+      const fromStatus = e.dataTransfer.getData("fromStatus") as TaskStatus;
+      if (!taskId || fromStatus === targetStatus) return;
+
+      startTransition(async () => {
+        applyOptimistic({ taskId, newStatus: targetStatus });
+        await fetch(`/api/tasks/${encodeURIComponent(taskId)}/status`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: targetStatus }),
+        });
+        router.refresh();
+      });
+    },
+    [applyOptimistic, router],
+  );
+
+  const byStatus = (status: TaskStatus) => optimisticTasks.filter((t) => t.status === status);
 
   return (
     <div className="flex gap-4 overflow-x-auto pb-2">
       {COLUMNS.map((column) => (
-        <div key={column.status} className="min-w-[290px] flex-1">
+        <div
+          key={column.status}
+          className="min-w-72.5 flex-1"
+          onDragEnter={() => handleDragEnter(column.status)}
+        >
           <KanbanColumn
             {...column}
             tasks={byStatus(column.status)}
@@ -168,6 +248,10 @@ export function KanbanBoard({
             selectedTaskId={selectedTaskId}
             onTaskClick={onTaskClick}
             addTaskConfig={addTaskConfig}
+            isDragOver={dragOverStatus === column.status}
+            onDragOver={(e) => handleDragOver(e, column.status)}
+            onDragLeave={() => handleDragLeave(column.status)}
+            onDrop={handleDrop}
           />
         </div>
       ))}

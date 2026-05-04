@@ -3,7 +3,6 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { estimateProviderCredits, TOKEN_METER_META } from "@/lib/token-accounting";
 
-const COST_PER_MILLION = 3.0;
 
 export type DashboardRange = "today" | "week" | "month";
 
@@ -134,7 +133,7 @@ export async function getDashboardStats(workspaceId?: string, range: DashboardRa
     };
   });
   const tokenCount = tokenBreakdown.reduce((sum, item) => sum + item.tokens, 0);
-  const sessionCost = tokenCount * (COST_PER_MILLION / 1_000_000);
+  const sessionCost = tokenBreakdown.reduce((sum, item) => sum + item.credits, 0);
   const breakdownWithPercent = tokenBreakdown.map((item) => ({
     ...item,
     percent: tokenCount > 0 ? Math.round((item.tokens / tokenCount) * 100) : 0,
