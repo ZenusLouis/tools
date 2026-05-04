@@ -20,6 +20,7 @@ RUN npx prisma generate
 
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
+RUN npm prune --omit=dev
 
 FROM node:22-alpine AS runner
 WORKDIR /app
@@ -30,13 +31,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static
 COPY --from=builder --chown=node:node /app/prisma ./prisma
-COPY --from=builder --chown=node:node /app/node_modules/.bin ./node_modules/.bin
-COPY --from=builder --chown=node:node /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder --chown=node:node /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder --chown=node:node /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder --chown=node:node /app/node_modules/effect ./node_modules/effect
-COPY --from=builder --chown=node:node /app/node_modules/fast-check ./node_modules/fast-check
-COPY --from=builder --chown=node:node /app/node_modules/@standard-schema ./node_modules/@standard-schema
+COPY --from=builder --chown=node:node /app/node_modules ./node_modules
 COPY --from=builder --chown=node:node /data /data
 COPY --from=builder --chown=node:node /app/scripts/start.sh ./scripts/start.sh
 RUN chmod +x ./scripts/start.sh
