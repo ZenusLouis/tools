@@ -35,6 +35,8 @@ COPY --from=builder --chown=node:node /app/node_modules/.prisma ./node_modules/.
 COPY --from=builder --chown=node:node /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder --chown=node:node /app/node_modules/prisma ./node_modules/prisma
 COPY --from=builder --chown=node:node /app/node_modules/effect ./node_modules/effect
+COPY --from=builder --chown=node:node /app/node_modules/fast-check ./node_modules/fast-check
+COPY --from=builder --chown=node:node /app/node_modules/@standard-schema ./node_modules/@standard-schema
 COPY --from=builder --chown=node:node /data /data
 COPY --from=builder --chown=node:node /app/scripts/start.sh ./scripts/start.sh
 RUN chmod +x ./scripts/start.sh
