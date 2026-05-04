@@ -9,6 +9,7 @@ import json
 import sys
 import os
 import sqlite3
+import time
 import urllib.request
 from datetime import datetime, date
 from pathlib import Path
@@ -25,6 +26,7 @@ LOG_DIR      = r"d:\GlobalClaudeSkills\logs"
 DAILY_THRESHOLD   = 100_000
 COMPACT_THRESHOLD = 25_000
 SESSION_FILE = os.path.join(os.path.dirname(__file__), ".session_tokens.tmp")
+TOOL_TIMING_FILE = os.path.join(os.path.dirname(__file__), ".tool_timing.tmp")
 
 # Dashboard API config (set in env or .env)
 DASHBOARD_URL = os.environ.get("DASHBOARD_URL", "https://gcs-dashboard.zenus.dev")
@@ -286,6 +288,41 @@ def session_summary():
         print(f"  Synced {codex_synced} Codex session(s) to dashboard.\n")
 
 
+# ── Tool timing ───────────────────────────────────────────────────────────────
+
+def _load_tool_timing() -> dict:
+    try:
+        return json.loads(open(TOOL_TIMING_FILE).read())
+    except Exception:
+        return {}
+
+def _save_tool_timing(data: dict):
+    try:
+        open(TOOL_TIMING_FILE, "w").write(json.dumps(data))
+    except Exception:
+        pass
+
+def pre_tool():
+    try:
+        raw = sys.stdin.read().strip()
+        if not raw:
+            return
+        data = json.loads(raw)
+    except Exception:
+        return
+    tool_use_id = data.get("tool_use_id") or data.get("id")
+    tool_name = data.get("tool_name") or data.get("tool", "unknown")
+    key = tool_use_id or tool_name
+    timing = _load_tool_timing()
+    timing[key] = time.time()
+    # Keep only last 50 entries to avoid unbounded growth
+    if len(timing) > 50:
+        oldest_keys = sorted(timing, key=lambda k: timing[k])[:len(timing) - 50]
+        for k in oldest_keys:
+            del timing[k]
+    _save_tool_timing(timing)
+
+
 # ── Glob pattern check (--check-glob) ─────────────────────────────────────────
 
 def check_glob_pattern():
@@ -312,6 +349,10 @@ def main():
         check_glob_pattern()
         return
 
+    if "--pre-tool" in sys.argv:
+        pre_tool()
+        return
+
     try:
         raw = sys.stdin.read().strip()
         if not raw:
@@ -320,11 +361,23 @@ def main():
     except Exception:
         return
 
-    tool_name  = data.get("tool_name", data.get("tool", "unknown"))
-    tool_input = data.get("tool_input", data.get("input", {}))
-    tokens     = estimate_tokens(tool_name, tool_input)
-    ts         = datetime.now().isoformat()
+    tool_name   = data.get("tool_name", data.get("tool", "unknown"))
+    tool_input  = data.get("tool_input", data.get("input", {}))
+    tool_use_id = data.get("tool_use_id") or data.get("id")
+    tokens      = estimate_tokens(tool_name, tool_input)
+    ts          = datetime.now().isoformat()
 
+    # Compute duration from pre-tool timing
+    duration_sec: float | None = None
+    timing_key = tool_use_id or tool_name
+    timing = _load_tool_timing()
+    if timing_key in timing:
+        duration_sec = round(time.time() - timing[timing_key], 3)
+        del timing[timing_key]
+        _save_tool_timing(timing)
+
+    project = os.environ.get("GCS_PROJECT") or None
+    task_id = os.environ.get("GCS_TASK_ID") or None
     entry = {
         "ts": ts,
         "tool": tool_name,
@@ -333,6 +386,9 @@ def main():
         "role": GCS_ROLE or None,
         "model": GCS_MODEL or None,
         "deviceKey": GCS_DEVICE_KEY,
+        "project": project,
+        "taskId": task_id,
+        "durationSec": duration_sec,
     }
 
     # 1. Send to dashboard API (primary)

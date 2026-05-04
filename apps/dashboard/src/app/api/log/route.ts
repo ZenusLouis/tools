@@ -11,6 +11,8 @@ const ToolEntrySchema = z.object({
   tool: z.string(),
   tokens: z.number().int().min(0),
   project: z.string().optional(),
+  taskId: z.string().optional(),
+  durationSec: z.number().optional(),
   provider: z.enum(["claude", "codex", "chatgpt"]).default("claude"),
   role: z.string().optional(),
   model: z.string().optional(),
@@ -84,6 +86,9 @@ export async function POST(req: NextRequest) {
         date: new Date(entry.ts),
         tool: entry.tool,
         tokens: entry.tokens,
+        project: entry.project ?? null,
+        taskId: entry.taskId ?? null,
+        durationSec: entry.durationSec ?? null,
       },
     }));
   } else {

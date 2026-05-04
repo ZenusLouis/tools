@@ -19,7 +19,7 @@ export type ProviderBreakdown = {
   creditNote: string;
 };
 export type DailyUsage = { date: string; label: string; tokens: number; cost: number };
-export type SessionRow = { date: string; time: string; timestamp: string; provider: string; role: string | null; model: string | null; project: string; tasksCompleted: number; tokens: number; cost: number; credits: number; creditBasis: string; creditNote: string; durationMin: number | null; source: "session" | "tool"; tool?: string };
+export type SessionRow = { date: string; time: string; timestamp: string; provider: string; role: string | null; model: string | null; project: string; tasksCompleted: number; tokens: number; cost: number; credits: number; creditBasis: string; creditNote: string; durationMin: number | null; source: "session" | "tool"; tool?: string; taskId?: string | null };
 export type SessionPagination = { page: number; pageSize: number; total: number; totalPages: number };
 export type AnalyticsData = {
   totalTokens: number;
@@ -181,13 +181,16 @@ export async function getAnalytics(
       provider: usage.provider,
       role: usage.role,
       model: usage.model,
-      project: "tool usage",
+      project: (usage as { project?: string | null }).project || "—",
       tasksCompleted: 0,
       tokens: usage.tokens,
       cost: usage.tokens * (COST_PER_MILLION / 1_000_000),
-      durationMin: null,
+      durationMin: (usage as { durationSec?: number | null }).durationSec != null
+        ? Math.round(((usage as { durationSec: number }).durationSec / 60) * 1000) / 1000
+        : null,
       source: "tool" as const,
       tool: usage.tool,
+      taskId: (usage as { taskId?: string | null }).taskId ?? null,
     })),
   ].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
   const filteredSessionRows = allSessionRows.filter((row) => {

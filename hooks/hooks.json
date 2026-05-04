@@ -11,6 +11,15 @@
             "timeout": 3
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python d:\\GlobalClaudeSkills\\hooks\\token-tracker.py --pre-tool",
+            "timeout": 3
+          }
+        ]
       }
     ],
     "PostToolUse": [

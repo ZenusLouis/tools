@@ -368,17 +368,20 @@ model Session {
 }
 
 model ToolUsage {
-  id        String   @id @default(cuid())
+  id          String        @id @default(cuid())
   workspaceId String?
-  deviceId String?
-  provider  AgentProvider @default(claude)
-  role      String?
-  model     String?
-  date      DateTime
-  tool      String
-  tokens    Int
-  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
-  createdAt DateTime @default(now())
+  deviceId    String?
+  provider    AgentProvider @default(claude)
+  role        String?
+  model       String?
+  date        DateTime
+  tool        String
+  tokens      Int
+  project     String?
+  taskId      String?
+  durationSec Float?
+  workspace   Workspace?    @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  createdAt   DateTime      @default(now())
 
   @@index([date])
   @@index([tool])
@@ -386,6 +389,7 @@ model ToolUsage {
   @@index([provider])
   @@index([role])
   @@index([deviceId])
+  @@index([project])
 }
 
 model Lesson {
