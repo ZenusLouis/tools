@@ -32,15 +32,22 @@ export async function GET(req: Request, { params }: { params: Promise<{ name: st
     status === "done" ? ["succeeded"] :
     null;
 
-  const where = {
+  const baseWhere = {
     workspaceId: user.workspaceId,
     type: "run_task",
-    ...(statusFilter ? { status: { in: statusFilter } } : {}),
     payload: { path: ["projectName"], equals: project.name },
   };
+  const where = {
+    ...baseWhere,
+    ...(statusFilter ? { status: { in: statusFilter } } : {}),
+  };
 
-  const [total, actions] = await Promise.all([
+  const [total, allCount, liveCount, failedCount, doneCount, actions] = await Promise.all([
     db.bridgeFileAction.count({ where }),
+    db.bridgeFileAction.count({ where: baseWhere }),
+    db.bridgeFileAction.count({ where: { ...baseWhere, status: { in: ["pending", "running"] } } }),
+    db.bridgeFileAction.count({ where: { ...baseWhere, status: { in: ["failed", "cancelled"] } } }),
+    db.bridgeFileAction.count({ where: { ...baseWhere, status: "succeeded" } }),
     db.bridgeFileAction.findMany({
       where,
       orderBy: { updatedAt: "desc" },
@@ -74,6 +81,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ name: st
     total,
     limit,
     status: statusFilter ? status : "all",
+    counts: {
+      all: allCount,
+      live: liveCount,
+      failed: failedCount,
+      done: doneCount,
+    },
     actions: actions.map((action) => {
       const payload = objectValue(action.payload);
       const result = objectValue(action.result);

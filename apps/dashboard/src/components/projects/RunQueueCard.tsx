@@ -37,6 +37,7 @@ type QueueAction = {
 };
 
 type QueueFilter = "all" | "live" | "failed" | "done";
+type QueueCounts = Record<QueueFilter, number>;
 
 const FILTERS: Array<{ value: QueueFilter; label: string }> = [
   { value: "all", label: "All" },
@@ -77,6 +78,7 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
   const [actions, setActions] = useState<QueueAction[]>([]);
   const [visibleLimit, setVisibleLimit] = useState(8);
   const [totalActions, setTotalActions] = useState(0);
+  const [counts, setCounts] = useState<QueueCounts>({ all: 0, live: 0, failed: 0, done: 0 });
   const [filter, setFilter] = useState<QueueFilter>("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -101,7 +103,7 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
       try {
         const params = new URLSearchParams({ limit: String(visibleLimit), status: filter });
         const res = await fetch(`/api/projects/${encodeURIComponent(projectName)}/run-queue?${params.toString()}`, { cache: "no-store" });
-        const body = await res.json().catch(() => ({})) as { actions?: QueueAction[]; total?: number; error?: string };
+        const body = await res.json().catch(() => ({})) as { actions?: QueueAction[]; total?: number; counts?: Partial<QueueCounts>; error?: string };
         if (!active) return;
         if (!res.ok) {
           setError(body.error ?? "Failed to load run queue.");
@@ -109,6 +111,12 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
         }
         setActions(body.actions ?? []);
         setTotalActions(body.total ?? body.actions?.length ?? 0);
+        setCounts({
+          all: body.counts?.all ?? 0,
+          live: body.counts?.live ?? 0,
+          failed: body.counts?.failed ?? 0,
+          done: body.counts?.done ?? 0,
+        });
         setError(null);
       } catch (err) {
         if (active) setError(err instanceof Error ? err.message : "Failed to load run queue.");
@@ -260,6 +268,11 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
             }`}
           >
             {item.label}
+            <span className={`ml-1 rounded px-1.5 py-0.5 font-mono ${
+              filter === item.value ? "bg-accent/20 text-accent" : "bg-card text-text-muted"
+            }`}>
+              {counts[item.value]}
+            </span>
           </button>
         ))}
       </div>
