@@ -34,15 +34,16 @@ export function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-start justify-center bg-black/65 px-4 pt-[10vh] backdrop-blur-sm"
+      className="fixed inset-0 z-[9999] grid place-items-center bg-black/75 px-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
     >
       <div className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
         <div className="flex items-start gap-3 border-b border-border px-5 py-4">
           <div
-            className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${destructive ? "bg-blocked/10 text-blocked" : "bg-accent/10 text-accent"
-              }`}
+            className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+              destructive ? "bg-blocked/10 text-blocked" : "bg-accent/10 text-accent"
+            }`}
           >
             <AlertTriangle size={18} />
           </div>
