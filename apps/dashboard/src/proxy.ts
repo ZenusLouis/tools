@@ -4,6 +4,7 @@ import { authCookieName, verifyAuthToken } from "@/lib/auth-token";
 const PUBLIC_PATHS = [
   "/login",
   "/api/auth/login",
+  "/api/admin",
   "/api/log",
   "/api/bridge/heartbeat",
   "/api/bridge/log",

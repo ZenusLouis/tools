@@ -6,7 +6,7 @@ npx prisma db push --skip-generate --accept-data-loss
 
 echo "[GCS Console] Ensuring default workspace exists..."
 # Create default workspace if it doesn't exist (required for legacy HOOK_SECRET auth)
-echo "INSERT INTO \"Workspace\" (\"id\", \"name\", \"slug\", \"updatedAt\", \"createdAt\") VALUES ('default-ws', 'Default Workspace', 'default', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT (\"slug\") DO NOTHING;" | npx prisma db execute --stdin
+echo "INSERT INTO \"Workspace\" (\"id\", \"name\", \"slug\", \"updatedAt\", \"createdAt\") VALUES ('default-ws', 'Default Workspace', 'default', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT (\"slug\") DO NOTHING;" | npx prisma db execute --stdin --url "$DATABASE_URL"
 
 echo "[GCS Console] Starting Next.js server in background..."
 node server.js &
