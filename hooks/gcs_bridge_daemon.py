@@ -1340,7 +1340,120 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
     return {"exitCode": returncode, "artifactPath": rel_artifact, "durationMin": duration_min, "tokens": total_tokens, "log": log_lines}
 
 
+def _detect_conventions(project_path: str, file_map: dict[str, list[str]]) -> str:
+    """Detect project conventions by grepping representative source files."""
+    import datetime as _dt
+    conventions: list[str] = []
+    cwd = Path(project_path)
+
+    def grep_files(pattern: str, exts: set[str], max_files: int = 5) -> list[tuple[str, str]]:
+        """Return (rel_path, matched_line) pairs."""
+        hits: list[tuple[str, str]] = []
+        for rel_dir, fnames in file_map.items():
+            for fname in fnames:
+                if os.path.splitext(fname)[1] not in exts:
+                    continue
+                fpath = cwd / rel_dir / fname
+                try:
+                    for line in fpath.read_text(encoding="utf-8", errors="replace").splitlines():
+                        if re.search(pattern, line):
+                            hits.append((f"{rel_dir}/{fname}", line.strip()))
+                            break
+                except Exception:
+                    pass
+                if len(hits) >= max_files:
+                    return hits
+        return hits
+
+    # ── Java / Spring Boot ───────────────────────────────────────────────────
+    java_files = {ext for ext in {".java"}}
+    if any(f.endswith(".java") for fnames in file_map.values() for f in fnames):
+        # Package root
+        pkg_hits = grep_files(r"^package\s+[\w.]+;", java_files, 1)
+        if pkg_hits:
+            pkg = re.search(r"^package\s+([\w.]+);", pkg_hits[0][1])
+            if pkg:
+                conventions.append(f"- Java package root: `{pkg.group(1)}`")
+
+        # Entity pattern
+        entity_hits = grep_files(r"@Entity", java_files, 1)
+        if entity_hits:
+            conventions.append(f"- JPA entities: `@Entity` — see `{entity_hits[0][0]}`")
+
+        # Repository base
+        repo_hits = grep_files(r"extends\s+Jpa|extends\s+Crud|extends\s+PagingAndSorting", java_files, 1)
+        if repo_hits:
+            base = re.search(r"extends\s+(\w+Repository)", repo_hits[0][1])
+            conventions.append(f"- Repository base: `{base.group(1) if base else 'JpaRepository'}` — see `{repo_hits[0][0]}`")
+
+        # Service annotation
+        svc_hits = grep_files(r"@Service", java_files, 1)
+        if svc_hits:
+            tx = grep_files(r"@Transactional", java_files, 1)
+            tx_note = " with `@Transactional`" if tx else ""
+            conventions.append(f"- Service layer: `@Service`{tx_note} — see `{svc_hits[0][0]}`")
+
+        # Controller pattern
+        ctrl_hits = grep_files(r"@RestController|@Controller", java_files, 1)
+        if ctrl_hits:
+            req = grep_files(r"@RequestMapping", java_files, 1)
+            conventions.append(f"- Controller: `@RestController` + `@RequestMapping` — see `{ctrl_hits[0][0]}`")
+
+        # Constructor injection
+        req_args = grep_files(r"@RequiredArgsConstructor|@AllArgsConstructor", java_files, 1)
+        if req_args:
+            conventions.append("- DI: `@RequiredArgsConstructor` (Lombok constructor injection)")
+        else:
+            autowired = grep_files(r"@Autowired", java_files, 1)
+            if autowired:
+                conventions.append("- DI: `@Autowired` field injection")
+
+        # JWT / Security
+        jwt_hits = grep_files(r"JwtPrincipal|JwtAuthenticationFilter|SecurityConfig", java_files, 1)
+        if jwt_hits:
+            conventions.append(f"- Security: JWT-based, principal via `JwtPrincipal` — see `{jwt_hits[0][0]}`")
+
+        # Exception handling
+        exc_hits = grep_files(r"@RestControllerAdvice|@ControllerAdvice", java_files, 1)
+        if exc_hits:
+            conventions.append(f"- Exception handler: `@RestControllerAdvice` — see `{exc_hits[0][0]}`")
+
+        # Flyway migrations
+        sql_files = [f for fnames in file_map.values() for f in fnames if f.endswith(".sql")]
+        if sql_files:
+            versions = sorted(re.findall(r"V(\d+)__", " ".join(sql_files)))
+            conventions.append(f"- DB migrations: Flyway, current version V{versions[-1] if versions else '?'}")
+
+    # ── TypeScript / Angular / NestJS ─────────────────────────────────────────
+    ts_files = {".ts", ".tsx"}
+    if any(f.endswith(".ts") for fnames in file_map.values() for f in fnames):
+        ng_hits = grep_files(r"@Component\(|@NgModule\(", ts_files, 1)
+        nest_hits = grep_files(r"@Controller\(|@Injectable\(", ts_files, 1)
+        if ng_hits:
+            conventions.append(f"- Angular components: `@Component` — see `{ng_hits[0][0]}`")
+        if nest_hits:
+            conventions.append(f"- NestJS: `@Controller` / `@Injectable` — see `{nest_hits[0][0]}`")
+        next_hits = grep_files(r"export default function|\"use client\"|\"use server\"", ts_files, 1)
+        if next_hits:
+            conventions.append("- Next.js App Router: server components default, `\"use client\"` for interactivity")
+
+    # ── Python ───────────────────────────────────────────────────────────────
+    py_files = {".py"}
+    if any(f.endswith(".py") for fnames in file_map.values() for f in fnames):
+        fastapi = grep_files(r"from fastapi|import fastapi", py_files, 1)
+        django = grep_files(r"from django|import django", py_files, 1)
+        if fastapi:
+            conventions.append("- Python framework: FastAPI")
+        elif django:
+            conventions.append("- Python framework: Django")
+
+    if not conventions:
+        return ""
+    return "## Conventions (auto-detected)\n" + "\n".join(conventions)
+
+
 def execute_generate_code_index(action: dict[str, Any]) -> dict[str, Any]:
+    import datetime as _dt
     payload = action.get("payload") if isinstance(action.get("payload"), dict) else {}
     action_id = str(action.get("id") or "")
     project_name = str(payload.get("projectName") or "")
@@ -1369,13 +1482,18 @@ def execute_generate_code_index(action: dict[str, Any]) -> dict[str, Any]:
                 file_map.setdefault(rel_dir, []).append(fname)
                 file_count += 1
 
-    today = __import__("datetime").date.today().isoformat()
+    post_action_progress(action_id, ["Detecting conventions..."])
+    conventions_block = _detect_conventions(project_path, file_map)
+
+    today = _dt.date.today().isoformat()
     lines = [
         f"# Code Index: {project_name} [HEADER — load on /start]",
         f"Total: {file_count} files | Last indexed: {today}",
         "---FULL INDEX BELOW---",
         "",
     ]
+    if conventions_block:
+        lines += [conventions_block, ""]
     for rel_dir in sorted(file_map):
         lines.append(f"## {rel_dir}/")
         for fname in file_map[rel_dir]:
