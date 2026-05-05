@@ -1158,8 +1158,23 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
         code_index_path = ROOT / "projects" / project_name / "code-index.md"
     if code_index_path.exists():
         try:
-            index_content = code_index_path.read_text(encoding="utf-8", errors="replace")
-            prompt = prompt + f"\n\n## Project Code Index\n{index_content}"
+            raw = code_index_path.read_text(encoding="utf-8", errors="replace")
+            separator = "---FULL INDEX BELOW---"
+            header_end = raw.find(separator)
+            if header_end != -1:
+                after = raw[header_end + len(separator):]
+                conv_match = re.search(r"(## Conventions.*?)(?=\n## [^C]|\Z)", after, re.DOTALL)
+                conventions = conv_match.group(1).strip() if conv_match else ""
+                header = raw[:header_end].strip()
+                index_content = header + ("\n\n" + conventions if conventions else "")
+            else:
+                index_content = raw[:2000]
+            rel_index = str(code_index_path.relative_to(cwd)) if code_index_path.is_relative_to(cwd) else ".gcs/code-index.md"
+            prompt = prompt + (
+                f"\n\n## Project Context\n{index_content}"
+                f"\n\nFull file index: `{rel_index}` — read this file to find any source file path."
+                f" Do NOT use find/Glob/Bash to discover project structure — the index already has everything."
+            )
         except Exception:
             pass
 
@@ -1173,15 +1188,15 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
         binary = os.environ.get("GCS_CLAUDE_BIN") or shutil.which("claude")
         if not binary:
             raise ValueError("claude executable not found in PATH")
-        max_turns = str(int(os.environ.get("GCS_MAX_TURNS", "15")))
         cmd = [
             binary, "-p",
             "--output-format", "stream-json",
             "--verbose",
             "--dangerously-skip-permissions",
-            "--max-turns", max_turns,
-            "--allowedTools", "Bash,Glob,Grep,Read,Write,Edit,Notebook,Sticker"
+            "--allowedTools", "Bash,Glob,Grep,Read,Write,Edit,Notebook,Sticker,Agent"
         ]
+        if os.environ.get("GCS_MAX_TURNS"):
+            cmd.extend(["--max-turns", os.environ["GCS_MAX_TURNS"]])
         if model:
             cmd.extend(["--model", model])
         prompt_handle = prompt_path.open("r", encoding="utf-8", errors="replace")
