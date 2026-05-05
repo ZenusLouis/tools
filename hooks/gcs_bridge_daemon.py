@@ -1153,6 +1153,16 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
     if model:
         env["GCS_MODEL"] = model
 
+    code_index_path = cwd / ".gcs" / "code-index.md"
+    if not code_index_path.exists():
+        code_index_path = ROOT / "projects" / project_name / "code-index.md"
+    if code_index_path.exists():
+        try:
+            index_content = code_index_path.read_text(encoding="utf-8", errors="replace")
+            prompt = prompt + f"\n\n## Project Code Index\n{index_content}"
+        except Exception:
+            pass
+
     prompt_path = _safe_task_file(project_path, task_id, "prompt.txt")
     prompt_path.parent.mkdir(parents=True, exist_ok=True)
     prompt_path.write_text(prompt, encoding="utf-8")
@@ -1330,6 +1340,57 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
     return {"exitCode": returncode, "artifactPath": rel_artifact, "durationMin": duration_min, "tokens": total_tokens, "log": log_lines}
 
 
+def execute_generate_code_index(action: dict[str, Any]) -> dict[str, Any]:
+    payload = action.get("payload") if isinstance(action.get("payload"), dict) else {}
+    action_id = str(action.get("id") or "")
+    project_name = str(payload.get("projectName") or "")
+    project_path = str(payload.get("projectPath") or "")
+    if not project_path or not project_name:
+        raise ValueError("generate_code_index requires projectName and projectPath")
+
+    cwd = Path(project_path).expanduser()
+    if not cwd.exists():
+        raise ValueError(f"projectPath not accessible: {project_path}")
+
+    post_action_progress(action_id, [f"Scanning {project_path} for code-index..."])
+
+    SKIP_DIRS = {"node_modules", ".git", ".next", "dist", "build", "__pycache__",
+                 ".venv", "target", ".turbo", ".gcs", ".gradle", ".idea"}
+    SOURCE_EXTS = {".ts", ".tsx", ".js", ".jsx", ".mjs", ".py", ".go", ".rs",
+                   ".java", ".kt", ".rb", ".vue", ".svelte", ".cs"}
+
+    file_map: dict[str, list[str]] = {}
+    file_count = 0
+    for root, dirs, files in os.walk(project_path):
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+        rel_dir = os.path.relpath(root, project_path).replace("\\", "/")
+        for fname in sorted(files):
+            if os.path.splitext(fname)[1] in SOURCE_EXTS:
+                file_map.setdefault(rel_dir, []).append(fname)
+                file_count += 1
+
+    today = __import__("datetime").date.today().isoformat()
+    lines = [
+        f"# Code Index: {project_name} [HEADER — load on /start]",
+        f"Total: {file_count} files | Last indexed: {today}",
+        "---FULL INDEX BELOW---",
+        "",
+    ]
+    for rel_dir in sorted(file_map):
+        lines.append(f"## {rel_dir}/")
+        for fname in file_map[rel_dir]:
+            lines.append(f"- `{fname}`")
+        lines.append("")
+    content = "\n".join(lines)
+
+    out_path = cwd / ".gcs" / "code-index.md"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(content, encoding="utf-8")
+
+    post_action_progress(action_id, [f"Code index written: {file_count} files → .gcs/code-index.md"])
+    return {"fileCount": file_count, "path": str(out_path)}
+
+
 def execute_file_action(action: dict[str, Any]) -> dict[str, Any]:
     action_type = str(action.get("type") or "")
     payload = action.get("payload") if isinstance(action.get("payload"), dict) else {}
@@ -1339,6 +1400,9 @@ def execute_file_action(action: dict[str, Any]) -> dict[str, Any]:
 
     if action_type == "run_task":
         return execute_task_action(action)
+
+    if action_type == "generate_code_index":
+        return execute_generate_code_index(action)
 
     if action_type != "sync_project_metadata":
         raise ValueError(f"unsupported file action type: {action_type}")

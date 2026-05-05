@@ -1,0 +1,22 @@
+{
+  "name": "omnibooking",
+  "path": "D:\\Code\\OmniBooking",
+  "framework": [
+    "angular",
+    "spring-boot",
+    "postgresql",
+    "docker",
+    "kubernetes"
+  ],
+  "mcpProfile": "fullstack",
+  "docs": {
+    "brd": "D:\\Code\\OmniBooking\\docx\\BRD_OmniBooking_Requirement_Deep_Dive_FINAL6.pdf"
+  },
+  "tools": {},
+  "env": {
+    "required": [],
+    "envFile": ".env.local"
+  },
+  "lastIndexed": "2026-04-29",
+  "activeTask": null
+}

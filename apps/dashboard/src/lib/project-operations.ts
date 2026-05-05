@@ -5,13 +5,13 @@ type ProjectWithLatestPath = {
   name: string;
   workspaceId: string | null;
   path: string | null;
-  bridgePaths: { path: string }[];
+  bridgePaths: { path: string; deviceId: string; device: { lastSeenAt: Date | null } }[];
 };
 
 async function loadProjectForOperation(projectName: string, workspaceId: string): Promise<ProjectWithLatestPath | null> {
   const project = await db.project.findFirst({
     where: { name: projectName, OR: [{ workspaceId }, { workspaceId: null }] },
-    include: { bridgePaths: { orderBy: { updatedAt: "desc" }, take: 1 } },
+    include: { bridgePaths: { orderBy: { updatedAt: "desc" }, take: 1, include: { device: { select: { lastSeenAt: true } } } } },
   });
 
   if (!project) return null;
@@ -53,6 +53,20 @@ export async function recordReindexProject(projectName: string, workspaceId: str
       cwd: projectPath,
     },
   });
+
+  if (projectPath) {
+    const onlineDevice = project.bridgePaths.find(
+      (bp) => bp.device.lastSeenAt && Date.now() - bp.device.lastSeenAt.getTime() < 90_000
+    );
+    await db.bridgeFileAction.create({
+      data: {
+        workspaceId,
+        type: "generate_code_index",
+        deviceId: onlineDevice?.deviceId ?? null,
+        payload: { projectName, projectPath },
+      },
+    });
+  }
 
   revalidateProject(projectName);
   return { ok: true };

@@ -312,6 +312,13 @@ export async function createProject(input: CreateProjectInput): Promise<{ error?
         },
       },
     });
+    await db.bridgeFileAction.create({
+      data: {
+        workspaceId: user.workspaceId,
+        type: "generate_code_index",
+        payload: { projectName: name, projectPath: trimmedFolderPath },
+      },
+    });
   }
 
   return { name, localSyncQueued: Boolean(trimmedFolderPath) };
