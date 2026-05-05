@@ -49,9 +49,13 @@ export async function POST(req: NextRequest) {
     action.result && typeof action.result === "object" && !Array.isArray(action.result)
       ? action.result as Record<string, unknown>
       : {};
+  const incomingResult = parsed.data.result ?? {};
+  const prevLog = Array.isArray(previousResult.log) ? previousResult.log as string[] : [];
+  const newLog = Array.isArray(incomingResult.log) ? incomingResult.log as string[] : [];
   const nextResult = {
     ...previousResult,
-    ...(parsed.data.result ?? {}),
+    ...incomingResult,
+    log: [...prevLog, ...newLog].slice(-200),
   } as Prisma.InputJsonValue;
 
   await db.bridgeFileAction.update({

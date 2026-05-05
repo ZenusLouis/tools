@@ -834,7 +834,7 @@ def _fetch_task_prompt(task_id: str, phase: str, role: str) -> str:
         return str(res["promptText"])
     if isinstance(res, dict) and "error" in res:
         raise ValueError(f"Failed to fetch prompt context: {res['error']}")
-    return "You are running a GCS local task. Please check the dashboard for details."
+    raise ValueError(f"Failed to fetch prompt context for {task_id}: dashboard unreachable or returned unexpected response.")
 
 
 def _load_skill_content(slugs: list[str]) -> str:
@@ -1125,12 +1125,17 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
     # Enforce global ignore rules before starting the agent
     ensure_global_ignore(cwd)
 
-    prompt = _fetch_task_prompt(task_id, phase, role)
     post_action_progress(action_id, [
         f"Starting local {provider} task run for {task_id}.",
         f"Project path: {project_path}",
         f"Role: {role}",
+        "Fetching task prompt from dashboard...",
     ])
+    try:
+        prompt = _fetch_task_prompt(task_id, phase, role)
+    except ValueError as exc:
+        post_action_progress(action_id, [f"ERROR: {exc}"])
+        raise
     _post_task_event(task_id, phase, "in_progress", provider, role, f"Local {provider} started {phase} for {task_id}.")
 
     started = time.time()
@@ -1158,12 +1163,13 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
         binary = os.environ.get("GCS_CLAUDE_BIN") or shutil.which("claude")
         if not binary:
             raise ValueError("claude executable not found in PATH")
+        max_turns = str(int(os.environ.get("GCS_MAX_TURNS", "15")))
         cmd = [
-            binary, "-p", 
-            "--output-format", "stream-json", 
-            "--verbose", 
+            binary, "-p",
+            "--output-format", "stream-json",
+            "--verbose",
             "--dangerously-skip-permissions",
-            "--max-turns", "15",
+            "--max-turns", max_turns,
             "--allowedTools", "Bash,Glob,Grep,Read,Write,Edit,Notebook,Sticker"
         ]
         if model:
