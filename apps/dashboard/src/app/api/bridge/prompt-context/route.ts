@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 
 export async function POST(req: Request) {
   try {
-    const { taskId, role, phase } = await req.json();
+    const { taskId, phase } = await req.json();
 
     if (!taskId) {
       return NextResponse.json({ error: "taskId is required" }, { status: 400 });
@@ -35,8 +35,6 @@ export async function POST(req: Request) {
     }
 
     const projectName = task.feature?.module?.project?.name || "local";
-    const roleSlug = task.devRole?.slug || "dev-implementer";
-
     // 2. Fetch Command Template dynamically
     const targetSlug = phase === "planning" ? "prepare-brief" : phase === "review" ? "review" : "implement";
     const commandTemplate = await db.commandTemplate.findUnique({
@@ -102,8 +100,8 @@ ${steps.map((s, i) => `${i + 1}. ${s}`).join("\n")}
     `.trim();
 
     return NextResponse.json({ promptText });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Prompt Context Error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Prompt context failed" }, { status: 500 });
   }
 }

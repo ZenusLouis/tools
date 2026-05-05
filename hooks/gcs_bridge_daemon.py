@@ -1105,6 +1105,66 @@ def ensure_global_ignore(project_path: Path) -> None:
             pass
 
 
+def _sync_task_to_progress(project_name: str, payload: dict[str, Any]) -> None:
+    """Upsert task details from bridge action payload into the hub's progress.json."""
+    task_data = payload.get("task")
+    if not isinstance(task_data, dict):
+        return
+    task_id = str(task_data.get("id") or payload.get("taskId") or "")
+    if not task_id:
+        return
+
+    progress_path = ROOT / "projects" / project_name / "progress.json"
+    try:
+        progress = json.loads(progress_path.read_text(encoding="utf-8")) if progress_path.exists() else {}
+    except Exception:
+        progress = {}
+
+    if not isinstance(progress, dict):
+        progress = {}
+    progress.setdefault("project", project_name)
+    progress.setdefault("modules", [])
+
+    module_name = str(task_data.get("moduleName") or "")
+    feature_name = str(task_data.get("featureName") or "")
+
+    # Find or create module
+    module_entry = next((m for m in progress["modules"] if m.get("name") == module_name), None)
+    if not module_entry:
+        module_entry = {"name": module_name, "features": []}
+        progress["modules"].append(module_entry)
+    module_entry.setdefault("features", [])
+
+    # Find or create feature
+    feature_entry = next((f for f in module_entry["features"] if f.get("name") == feature_name), None)
+    if not feature_entry:
+        feature_entry = {"name": feature_name, "tasks": []}
+        module_entry["features"].append(feature_entry)
+    feature_entry.setdefault("tasks", [])
+
+    # Upsert task
+    existing = next((t for t in feature_entry["tasks"] if t.get("id") == task_id), None)
+    task_entry = {
+        "id": task_id,
+        "name": str(task_data.get("name") or ""),
+        "summary": str(task_data.get("summary") or ""),
+        "details": str(task_data.get("details") or ""),
+        "acceptanceCriteria": task_data.get("acceptanceCriteria") or [],
+        "steps": task_data.get("steps") or [],
+        "status": "pending",
+    }
+    if existing:
+        existing.update(task_entry)
+    else:
+        feature_entry["tasks"].append(task_entry)
+
+    try:
+        progress_path.parent.mkdir(parents=True, exist_ok=True)
+        progress_path.write_text(json.dumps(progress, indent=2, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+
+
 def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
     action_id = str(action.get("id") or "")
     payload = action.get("payload") if isinstance(action.get("payload"), dict) else {}
@@ -1129,13 +1189,9 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
         f"Starting local {provider} task run for {task_id}.",
         f"Project path: {project_path}",
         f"Role: {role}",
-        "Fetching task prompt from dashboard...",
+        "Syncing task details to hub...",
     ])
-    try:
-        prompt = _fetch_task_prompt(task_id, phase, role)
-    except ValueError as exc:
-        post_action_progress(action_id, [f"ERROR: {exc}"])
-        raise
+    _sync_task_to_progress(project_name, payload)
     _post_task_event(task_id, phase, "in_progress", provider, role, f"Local {provider} started {phase} for {task_id}.")
 
     started = time.time()
@@ -1146,6 +1202,7 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
     env = os.environ.copy()
     env.update({
         "GCS_PROJECT": project_name,
+        "GCS_PROJECT_PATH": project_path,
         "GCS_TASK_ID": task_id,
         "GCS_PROVIDER": provider,
         "GCS_ROLE": role,
@@ -1153,56 +1210,31 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
     if model:
         env["GCS_MODEL"] = model
 
-    code_index_path = cwd / ".gcs" / "code-index.md"
-    if not code_index_path.exists():
-        code_index_path = ROOT / "projects" / project_name / "code-index.md"
-    if code_index_path.exists():
-        try:
-            raw = code_index_path.read_text(encoding="utf-8", errors="replace")
-            separator = "---FULL INDEX BELOW---"
-            header_end = raw.find(separator)
-            if header_end != -1:
-                after = raw[header_end + len(separator):]
-                conv_match = re.search(r"(## Conventions.*?)(?=\n## [^C]|\Z)", after, re.DOTALL)
-                conventions = conv_match.group(1).strip() if conv_match else ""
-                header = raw[:header_end].strip()
-                index_content = header + ("\n\n" + conventions if conventions else "")
-            else:
-                index_content = raw[:2000]
-            rel_index = str(code_index_path.relative_to(cwd)) if code_index_path.is_relative_to(cwd) else ".gcs/code-index.md"
-            prompt = prompt + (
-                f"\n\n## Project Context\n{index_content}"
-                f"\n\nFull file index: `{rel_index}` — read this file to find any source file path."
-                f" Do NOT use find/Glob/Bash to discover project structure — the index already has everything."
-            )
-        except Exception:
-            pass
-
-    prompt_path = _safe_task_file(project_path, task_id, "prompt.txt")
-    prompt_path.parent.mkdir(parents=True, exist_ok=True)
-    prompt_path.write_text(prompt, encoding="utf-8")
-    rel_prompt = str(prompt_path.relative_to(cwd)) if prompt_path.is_relative_to(cwd) else str(prompt_path)
-
     prompt_handle = None
     if provider == "claude":
         binary = os.environ.get("GCS_CLAUDE_BIN") or shutil.which("claude")
         if not binary:
             raise ValueError("claude executable not found in PATH")
+        # Strip project prefix to get relative task ID for /run-task skill
+        relative_task_id = task_id
+        if task_id.startswith(f"{project_name}-"):
+            relative_task_id = task_id[len(project_name) + 1:]
+        phase_cmd = "run-task" if phase == "implementation" else f"run-task --phase {phase}"
+        slash_cmd = f"/{phase_cmd} {relative_task_id}"
         cmd = [
-            binary, "-p",
+            binary, "-p", slash_cmd,
             "--output-format", "stream-json",
             "--verbose",
             "--dangerously-skip-permissions",
-            "--allowedTools", "Bash,Glob,Grep,Read,Write,Edit,Notebook,Sticker,Agent"
+            "--allowedTools", "Bash,Glob,Grep,Read,Write,Edit,Notebook,Sticker,Agent",
         ]
         if os.environ.get("GCS_MAX_TURNS"):
             cmd.extend(["--max-turns", os.environ["GCS_MAX_TURNS"]])
         if model:
             cmd.extend(["--model", model])
-        prompt_handle = prompt_path.open("r", encoding="utf-8", errors="replace")
-        display_cmd = f"cd /d {_quote_cmd_arg(str(cwd))} && type {_quote_cmd_arg(str(prompt_path))} | {' '.join(_quote_cmd_arg(part) for part in cmd)}"
-        post_action_progress(action_id, [f"CMD: {display_cmd}", f"Prompt file: {rel_prompt}"])
-        proc = subprocess.Popen(cmd, cwd=str(cwd), env=env, stdin=prompt_handle, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
+        display_cmd = f"cd /d {_quote_cmd_arg(str(ROOT))} && {' '.join(_quote_cmd_arg(part) for part in cmd)}"
+        post_action_progress(action_id, [f"CMD: {display_cmd}"])
+        proc = subprocess.Popen(cmd, cwd=str(ROOT), env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
     elif provider == "codex":
         binary = os.environ.get("GCS_CODEX_BIN") or shutil.which("codex")
         if not binary:

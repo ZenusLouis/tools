@@ -22,21 +22,29 @@ Claude implements a specific task using code-index + design-map for minimal toke
 - `M2` → find all pending tasks in module 2, run sequentially by feature order
 - After each task in a sequence: show result + ask "Continue to next task? [yes / stop]"
 
-## Steps (token-optimized)
-1. Read `projects/<name>/progress.json` → task name, description, module
-2. Read `projects/<name>/design-map.json` → nodeId for this task
-   **If file missing** (i.e., `/design --figma` was never run) → treat all tasks as `null` (skip Figma entirely)
-3. Read `projects/<name>/decisions.md` → relevant constraints (Grep for task module)
-4. Read `projects/<name>/code-index.md` (full) → find relevant files
-5. Read ONLY the files identified in step 4 (1-3 files max)
-6. If nodeId ≠ null → call `figma.get_design_context(fileKey, nodeId)` — exact node
-7. If nodeId = null → skip Figma entirely
-8. Implement task
-9. Update `code-index.md --delta` for any new/changed files
-10. Update `progress.json` task status → "in-progress"
+## Bridge Mode (when GCS_TASK_ID is set)
+When env var `GCS_TASK_ID` is present, the bridge invoked this skill headlessly:
+- `<name>` = `$GCS_PROJECT`
+- Project root for writing files = `$GCS_PROJECT_PATH` (overrides context.json path)
+- Skip all GATE prompts — proceed directly
+- Do NOT ask "Continue to next task?" — run only the single task in `GCS_TASK_ID`
 
-## GATE 3 (first task of each module)
-Before starting the first task of a new module:
+## Steps (token-optimized)
+1. Resolve `<name>`: use `$GCS_PROJECT` env var if set, else read from `context.json`
+2. Read `projects/<name>/progress.json` → task name, description, acceptanceCriteria, steps
+3. Read `projects/<name>/design-map.json` → nodeId for this task
+   **If file missing** → treat all tasks as `null` (skip Figma entirely)
+4. Read `projects/<name>/decisions.md` → relevant constraints (Grep for task module)
+5. Read `projects/<name>/code-index.md` (full) → find relevant files by path
+6. Determine project root: `$GCS_PROJECT_PATH` if set, else `path` from context.json
+7. Read ONLY the 1-3 files most relevant to the task from code-index
+8. If nodeId ≠ null → call `figma.get_design_context(fileKey, nodeId)`
+9. Implement task — write to project root
+10. Update `projects/<name>/code-index.md --delta` for new/changed files
+11. Update `projects/<name>/progress.json` task status → "done"
+
+## GATE 3 (first task of each module — interactive only)
+Skip if `GCS_TASK_ID` is set. Otherwise:
 ```
 Starting Module <n>: <name> (<total> tasks)
 First task: <id> — <description>

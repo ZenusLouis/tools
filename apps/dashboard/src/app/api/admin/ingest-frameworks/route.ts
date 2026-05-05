@@ -18,7 +18,7 @@ function findSkillFiles(dir: string, fileList: string[] = []): string[] {
   return fileList;
 }
 
-export async function POST(req: Request) {
+export async function POST() {
   try {
     // Determine repo root: In Docker it's /data, locally it's ../../
     let repoRoot = path.resolve(process.cwd(), "../../");
@@ -97,8 +97,8 @@ export async function POST(req: Request) {
       skillsIngested,
       message: "Successfully ingested frameworks into database.",
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Ingestion error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Ingestion failed" }, { status: 500 });
   }
 }

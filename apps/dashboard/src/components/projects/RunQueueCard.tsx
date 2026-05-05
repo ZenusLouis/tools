@@ -36,7 +36,27 @@ type QueueAction = {
   completedAt: string | null;
 };
 
+type QueueActionDetail = {
+  id: string;
+  status: string;
+  error: string | null;
+  taskId: string | null;
+  provider: string | null;
+  phase: string | null;
+  role: string | null;
+  deviceName: string | null;
+  artifactPath: string | null;
+  exitCode: number | null;
+  command: string | null;
+  log: string[];
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+};
+
 type QueueFilter = "all" | "live" | "failed" | "done";
+type ProviderFilter = "all" | "claude" | "codex";
+type PhaseFilter = "all" | "analysis" | "implementation" | "review";
 type QueueCounts = Record<QueueFilter, number>;
 
 const FILTERS: Array<{ value: QueueFilter; label: string }> = [
@@ -44,6 +64,19 @@ const FILTERS: Array<{ value: QueueFilter; label: string }> = [
   { value: "live", label: "Live" },
   { value: "failed", label: "Failed" },
   { value: "done", label: "Done" },
+];
+
+const PROVIDERS: Array<{ value: ProviderFilter; label: string }> = [
+  { value: "all", label: "All agents" },
+  { value: "claude", label: "Claude" },
+  { value: "codex", label: "Codex" },
+];
+
+const PHASES: Array<{ value: PhaseFilter; label: string }> = [
+  { value: "all", label: "All phases" },
+  { value: "analysis", label: "Brief" },
+  { value: "implementation", label: "Build" },
+  { value: "review", label: "Review" },
 ];
 
 function statusClass(status: string) {
@@ -80,11 +113,16 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
   const [totalActions, setTotalActions] = useState(0);
   const [counts, setCounts] = useState<QueueCounts>({ all: 0, live: 0, failed: 0, done: 0 });
   const [filter, setFilter] = useState<QueueFilter>("all");
+  const [providerFilter, setProviderFilter] = useState<ProviderFilter>("all");
+  const [phaseFilter, setPhaseFilter] = useState<PhaseFilter>("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyActionId, setBusyActionId] = useState<string | null>(null);
   const [expandedActionId, setExpandedActionId] = useState<string | null>(null);
   const [copiedActionId, setCopiedActionId] = useState<string | null>(null);
+  const [detailAction, setDetailAction] = useState<QueueActionDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
 
   const hasLiveAction = useMemo(
     () => actions.some((action) => action.status === "pending" || action.status === "running"),
@@ -101,7 +139,12 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
 
   const loadQueue = useCallback(async (active = true) => {
       try {
-        const params = new URLSearchParams({ limit: String(visibleLimit), status: filter });
+        const params = new URLSearchParams({
+          limit: String(visibleLimit),
+          status: filter,
+          provider: providerFilter,
+          phase: phaseFilter,
+        });
         const res = await fetch(`/api/projects/${encodeURIComponent(projectName)}/run-queue?${params.toString()}`, { cache: "no-store" });
         const body = await res.json().catch(() => ({})) as { actions?: QueueAction[]; total?: number; counts?: Partial<QueueCounts>; error?: string };
         if (!active) return;
@@ -123,7 +166,7 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
       } finally {
         if (active) setLoading(false);
       }
-  }, [filter, projectName, visibleLimit]);
+  }, [filter, phaseFilter, projectName, providerFilter, visibleLimit]);
 
   useEffect(() => {
     let active = true;
@@ -215,6 +258,29 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
     window.setTimeout(() => setCopiedActionId((current) => current === action.id ? null : current), 1500);
   }
 
+  async function openFullLog(action: QueueAction) {
+    setDetailLoading(true);
+    setDetailError(null);
+    setDetailAction(null);
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectName)}/run-queue/${encodeURIComponent(action.id)}`, { cache: "no-store" });
+      const body = await res.json().catch(() => ({})) as { action?: QueueActionDetail; error?: string };
+      if (!res.ok || !body.action) {
+        setDetailError(body.error ?? "Failed to load full run log.");
+        return;
+      }
+      setDetailAction(body.action);
+    } catch (err) {
+      setDetailError(err instanceof Error ? err.message : "Failed to load full run log.");
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+
+  async function copyText(text: string) {
+    await navigator.clipboard.writeText(text);
+  }
+
   return (
     <section className="bg-card border border-border rounded-xl p-5">
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -277,6 +343,37 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
         ))}
       </div>
 
+      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <select
+          value={providerFilter}
+          onChange={(event) => {
+            setProviderFilter(event.target.value as ProviderFilter);
+            setVisibleLimit(8);
+            setExpandedActionId(null);
+          }}
+          className="rounded-lg border border-border bg-bg-base px-2.5 py-2 text-xs font-bold text-text outline-none transition-colors hover:border-accent focus:border-accent"
+          aria-label="Filter run queue by provider"
+        >
+          {PROVIDERS.map((item) => (
+            <option key={item.value} value={item.value}>{item.label}</option>
+          ))}
+        </select>
+        <select
+          value={phaseFilter}
+          onChange={(event) => {
+            setPhaseFilter(event.target.value as PhaseFilter);
+            setVisibleLimit(8);
+            setExpandedActionId(null);
+          }}
+          className="rounded-lg border border-border bg-bg-base px-2.5 py-2 text-xs font-bold text-text outline-none transition-colors hover:border-accent focus:border-accent"
+          aria-label="Filter run queue by phase"
+        >
+          {PHASES.map((item) => (
+            <option key={item.value} value={item.value}>{item.label}</option>
+          ))}
+        </select>
+      </div>
+
       {error && (
         <div className="rounded-lg border border-blocked/30 bg-blocked/10 px-3 py-2 text-xs text-blocked">
           {error}
@@ -331,6 +428,15 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
                     >
                       {expandedActionId === action.id ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
                       Log
+                    </button>
+                  )}
+                  {(action.logTail.length > 0 || action.artifactPath || action.error) && (
+                    <button
+                      type="button"
+                      onClick={() => void openFullLog(action)}
+                      className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-[10px] font-bold text-text-muted hover:border-accent hover:text-accent"
+                    >
+                      Full
                     </button>
                   )}
                   {action.taskId && (action.status === "pending" || action.status === "running") && (
@@ -412,6 +518,79 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
               Show more runs ({totalActions - actions.length} hidden)
             </button>
           )}
+        </div>
+      )}
+      {(detailAction || detailLoading || detailError) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="flex max-h-[85vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-border bg-bg-base shadow-2xl">
+            <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
+              <div className="min-w-0">
+                <h3 className="text-sm font-bold text-text">Run Log Detail</h3>
+                <p className="mt-1 truncate font-mono text-[11px] text-text-muted">
+                  {detailAction?.taskId ?? "loading"} {detailAction?.provider ? `- ${detailAction.provider}` : ""} {detailAction?.phase ? `- ${detailAction.phase}` : ""}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                {detailAction?.command && (
+                  <button
+                    type="button"
+                    onClick={() => void copyText(detailAction.command ?? "")}
+                    className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-[10px] font-bold text-text-muted hover:border-accent hover:text-accent"
+                  >
+                    <Clipboard size={10} /> Copy CMD
+                  </button>
+                )}
+                {detailAction?.log.length ? (
+                  <button
+                    type="button"
+                    onClick={() => void copyText(detailAction.log.join("\n"))}
+                    className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-[10px] font-bold text-text-muted hover:border-accent hover:text-accent"
+                  >
+                    <Clipboard size={10} /> Copy Log
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDetailAction(null);
+                    setDetailError(null);
+                    setDetailLoading(false);
+                  }}
+                  className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-[10px] font-bold text-text-muted hover:border-blocked hover:text-blocked"
+                >
+                  <X size={10} /> Close
+                </button>
+              </div>
+            </div>
+            {detailLoading && (
+              <div className="flex items-center justify-center gap-2 p-8 text-sm text-text-muted">
+                <Loader2 size={16} className="animate-spin" /> Loading full log...
+              </div>
+            )}
+            {detailError && (
+              <div className="m-4 rounded-lg border border-blocked/30 bg-blocked/10 px-3 py-2 text-xs text-blocked">
+                {detailError}
+              </div>
+            )}
+            {detailAction && (
+              <div className="min-h-0 overflow-auto p-4">
+                <div className="mb-3 grid grid-cols-2 gap-2 text-[11px] text-text-muted md:grid-cols-4">
+                  <span>Status: <b className="text-text">{detailAction.status}</b></span>
+                  <span>Device: <b className="text-text">{detailAction.deviceName ?? "unknown"}</b></span>
+                  <span>Exit: <b className="text-text">{detailAction.exitCode ?? "--"}</b></span>
+                  <span>Lines: <b className="text-text">{detailAction.log.length}</b></span>
+                </div>
+                {detailAction.artifactPath && (
+                  <p className="mb-3 truncate rounded border border-border bg-card px-3 py-2 font-mono text-[11px] text-done" title={detailAction.artifactPath}>
+                    {detailAction.artifactPath}
+                  </p>
+                )}
+                <pre className="max-h-[58vh] overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-card p-3 font-mono text-[11px] leading-relaxed text-text-muted">
+                  {detailAction.log.length ? detailAction.log.join("\n") : detailAction.error ?? "No process output captured."}
+                </pre>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </section>

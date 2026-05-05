@@ -355,6 +355,9 @@
 - Added backend-backed Run Queue expansion. `/api/projects/:name/run-queue` now returns `total` and up to 80 log lines per action, while the Project Overview queue shows `visible/total` and a `Show more runs` control instead of hiding older runs permanently.
 - Added backend Run Queue status filtering. The API accepts `status=all|live|failed|done`, and Project Overview now has segmented filters that reset pagination and make it easier to focus on live, failed/cancelled, or completed task runs.
 - Added Run Queue summary counts. The backend now returns all/live/failed/done counts for the project, and each filter tab shows its count so queue health is visible at a glance.
+- Added provider and phase filters to Project Run Queue. The API now accepts `provider=all|claude|codex` and `phase=all|analysis|implementation|review`, applies them at the database query level, and the UI exposes provider/phase selects that reset pagination and scoped counts.
+- Cleaned up lint blockers in the framework ingest and bridge prompt-context API routes by removing unused request/role variables and replacing `any` catch handlers with `unknown` plus safe error messages.
+- Added full run-log inspection from Project Run Queue. A new authenticated `/api/projects/:name/run-queue/:actionId` endpoint returns the stored command, full action log, artifact path, device, status, and exit code; the queue UI now opens this in a modal with `Copy CMD` and `Copy Log`.
 
 ## Checks
 
@@ -370,6 +373,12 @@
 - `npm run lint`
 - `npm run build`
 - `python -m py_compile hooks/gcs_bridge_daemon.py`
+- `npm run lint`
+- `npx tsc --noEmit`
+- `npm run build`
+- `npm run lint`
+- `npx tsc --noEmit`
+- `npm run build`
 - `npm run lint`
 - `npx tsc --noEmit`
 - `npm run build`

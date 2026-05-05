@@ -19,6 +19,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ name: st
   const url = new URL(req.url);
   const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 12), 1), 50);
   const status = url.searchParams.get("status");
+  const provider = url.searchParams.get("provider");
+  const phase = url.searchParams.get("phase");
 
   const project = await db.project.findFirst({
     where: { name: projectName, OR: [{ workspaceId: user.workspaceId }, { workspaceId: null }] },
@@ -31,11 +33,17 @@ export async function GET(req: Request, { params }: { params: Promise<{ name: st
     status === "failed" ? ["failed", "cancelled"] :
     status === "done" ? ["succeeded"] :
     null;
+  const providerFilter = provider === "claude" || provider === "codex" ? provider : null;
+  const phaseFilter = phase === "analysis" || phase === "implementation" || phase === "review" ? phase : null;
 
   const baseWhere = {
     workspaceId: user.workspaceId,
     type: "run_task",
-    payload: { path: ["projectName"], equals: project.name },
+    AND: [
+      { payload: { path: ["projectName"], equals: project.name } },
+      ...(providerFilter ? [{ payload: { path: ["provider"], equals: providerFilter } }] : []),
+      ...(phaseFilter ? [{ payload: { path: ["phase"], equals: phaseFilter } }] : []),
+    ],
   };
   const where = {
     ...baseWhere,
@@ -81,6 +89,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ name: st
     total,
     limit,
     status: statusFilter ? status : "all",
+    provider: providerFilter ?? "all",
+    phase: phaseFilter ?? "all",
     counts: {
       all: allCount,
       live: liveCount,
