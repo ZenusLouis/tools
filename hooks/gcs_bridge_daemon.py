@@ -355,7 +355,8 @@ def sync_codex_threads(state: dict[str, int]) -> int:
                 previous_tokens = legacy_previous_tokens
                 state[daily_token_key] = legacy_previous_tokens
 
-            if not _should_backfill_existing_codex_thread(row["updated_at_ms"]):
+            if previous_tokens is None and not _should_backfill_existing_codex_thread(row["updated_at_ms"]):
+                # No baseline at all — first time seeing thread, skip unless backfill enabled
                 state[daily_token_key] = current_tokens
                 state[legacy_token_key] = current_tokens
                 max_ms = max(max_ms, row["updated_at_ms"])
