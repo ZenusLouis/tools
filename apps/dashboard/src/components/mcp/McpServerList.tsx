@@ -28,7 +28,7 @@ function CopyButton({ text }: { text: string }) {
   }
 
   return (
-    <button onClick={handleCopy} className="flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-[10px] font-bold text-text-muted transition-all hover:bg-card-hover hover:text-text">
+    <button onClick={handleCopy} className="flex shrink-0 items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-[10px] font-bold text-text-muted whitespace-nowrap transition-all hover:bg-card-hover hover:text-text">
       {copied ? <Check size={12} className="text-done" /> : <Copy size={12} />}
       Copy claude mcp add
     </button>

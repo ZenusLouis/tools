@@ -20,7 +20,7 @@ export default async function McpPage() {
     <>
       <TopBar title="MCP Monitor" />
       <PageShell>
-        <div className="mx-auto grid max-w-[1400px] grid-cols-12 gap-8">
+        <div className="mx-auto grid max-w-[1400px] grid-cols-12 gap-8 items-start">
           <div className="col-span-12 lg:col-span-7 space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold tracking-tight text-text">MCP Servers</h2>
@@ -29,7 +29,7 @@ export default async function McpPage() {
             <McpServerList servers={servers} />
           </div>
 
-          <div className="col-span-12 lg:col-span-5 space-y-6">
+          <div className="col-span-12 lg:col-span-5 space-y-6 lg:sticky lg:top-8">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold tracking-tight text-text">MCP Profiles</h2>
               <span className="text-xs text-text-muted bg-card-hover px-2 py-1 rounded">
