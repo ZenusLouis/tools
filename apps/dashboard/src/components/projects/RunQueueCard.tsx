@@ -114,7 +114,7 @@ const PHASES: Array<{ value: PhaseFilter; label: string }> = [
 
 function statusClass(status: string) {
   if (status === "succeeded") return "border-done/30 bg-done/10 text-done";
-  if (status === "failed") return "border-blocked/30 bg-blocked/10 text-blocked";
+  if (status === "failed" || status === "expired") return "border-blocked/30 bg-blocked/10 text-blocked";
   if (status === "cancelled") return "border-text-muted/30 bg-text-muted/10 text-text-muted";
   if (status === "running") return "border-accent/30 bg-accent/10 text-accent";
   return "border-in-progress/30 bg-in-progress/10 text-in-progress";
@@ -122,7 +122,7 @@ function statusClass(status: string) {
 
 function StatusIcon({ status }: { status: string }) {
   if (status === "succeeded") return <CheckCircle2 size={12} />;
-  if (status === "failed" || status === "cancelled") return <XCircle size={12} />;
+  if (status === "failed" || status === "cancelled" || status === "expired") return <XCircle size={12} />;
   if (status === "running") return <Loader2 size={12} className="animate-spin" />;
   return <Clock3 size={12} />;
 }
@@ -148,8 +148,10 @@ function contextReportObject(report: Record<string, unknown> | null | undefined,
 
 export function RunQueueCard({ projectName }: { projectName: string }) {
   const [actions, setActions] = useState<QueueAction[]>([]);
-  const [visibleLimit, setVisibleLimit] = useState(8);
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(8);
   const [totalActions, setTotalActions] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [counts, setCounts] = useState<QueueCounts>({ all: 0, live: 0, failed: 0, done: 0 });
   const [filter, setFilter] = useState<QueueFilter>("all");
   const [providerFilter, setProviderFilter] = useState<ProviderFilter>("all");
@@ -164,28 +166,37 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
   const [detailError, setDetailError] = useState<string | null>(null);
 
   const hasLiveAction = useMemo(
-    () => actions.some((action) => action.status === "pending" || action.status === "running"),
+    () => actions.some((action) => action.status === "pending" || action.status === "claimed" || action.status === "running"),
     [actions],
   );
   const liveActions = useMemo(
-    () => actions.filter((action) => action.taskId && (action.status === "pending" || action.status === "running")),
+    () => actions.filter((action) => action.taskId && (action.status === "pending" || action.status === "claimed" || action.status === "running")),
     [actions],
   );
   const retryableActions = useMemo(
-    () => actions.filter((action) => action.taskId && (action.status === "failed" || action.status === "cancelled")),
+    () => actions.filter((action) => action.taskId && (action.status === "failed" || action.status === "cancelled" || action.status === "expired")),
     [actions],
   );
 
   const loadQueue = useCallback(async (active = true) => {
       try {
         const params = new URLSearchParams({
-          limit: String(visibleLimit),
+          page: String(page),
+          pageSize: String(pageSize),
           status: filter,
           provider: providerFilter,
           phase: phaseFilter,
         });
         const res = await fetch(`/api/projects/${encodeURIComponent(projectName)}/run-queue?${params.toString()}`, { cache: "no-store" });
-        const body = await res.json().catch(() => ({})) as { actions?: QueueAction[]; total?: number; counts?: Partial<QueueCounts>; error?: string };
+        const body = await res.json().catch(() => ({})) as {
+          actions?: QueueAction[];
+          total?: number;
+          page?: number;
+          pageSize?: number;
+          totalPages?: number;
+          counts?: Partial<QueueCounts>;
+          error?: string;
+        };
         if (!active) return;
         if (!res.ok) {
           setError(body.error ?? "Failed to load run queue.");
@@ -193,6 +204,9 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
         }
         setActions(body.actions ?? []);
         setTotalActions(body.total ?? body.actions?.length ?? 0);
+        const nextTotalPages = body.totalPages ?? 1;
+        setTotalPages(nextTotalPages);
+        if (page > nextTotalPages) setPage(nextTotalPages);
         setCounts({
           all: body.counts?.all ?? 0,
           live: body.counts?.live ?? 0,
@@ -205,7 +219,7 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
       } finally {
         if (active) setLoading(false);
       }
-  }, [filter, phaseFilter, projectName, providerFilter, visibleLimit]);
+  }, [filter, page, pageSize, phaseFilter, projectName, providerFilter]);
 
   useEffect(() => {
     let active = true;
@@ -363,7 +377,7 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
             type="button"
             onClick={() => {
               setFilter(item.value);
-              setVisibleLimit(8);
+              setPage(1);
               setExpandedActionId(null);
             }}
             className={`rounded-lg border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors ${
@@ -387,7 +401,7 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
           value={providerFilter}
           onChange={(event) => {
             setProviderFilter(event.target.value as ProviderFilter);
-            setVisibleLimit(8);
+            setPage(1);
             setExpandedActionId(null);
           }}
           className="rounded-lg border border-border bg-bg-base px-2.5 py-2 text-xs font-bold text-text outline-none transition-colors hover:border-accent focus:border-accent"
@@ -401,7 +415,7 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
           value={phaseFilter}
           onChange={(event) => {
             setPhaseFilter(event.target.value as PhaseFilter);
-            setVisibleLimit(8);
+            setPage(1);
             setExpandedActionId(null);
           }}
           className="rounded-lg border border-border bg-bg-base px-2.5 py-2 text-xs font-bold text-text outline-none transition-colors hover:border-accent focus:border-accent"
@@ -495,7 +509,7 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
                       Full
                     </button>
                   )}
-                  {action.taskId && (action.status === "pending" || action.status === "running") && (
+                  {action.taskId && (action.status === "pending" || action.status === "claimed" || action.status === "running") && (
                     <button
                       type="button"
                       onClick={() => void cancelTaskRun(action)}
@@ -506,7 +520,7 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
                       Cancel
                     </button>
                   )}
-                  {action.taskId && (action.status === "failed" || action.status === "cancelled") && (
+                  {action.taskId && (action.status === "failed" || action.status === "cancelled" || action.status === "expired") && (
                     <button
                       type="button"
                       onClick={() => void retryTaskRun(action)}
@@ -565,14 +579,28 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
               )}
             </div>
           ))}
-          {actions.length < totalActions && (
-            <button
-              type="button"
-              onClick={() => setVisibleLimit((current) => Math.min(current + 8, 50))}
-              className="w-full rounded-lg border border-dashed border-border bg-bg-base px-3 py-2 text-xs font-bold text-text-muted transition-colors hover:border-accent hover:text-accent"
-            >
-              Show more runs ({totalActions - actions.length} hidden)
-            </button>
+          {totalActions > pageSize && (
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-bg-base px-3 py-2">
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={page <= 1}
+                className="rounded border border-border px-2.5 py-1 text-[10px] font-bold text-text-muted hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Prev
+              </button>
+              <span className="text-[10px] font-mono text-text-muted">
+                Page {page}/{totalPages} - {totalActions.toLocaleString()} runs
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                disabled={page >= totalPages}
+                className="rounded border border-border px-2.5 py-1 text-[10px] font-bold text-text-muted hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
           )}
         </div>
       )}

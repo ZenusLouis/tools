@@ -1,0 +1,6 @@
+{
+  "profile": "design-figma",
+  "description": "Figma-first design inspection and implementation profile using local figma-mcp-go plus Stitch/context helpers.",
+  "servers": ["figma-mcp-go", "figma", "stitch", "context7", "typescript-lsp"],
+  "use_when": "project has a Figma URL, design review, visual implementation, UI brief generation, or visual diff workflow"
+}

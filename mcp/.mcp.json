@@ -16,6 +16,12 @@
       "url": "https://mcp.figma.com/mcp",
       "note": "Pull design → code — dùng khi có Figma URL"
     },
+    "figma-mcp-go": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@vkhanhqui/figma-mcp-go@latest"],
+      "note": "Local Figma plugin bridge with read/write design automation. Requires the companion Figma plugin from vkhanhqui/figma-mcp-go."
+    },
     "postman": {
       "type": "http",
       "url": "https://mcp.postman.com/mcp",

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Check, Code2, Copy, Database, Palette, Send, Server, Terminal } from "lucide-react";
 import type { McpServer } from "@/lib/mcp";
-import { buildMcpAddCommand } from "@/lib/mcp-utils";
+import { buildCodexMcpAddCommand, buildMcpAddCommand } from "@/lib/mcp-utils";
 
 interface Props {
   servers: McpServer[];
@@ -12,6 +12,7 @@ interface Props {
 const SERVER_ICONS: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
   github: Code2,
   figma: Palette,
+  "figma-mcp-go": Palette,
   context7: Database,
   postman: Send,
 };
@@ -28,9 +29,9 @@ function CopyButton({ text }: { text: string }) {
   }
 
   return (
-    <button onClick={handleCopy} className="flex shrink-0 items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-[10px] font-bold text-text-muted whitespace-nowrap transition-all hover:bg-card-hover hover:text-text">
-      {copied ? <Check size={12} className="text-done" /> : <Copy size={12} />}
-      Copy claude mcp add
+    <button onClick={handleCopy} className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-[10px] font-bold text-text-muted transition-all hover:bg-card-hover hover:text-text">
+      {copied ? <Check size={11} className="text-done" /> : <Copy size={11} />}
+      <span className="whitespace-nowrap">Copy CMD</span>
     </button>
   );
 }
@@ -127,10 +128,15 @@ export function McpServerList({ servers }: Props) {
               <dt className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Claude Add Command</dt>
               <dd className="mt-2 break-all font-mono text-xs text-text">{buildMcpAddCommand(selected)}</dd>
             </div>
+            <div className="rounded-lg border border-border bg-bg-base p-3">
+              <dt className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Codex Add Command</dt>
+              <dd className="mt-2 break-all font-mono text-xs text-text">{buildCodexMcpAddCommand(selected)}</dd>
+            </div>
           </dl>
 
-          <div className="mt-4">
+          <div className="mt-4 flex flex-wrap gap-2">
             <CopyButton text={buildMcpAddCommand(selected)} />
+            <CopyButton text={buildCodexMcpAddCommand(selected)} />
           </div>
         </aside>
       )}

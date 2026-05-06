@@ -36,6 +36,17 @@ export async function POST(req: NextRequest) {
       tokenHash: hashBridgeToken(rawToken),
     },
   });
+  await db.auditLog.create({
+    data: {
+      workspaceId: user.workspaceId,
+      userId: user.id,
+      actorType: "user",
+      event: "bridge_token_created",
+      targetType: "BridgeToken",
+      targetId: token.id,
+      metadata: { name: token.name, deviceId: token.deviceId },
+    },
+  }).catch(() => null);
   return NextResponse.json({ token, rawToken }, { status: 201 });
 }
 
@@ -43,10 +54,25 @@ export async function DELETE(req: NextRequest) {
   const user = await requireCurrentUser();
   const { id } = await req.json().catch(() => ({ id: "" }));
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+  const token = await db.bridgeToken.findFirst({
+    where: { id, workspaceId: user.workspaceId },
+    select: { id: true, name: true, deviceId: true },
+  });
+  if (!token) return NextResponse.json({ error: "Bridge token not found" }, { status: 404 });
   await db.bridgeToken.updateMany({
     where: { id, workspaceId: user.workspaceId },
     data: { revokedAt: new Date() },
   });
+  await db.auditLog.create({
+    data: {
+      workspaceId: user.workspaceId,
+      userId: user.id,
+      actorType: "user",
+      event: "bridge_token_revoked",
+      targetType: "BridgeToken",
+      targetId: token.id,
+      metadata: { name: token.name, deviceId: token.deviceId },
+    },
+  }).catch(() => null);
   return NextResponse.json({ ok: true });
 }
-

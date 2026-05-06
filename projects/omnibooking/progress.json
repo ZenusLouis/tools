@@ -54,6 +54,37 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Cinema Booking",
+      "features": [
+        {
+          "name": "Movie & Room Management",
+          "tasks": [
+            {
+              "id": "omnibooking-M1-F0-T1",
+              "name": "Movie CRUD with status lifecycle and deletion guard",
+              "summary": "Cinema manager creates/updates movies with DRAFT → COMING_SOON → NOW_SHOWING → ENDED lifecycle; delete is blocked when showtimes reference the movie.",
+              "details": "Required fields before public display: title, durationMinutes, releaseDate, ageRating, language, status, poster. Poster optional in DRAFT. Status ENDED cannot be used for new future showtimes. DELETE returns 409 with showtime count if any showtime references the movie. Support advanced list search: by title, genre, status, language, age rating, release date with server-side pagination. Page 7-8.",
+              "acceptanceCriteria": [
+                "Movie saved as DRAFT with optional poster",
+                "Transition to COMING_SOON/NOW_SHOWING requires poster",
+                "DELETE returns 409 dependency message with showtime count when showtimes exist",
+                "ENDED movie cannot be scheduled for new future showtimes",
+                "Movie list paginated and filterable by all listed criteria"
+              ],
+              "steps": [
+                "Create movies table with status enum column",
+                "Implement status transition validation in MovieService",
+                "Add DELETE guard: count showtimes by movieId, reject if > 0",
+                "Write movie list endpoint with dynamic JPA Specification filters",
+                "Build Angular movie list with filter bar and status chips"
+              ],
+              "status": "pending"
+            }
+          ]
+        }
+      ]
     }
   ]
 }

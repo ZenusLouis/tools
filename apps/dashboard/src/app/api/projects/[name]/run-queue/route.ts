@@ -18,7 +18,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ name: st
   const { name } = await params;
   const projectName = decodeURIComponent(name);
   const url = new URL(req.url);
-  const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 12), 1), 50);
+  const requestedLimit = Number(url.searchParams.get("limit") ?? 12);
+  const page = Math.min(Math.max(Number(url.searchParams.get("page") ?? 1), 1), 10_000);
+  const pageSize = Math.min(Math.max(Number(url.searchParams.get("pageSize") ?? requestedLimit), 1), 50);
   const status = url.searchParams.get("status");
   const provider = url.searchParams.get("provider");
   const phase = url.searchParams.get("phase");
@@ -61,7 +63,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ name: st
     db.bridgeFileAction.findMany({
       where,
       orderBy: { updatedAt: "desc" },
-      take: limit,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
       select: {
         id: true,
         status: true,
@@ -89,7 +92,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ name: st
 
   return NextResponse.json({
     total,
-    limit,
+    page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    hasPrev: page > 1,
+    hasNext: page * pageSize < total,
     status: statusFilter ? status : "all",
     provider: providerFilter ?? "all",
     phase: phaseFilter ?? "all",

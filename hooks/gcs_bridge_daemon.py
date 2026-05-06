@@ -16,13 +16,15 @@ import subprocess
 import sys
 import threading
 import time
-import urllib.request
 import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from gcs_env import ROOT, bridge_user_agent, load_dashboard_env, local_device_identity
+from gcs_bridge.bridge_client import BridgeClient
+from gcs_bridge.local_paths import collect_project_paths as collect_local_project_paths
+from gcs_bridge.local_paths import remember_project_path as remember_local_project_path
 from gcs_bridge.sanitizer import sanitize_json, sanitize_text
 
 
@@ -35,59 +37,22 @@ LOG_DIR = ROOT / "logs"
 STATE_PATH = ROOT / "hooks" / ".gcs_bridge_state.json"
 PROJECTS_DIR = ROOT / "projects"
 LOCAL_PROJECT_PATHS = ROOT / "hooks" / ".gcs_project_paths.json"
+CLIENT = BridgeClient(DASHBOARD_URL, BRIDGE_TOKEN, HOOK_SECRET, bridge_user_agent)
 
 def headers() -> dict[str, str]:
-    result = {"Content-Type": "application/json", "User-Agent": bridge_user_agent()}
-    if BRIDGE_TOKEN:
-        result["x-bridge-token"] = BRIDGE_TOKEN
-    if HOOK_SECRET:
-        result["x-hook-secret"] = HOOK_SECRET
-    return result
+    return CLIENT.headers()
 
 
 def post_json(path: str, payload: dict, timeout: int = 8) -> tuple[bool, str]:
-    try:
-        req = urllib.request.Request(
-            f"{DASHBOARD_URL}{path}",
-            data=json.dumps(payload).encode("utf-8"),
-            headers=headers(),
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            body = resp.read().decode("utf-8", errors="replace")
-            return 200 <= resp.status < 300, body
-    except Exception as exc:
-        return False, str(exc)
+    return CLIENT.post_json(path, payload, timeout=timeout)
 
 
 def post_json_data(path: str, payload: dict, timeout: int = 8) -> tuple[bool, dict[str, Any] | str]:
-    ok, body = post_json(path, payload, timeout=timeout)
-    if not ok:
-        return False, body
-    try:
-        data = json.loads(body)
-    except Exception:
-        return False, body
-    if not isinstance(data, dict):
-        return False, body
-    return True, data
+    return CLIENT.post_json_data(path, payload, timeout=timeout)
 
 
 def get_json(path: str, timeout: int = 8) -> tuple[bool, dict[str, Any] | str]:
-    try:
-        req = urllib.request.Request(
-            f"{DASHBOARD_URL}{path}",
-            headers=headers(),
-            method="GET",
-        )
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            body = resp.read().decode("utf-8", errors="replace")
-            if not (200 <= resp.status < 300):
-                return False, body
-            data = json.loads(body)
-            return (True, data) if isinstance(data, dict) else (False, body)
-    except Exception as exc:
-        return False, str(exc)
+    return CLIENT.get_json(path, timeout=timeout)
 
 
 def post_action_progress(action_id: str, lines: list[str], timeout: int = 4) -> None:
@@ -116,48 +81,11 @@ def is_action_cancelled(action_id: str, timeout: int = 3) -> bool:
 
 
 def collect_project_paths() -> list[dict[str, str]]:
-    """Read local GCS project contexts and report source folders known to this device."""
-    by_name: dict[str, str] = {}
-    try:
-        data = json.loads(LOCAL_PROJECT_PATHS.read_text(encoding="utf-8"))
-        if isinstance(data, dict):
-            for project_name, project_path in data.items():
-                if isinstance(project_name, str) and isinstance(project_path, str) and project_name and project_path:
-                    by_name[project_name] = project_path
-    except Exception:
-        pass
-
-    if not PROJECTS_DIR.exists():
-        return [{"projectName": name, "path": path} for name, path in sorted(by_name.items())]
-
-    for context_path in PROJECTS_DIR.glob("*/context.json"):
-        try:
-            data = json.loads(context_path.read_text(encoding="utf-8"))
-        except Exception:
-            continue
-        if not isinstance(data, dict):
-            continue
-        project_name = str(data.get("name") or context_path.parent.name).strip()
-        project_path = str(data.get("path") or "").strip()
-        if project_name and project_path:
-            by_name[project_name] = project_path
-    return [{"projectName": name, "path": path} for name, path in sorted(by_name.items())]
+    return collect_local_project_paths(PROJECTS_DIR, LOCAL_PROJECT_PATHS)
 
 
 def remember_project_path(project_name: str, project_path: str) -> None:
-    if not project_name or not project_path:
-        return
-    try:
-        data = json.loads(LOCAL_PROJECT_PATHS.read_text(encoding="utf-8")) if LOCAL_PROJECT_PATHS.exists() else {}
-        if not isinstance(data, dict):
-            data = {}
-    except Exception:
-        data = {}
-    data[project_name] = project_path
-    LOCAL_PROJECT_PATHS.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = LOCAL_PROJECT_PATHS.with_suffix(f"{LOCAL_PROJECT_PATHS.suffix}.tmp")
-    tmp_path.write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")
-    tmp_path.replace(LOCAL_PROJECT_PATHS)
+    remember_local_project_path(LOCAL_PROJECT_PATHS, project_name, project_path)
 
 
 def command_path(command: str) -> str | None:
@@ -1603,8 +1531,8 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
             cmd.extend(["--max-turns", os.environ["GCS_MAX_TURNS"]])
         if model:
             cmd.extend(["--model", model])
-        display_cmd = f"cd /d {_quote_cmd_arg(str(cwd))} && type {_quote_cmd_arg(str(prompt_path))} | {' '.join(_quote_cmd_arg(part) for part in cmd)}"
-        post_action_progress(action_id, [f"CMD: {display_cmd}"])
+        display_cmd = f"type {_quote_cmd_arg(str(prompt_path))} | {' '.join(_quote_cmd_arg(part) for part in cmd)}"
+        post_action_progress(action_id, [f"CWD: {cwd}", f"CMD: {display_cmd}"])
         proc = subprocess.Popen(cmd, cwd=str(cwd), env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
         try:
             assert proc.stdin is not None
@@ -1617,9 +1545,12 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
         binary = command_path("codex")
         if not binary:
             raise ValueError("codex executable not found in PATH")
-        cmd = [binary, *os.environ.get("GCS_CODEX_TASK_ARGS", "exec").split(), prompt]
-        display_cmd = f"cd /d {_quote_cmd_arg(str(cwd))} && {' '.join(_quote_cmd_arg(part) for part in cmd[:-1])} <task-prompt>"
-        post_action_progress(action_id, [f"CMD: {display_cmd}", f"Prompt file: {rel_prompt}"])
+        codex_args = os.environ.get("GCS_CODEX_TASK_ARGS", "exec --skip-git-repo-check").split()
+        if "exec" in codex_args and "--skip-git-repo-check" not in codex_args:
+            codex_args.insert(codex_args.index("exec") + 1, "--skip-git-repo-check")
+        cmd = [binary, *codex_args, prompt]
+        display_cmd = f"{' '.join(_quote_cmd_arg(part) for part in cmd[:-1])} <task-prompt>"
+        post_action_progress(action_id, [f"CWD: {cwd}", f"CMD: {display_cmd}", f"Prompt file: {rel_prompt}"])
         proc = subprocess.Popen(cmd, cwd=str(cwd), env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
     else:
         raise ValueError(f"unsupported run_task provider: {provider}")

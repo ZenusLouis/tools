@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireCurrentUser } from "@/lib/auth";
+import { expireStaleBridgeActions } from "@/lib/bridge-actions";
 import { db } from "@/lib/db";
 
 function objectValue(value: unknown) {
@@ -19,6 +20,7 @@ export async function GET(
   const user = await requireCurrentUser();
   const { name, actionId } = await params;
   const projectName = decodeURIComponent(name);
+  await expireStaleBridgeActions(user.workspaceId);
 
   const project = await db.project.findFirst({
     where: { name: projectName, OR: [{ workspaceId: user.workspaceId }, { workspaceId: null }] },

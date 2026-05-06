@@ -13,6 +13,7 @@ interface Props {
 const PROFILE_ICONS: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
   fullstack:    Layers,
   frontend:     Paintbrush,
+  "design-figma": Paintbrush,
   "api-design": Cpu,
 };
 
