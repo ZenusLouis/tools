@@ -10,8 +10,6 @@ import argparse
 import json
 import os
 import queue
-import shutil
-import sqlite3
 import subprocess
 import sys
 import threading
@@ -22,10 +20,38 @@ from pathlib import Path
 from typing import Any
 
 from gcs_env import ROOT, bridge_user_agent, load_dashboard_env, local_device_identity
+from gcs_bridge.action_lifecycle import ActionLifecycle
+from gcs_bridge.action_runner import FileActionPoller
+from gcs_bridge.analysis_runner import (
+    analysis_document_context,
+    analysis_pages,
+    analysis_requirement_excerpt,
+    extract_analysis_modules,
+    requirement_groups,
+    requirement_ids,
+)
 from gcs_bridge.bridge_client import BridgeClient
+from gcs_bridge.codex_meter import sync_codex_threads as sync_codex_meter_threads
+from gcs_bridge.command_utils import command_path
+from gcs_bridge.heartbeat import send_heartbeat
 from gcs_bridge.local_paths import collect_project_paths as collect_local_project_paths
 from gcs_bridge.local_paths import remember_project_path as remember_local_project_path
+from gcs_bridge.prompt_builder import (
+    apply_prompt_budget,
+    build_task_run_prompt,
+    dict_value,
+    estimate_text_tokens,
+    string_list,
+)
 from gcs_bridge.sanitizer import sanitize_json, sanitize_text
+from gcs_bridge.task_runner import (
+    drain_process_output,
+    pipe_reader,
+    quote_cmd_arg,
+)
+from gcs_bridge.telemetry import load_state as load_bridge_state
+from gcs_bridge.telemetry import save_state as save_bridge_state
+from gcs_bridge.telemetry import sync_logs as sync_jsonl_logs
 
 
 load_dashboard_env()
@@ -38,6 +64,7 @@ STATE_PATH = ROOT / "hooks" / ".gcs_bridge_state.json"
 PROJECTS_DIR = ROOT / "projects"
 LOCAL_PROJECT_PATHS = ROOT / "hooks" / ".gcs_project_paths.json"
 CLIENT = BridgeClient(DASHBOARD_URL, BRIDGE_TOKEN, HOOK_SECRET, bridge_user_agent)
+ACTION_LIFECYCLE = ActionLifecycle(CLIENT)
 
 def headers() -> dict[str, str]:
     return CLIENT.headers()
@@ -51,33 +78,9 @@ def post_json_data(path: str, payload: dict, timeout: int = 8) -> tuple[bool, di
     return CLIENT.post_json_data(path, payload, timeout=timeout)
 
 
-def get_json(path: str, timeout: int = 8) -> tuple[bool, dict[str, Any] | str]:
-    return CLIENT.get_json(path, timeout=timeout)
-
-
-def post_action_progress(action_id: str, lines: list[str], timeout: int = 4) -> None:
-    if not action_id or not lines:
-        return
-    post_json(f"/api/bridge/file-actions/{action_id}/progress", {"lines": [sanitize_text(line) for line in lines]}, timeout=timeout)
-
-
-def refresh_action_lease(action_id: str, claim_token: str | None = None, timeout: int = 4) -> bool:
-    if not action_id:
-        return False
-    payload = {"claimToken": claim_token} if claim_token else {}
-    ok, data = post_json_data(f"/api/bridge/file-actions/{action_id}/lease", payload, timeout=timeout)
-    if ok and isinstance(data, dict):
-        return not bool(data.get("cancelled"))
-    return ok
-
-
-def is_action_cancelled(action_id: str, timeout: int = 3) -> bool:
-    if not action_id:
-        return False
-    ok, data = get_json(f"/api/bridge/file-actions/{action_id}/status", timeout=timeout)
-    if not ok or not isinstance(data, dict):
-        return False
-    return bool(data.get("cancelled") or data.get("status") == "cancelled")
+post_action_progress = ACTION_LIFECYCLE.post_progress
+refresh_action_lease = ACTION_LIFECYCLE.refresh_lease
+is_action_cancelled = ACTION_LIFECYCLE.is_cancelled
 
 
 def collect_project_paths() -> list[dict[str, str]]:
@@ -88,263 +91,27 @@ def remember_project_path(project_name: str, project_path: str) -> None:
     remember_local_project_path(LOCAL_PROJECT_PATHS, project_name, project_path)
 
 
-def command_path(command: str) -> str | None:
-    configured_keys = (f"GCS_{command.upper()}_BIN", f"{command.upper()}_BIN")
-    for env_key in configured_keys:
-        configured = os.environ.get(env_key)
-        if configured and Path(configured).exists():
-            return configured
-
-    resolved = shutil.which(command)
-    if resolved:
-        return resolved
-
-    if os.name == "nt":
-        try:
-            result = subprocess.run(
-                ["where.exe", command],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                check=False,
-                timeout=5,
-            )
-            if result.returncode == 0:
-                first = next((line.strip() for line in result.stdout.splitlines() if line.strip()), "")
-                if first:
-                    return first
-        except Exception:
-            pass
-    return None
-
-
-def command_available(command: str) -> bool:
-    return command_path(command) is not None
-
-
 def heartbeat(verbose: bool) -> bool:
-    if not BRIDGE_TOKEN and not HOOK_SECRET:
-        print("BRIDGE_TOKEN or HOOK_SECRET is not set; bridge cannot authenticate.", flush=True)
-        return False
-
-    identity = local_device_identity()
-    device_key = identity["deviceKey"]
-    device_name = identity["deviceName"]
-    ok, detail = post_json(
-        "/api/bridge/heartbeat",
-        {
-            "deviceKey": device_key,
-            "name": device_name,
-            "claudeAvailable": command_available("claude"),
-            "codexAvailable": command_available("codex"),
-            "projectPaths": collect_project_paths(),
-            "metadata": {
-                "cwd": os.getcwd(),
-                "runner": "hooks/gcs_bridge_daemon.py",
-                "startedAt": datetime.now().isoformat(),
-                "claudePath": command_path("claude"),
-                "codexPath": command_path("codex"),
-            },
-        },
+    return send_heartbeat(
+        CLIENT,
+        BRIDGE_TOKEN,
+        HOOK_SECRET,
+        local_device_identity,
+        collect_project_paths,
+        verbose=verbose,
     )
-    if verbose or not ok:
-        print(f"[heartbeat] {'ok' if ok else 'failed'} {detail[:160]}", flush=True)
-    return ok
 
 
 def load_state() -> dict[str, int]:
-    if not STATE_PATH.exists():
-        return {}
-    try:
-        data = json.loads(STATE_PATH.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-    if not isinstance(data, dict):
-        return {}
-    return {str(key): int(value) for key, value in data.items() if isinstance(value, int)}
+    return load_bridge_state(STATE_PATH)
 
 
 def save_state(state: dict[str, int]) -> None:
-    STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = STATE_PATH.with_suffix(f"{STATE_PATH.suffix}.tmp")
-    tmp_path.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
-    tmp_path.replace(STATE_PATH)
-
-
-def normalize_log_entry(entry: dict) -> dict | None:
-    if entry.get("type") in {"tool", "session"}:
-        payload = dict(entry)
-    elif "tool" in entry and "tokens" in entry:
-        payload = {
-            "type": "tool",
-            "ts": entry.get("ts") or entry.get("date") or datetime.now().isoformat(),
-            "tool": str(entry.get("tool", "unknown")),
-            "tokens": int(entry.get("tokens", 0) or 0),
-            "provider": entry.get("provider") or os.environ.get("GCS_PROVIDER", "claude"),
-            "role": entry.get("role") or os.environ.get("GCS_ROLE") or None,
-            "model": entry.get("model") or os.environ.get("GCS_MODEL") or None,
-        }
-    else:
-        return None
-
-    return {key: value for key, value in payload.items() if value is not None}
-
-
-def sync_log_file(path: Path, state: dict[str, int], from_end: bool) -> int:
-    key = str(path.resolve())
-    size = path.stat().st_size
-    offset = state.get(key)
-    if offset is None:
-        offset = size if from_end else 0
-    if size < offset:
-        offset = 0
-    if size == offset:
-        state[key] = offset
-        return 0
-
-    sent = 0
-    with path.open("r", encoding="utf-8") as handle:
-        handle.seek(offset)
-        for line in handle:
-            raw = line.strip()
-            if not raw:
-                continue
-            try:
-                entry = json.loads(raw)
-            except Exception:
-                continue
-            payload = normalize_log_entry(entry)
-            if not payload:
-                continue
-            ok, detail = post_json("/api/log", payload, timeout=5)
-            if ok:
-                sent += 1
-            else:
-                print(f"[sync] failed {path.name}: {detail[:160]}", flush=True)
-                break
-        state[key] = handle.tell()
-    return sent
-
-
-CODEX_STATE_DB = Path.home() / ".codex" / "state_5.sqlite"
-CODEX_STATE_KEY = "__codex_last_updated_at_ms__"
-CODEX_SYNC_EXISTING = os.environ.get("GCS_CODEX_SYNC_EXISTING", "").lower() in {"1", "true", "yes"}
-
-
-def _project_from_cwd(cwd: str) -> str:
-    """Extract a short project name from a Codex thread cwd path."""
-    clean = cwd.lstrip("\\\\?\\").replace("\\", "/")
-    return Path(clean).name or "local"
-
-
-def _should_backfill_existing_codex_thread(updated_at_ms: int) -> bool:
-    return CODEX_SYNC_EXISTING
-
-
-def _codex_token_keys(thread_id: str, updated_at_ms: int) -> tuple[str, str]:
-    """Return legacy thread key plus a daily key for date-scoped token deltas."""
-    updated_at = datetime.fromtimestamp(updated_at_ms / 1000)
-    day_key = updated_at.strftime("%Y-%m-%d")
-    legacy_key = f"__codex_thread_tokens__:{thread_id}"
-    daily_key = f"__codex_thread_tokens__:{thread_id}:{day_key}"
-    return legacy_key, daily_key
+    save_bridge_state(STATE_PATH, state)
 
 
 def sync_codex_threads(state: dict[str, int]) -> int:
-    if not CODEX_STATE_DB.exists():
-        return 0
-    last_ms = state.get(CODEX_STATE_KEY, 0)
-    try:
-        conn = sqlite3.connect(str(CODEX_STATE_DB), timeout=1, check_same_thread=False)
-        conn.row_factory = sqlite3.Row
-        rows = conn.execute(
-            """SELECT id, updated_at_ms, model, cwd, title, tokens_used, first_user_message
-               FROM threads
-               WHERE tokens_used > 0 AND updated_at_ms > ?
-               ORDER BY updated_at_ms ASC""",
-            (last_ms,),
-        ).fetchall()
-        conn.close()
-    except Exception as exc:
-        print(f"[codex-sync] sqlite error: {exc}", flush=True)
-        return 0
-
-    sent = 0
-    max_ms = last_ms
-    for row in rows:
-        legacy_token_key, daily_token_key = _codex_token_keys(row["id"], row["updated_at_ms"])
-        previous_tokens = state.get(daily_token_key)
-        legacy_previous_tokens = state.get(legacy_token_key)
-        current_tokens = int(row["tokens_used"] or 0)
-        if previous_tokens is None:
-            if legacy_previous_tokens is not None:
-                previous_tokens = legacy_previous_tokens
-                state[daily_token_key] = legacy_previous_tokens
-
-            if previous_tokens is None and not _should_backfill_existing_codex_thread(row["updated_at_ms"]):
-                # No baseline at all — first time seeing thread, skip unless backfill enabled
-                state[daily_token_key] = current_tokens
-                state[legacy_token_key] = current_tokens
-                max_ms = max(max_ms, row["updated_at_ms"])
-                continue
-
-            delta_tokens = current_tokens if previous_tokens is None else max(0, current_tokens - previous_tokens)
-        else:
-            delta_tokens = max(0, current_tokens - previous_tokens)
-            if delta_tokens <= 0:
-                state[daily_token_key] = current_tokens
-                state[legacy_token_key] = current_tokens
-                max_ms = max(max_ms, row["updated_at_ms"])
-                continue
-
-        project = _project_from_cwd(row["cwd"] or "")
-        event_date = datetime.fromtimestamp(row["updated_at_ms"] / 1000).isoformat()
-        tool_payload = {
-            "type": "tool",
-            "ts": event_date,
-            "tool": "CodexIDE",
-            "tokens": delta_tokens,
-            "provider": "codex",
-            "role": os.environ.get("GCS_ROLE") or "dev-implementer",
-            "model": row["model"] or None,
-            "deviceKey": local_device_identity()["deviceKey"],
-        }
-        ok, detail = post_json("/api/log", {k: v for k, v in tool_payload.items() if v is not None}, timeout=5)
-        if not ok:
-            print(f"[codex-sync] failed tool delta {row['id'][:8]}: {detail[:120]}", flush=True)
-            break
-
-        payload = {
-            "type": "session",
-            "project": project,
-            "provider": "codex",
-            "model": row["model"] or None,
-            "date": event_date,
-            "tasksCompleted": [],
-            "cwd": (row["cwd"] or "").lstrip("\\\\?\\"),
-            "totalTokens": delta_tokens,
-            "totalCostUSD": round(delta_tokens * 3.0 / 1_000_000, 6),
-            "sessionNotes": row["title"] or row["first_user_message"] or None,
-            "risks": [],
-        }
-        payload = {k: v for k, v in payload.items() if v is not None}
-        ok, detail = post_json("/api/log", payload, timeout=5)
-        if ok:
-            state[daily_token_key] = current_tokens
-            state[legacy_token_key] = current_tokens
-            max_ms = max(max_ms, row["updated_at_ms"])
-            sent += 1
-        else:
-            print(f"[codex-sync] failed thread {row['id'][:8]}: {detail[:120]}", flush=True)
-            break
-
-    if max_ms > last_ms:
-        state[CODEX_STATE_KEY] = max_ms
-    if sent:
-        print(f"[codex-sync] synced {sent} Codex thread(s)", flush=True)
-    return sent
+    return sync_codex_meter_threads(CLIENT, state, device_identity_fn=local_device_identity)
 
 
 def _safe_local_target(project_path: str, relative_path: str) -> Path:
@@ -362,155 +129,6 @@ def _safe_local_target(project_path: str, relative_path: str) -> Path:
     return target
 
 
-def _extract_pdf_text(path: "Path") -> str:
-    """Extract text from a PDF. Tries pdftotext first, falls back to pypdf."""
-    if shutil.which("pdftotext"):
-        try:
-            proc = subprocess.run(
-                ["pdftotext", "-layout", str(path), "-"],
-                capture_output=True, text=True, encoding="utf-8", errors="replace",
-                timeout=int(os.environ.get("GCS_PDFTOTEXT_TIMEOUT_SEC", "60")),
-            )
-            if proc.returncode == 0 and proc.stdout.strip():
-                return proc.stdout.strip()
-        except Exception:
-            pass
-    try:
-        import pypdf  # type: ignore
-        reader = pypdf.PdfReader(str(path))
-        pages = [page.extract_text() or "" for page in reader.pages]
-        return "\n\n".join(p for p in pages if p.strip())
-    except ImportError:
-        raise ValueError("pypdf is not installed. Run: pip install pypdf")
-    except Exception as exc:
-        raise ValueError(f"PDF extraction failed: {exc}") from exc
-
-
-def _analysis_document_context(document_path: str) -> str:
-    """Return extracted document text so claude -p does not spend turns searching files."""
-    if not document_path:
-        return "No document path configured."
-
-    path = Path(document_path).expanduser()
-    if not path.exists():
-        raise ValueError(f"Document path configured but not accessible on this device: {document_path}")
-
-    suffix = path.suffix.lower()
-    try:
-        if suffix in {".md", ".txt", ".json", ".yaml", ".yml"}:
-            text = path.read_text(encoding="utf-8", errors="replace")
-            return text[: int(os.environ.get("GCS_ANALYZE_DOC_MAX_CHARS", "140000"))]
-        if suffix == ".pdf":
-            text = _extract_pdf_text(path)
-            if not text:
-                raise ValueError(f"PDF extraction produced no text for {path}")
-            max_chars = int(os.environ.get("GCS_ANALYZE_DOC_MAX_CHARS", "140000"))
-            return text[:max_chars]
-    except Exception as exc:
-        raise ValueError(f"Document path is present but could not be read: {path} ({exc})")
-
-    raise ValueError(f"Unsupported analysis document type: {path.suffix or 'unknown'}")
-
-
-def _requirement_groups(text: str) -> list[str]:
-    import re
-    groups = sorted(set(re.findall(r"\b(CORE-[A-Z]+|CIN-[A-Z]+|HOT-[A-Z]+|CROSS-[A-Z]+|UI-[A-Z]+)-\d{3}\b", text)))
-    return groups
-
-
-def _requirement_ids(text: str) -> list[str]:
-    import re
-    return sorted(set(re.findall(r"\b(?:CORE-[A-Z]+|CIN-[A-Z]+|HOT-[A-Z]+|CROSS-[A-Z]+|UI-[A-Z]+)-\d{3}\b", text)))
-
-
-def _analysis_pages(text: str) -> list[tuple[int, str]]:
-    pages = [page.strip() for page in text.split("\f")]
-    if len(pages) <= 1:
-        return [(1, text.strip())]
-    return [(index + 1, page) for index, page in enumerate(pages) if page.strip()]
-
-
-def _analysis_requirement_excerpt(text: str, max_chars: int | None = None) -> str:
-    """Compact long BRDs to page-tagged requirement-bearing lines plus nearby context."""
-    import re
-    limit = max_chars or int(os.environ.get("GCS_ANALYZE_REQ_CONTEXT_MAX_CHARS", "36000"))
-    req_pattern = re.compile(r"\b(?:CORE-[A-Z]+|CIN-[A-Z]+|HOT-[A-Z]+|CROSS-[A-Z]+|UI-[A-Z]+)-\d{3}\b")
-    chunks: list[str] = []
-
-    for page_number, page_text in _analysis_pages(text):
-        lines = [line.rstrip() for line in page_text.splitlines()]
-        keep: set[int] = set()
-        page_req_ids: list[str] = []
-        for index, line in enumerate(lines):
-            ids = req_pattern.findall(line)
-            if ids:
-                page_req_ids.extend(ids)
-                keep.update(range(max(0, index - 2), min(len(lines), index + 4)))
-        if not keep:
-            continue
-
-        chunks.append(f"\n\n## Page {page_number} | Req IDs: {', '.join(sorted(set(page_req_ids)))}")
-        last = -10
-        for index in sorted(keep):
-            if index != last + 1:
-                chunks.append("---")
-            line = lines[index].strip()
-            if line:
-                chunks.append(line)
-            last = index
-
-    if not chunks:
-        return text[:limit]
-    excerpt = "\n".join(chunks)
-    return excerpt[:limit]
-
-
-def _extract_analysis_modules(content: str) -> list[dict[str, Any]]:
-    """Parse Claude output into modules, tolerating fenced JSON or a single module object."""
-    import re
-
-    decoder = json.JSONDecoder()
-    candidates: list[str] = []
-    for match in re.finditer(r"```(?:json)?\s*([\s\S]*?)```", content, flags=re.IGNORECASE):
-        candidates.append(match.group(1).strip())
-    candidates.append(content.strip())
-
-    # Also try each object start. raw_decode handles trailing text that json.loads rejects as Extra data.
-    for start in [match.start() for match in re.finditer(r"\{", content)]:
-        candidates.append(content[start:].strip())
-
-    parsed_values: list[Any] = []
-    for candidate in candidates:
-        if not candidate:
-            continue
-        try:
-            parsed_values.append(json.loads(candidate))
-            continue
-        except Exception:
-            pass
-        try:
-            value, _ = decoder.raw_decode(candidate)
-            parsed_values.append(value)
-        except Exception:
-            continue
-
-    for value in parsed_values:
-        if isinstance(value, dict) and isinstance(value.get("modules"), list):
-            return [module for module in value["modules"] if isinstance(module, dict)]
-
-    for value in parsed_values:
-        if isinstance(value, dict) and isinstance(value.get("features"), list):
-            return [value]
-
-    for value in parsed_values:
-        if isinstance(value, list):
-            modules = [module for module in value if isinstance(module, dict) and isinstance(module.get("features"), list)]
-            if modules:
-                return modules
-
-    raise ValueError(f"No valid modules JSON found in claude output: {content[:300]}")
-
-
 def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
     """Run `claude -p` to generate project modules/tasks and POST result to dashboard."""
     import re
@@ -523,11 +141,11 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
 
     brd_path = docs.get("brd") or docs.get("prd") or ""
     brd_filename = Path(brd_path).name if brd_path else "no document"
-    document_context = _analysis_document_context(str(brd_path))
-    requirement_context = _analysis_requirement_excerpt(document_context)
-    page_count = len(_analysis_pages(document_context))
-    req_groups = _requirement_groups(document_context)
-    req_ids = _requirement_ids(document_context)
+    document_context = analysis_document_context(str(brd_path))
+    requirement_context = analysis_requirement_excerpt(document_context)
+    page_count = len(analysis_pages(document_context))
+    req_groups = requirement_groups(document_context)
+    req_ids = requirement_ids(document_context)
     page_estimate = page_count if document_context else 0
     fw = ", ".join(f for f in frameworks if f != "unknown") or "unknown stack"
 
@@ -709,7 +327,7 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
     except Exception:
         content = raw
 
-    modules = _extract_analysis_modules(str(content))
+    modules = extract_analysis_modules(str(content))
     if not modules:
         raise ValueError("Empty modules in claude output")
     total_features = sum(len(module.get("features", [])) for module in modules if isinstance(module, dict))
@@ -890,134 +508,6 @@ def _safe_task_file(project_path: str, task_id: str, filename: str) -> Path:
     return _safe_local_target(project_path, f".gcs/tasks/{safe_task}/{filename}")
 
 
-def _quote_cmd_arg(value: str) -> str:
-    if not value:
-        return '""'
-    if any(ch.isspace() for ch in value) or any(ch in value for ch in ['"', "&", "|", "(", ")"]):
-        return '"' + value.replace('"', '\\"') + '"'
-    return value
-
-
-def _format_stream_line(raw: str) -> str | None:
-    """Convert a stream-json stdout line to a human-readable string, or None to skip."""
-    if not raw.startswith("{"):
-        return raw  # plain-text output, keep as-is
-    try:
-        data = json.loads(raw)
-    except Exception:
-        return raw  # not JSON, keep
-    if not isinstance(data, dict):
-        return None
-    event_type = data.get("type")
-
-    # Assistant text or thinking
-    if event_type == "assistant":
-        message = data.get("message") if isinstance(data.get("message"), dict) else {}
-        parts: list[str] = []
-        for block in (message.get("content") or []):
-            if not isinstance(block, dict):
-                continue
-            if block.get("type") == "text":
-                text = (block.get("text") or "").strip()
-                if text:
-                    parts.append(text[:300])
-            elif block.get("type") == "tool_use":
-                name = block.get("name") or "tool"
-                inp = block.get("input") or {}
-                hint = ""
-                if isinstance(inp, dict):
-                    hint = (
-                        inp.get("command") or inp.get("pattern") or inp.get("file_path")
-                        or inp.get("prompt") or inp.get("description") or ""
-                    )
-                    if hint:
-                        hint = f": {str(hint)[:120]}"
-                parts.append(f"[{name}{hint}]")
-        return "\n".join(parts) if parts else None
-
-    # Sub-agent progress
-    if event_type == "system":
-        subtype = data.get("subtype")
-        if subtype == "task_started":
-            return f"→ Agent: {data.get('description') or 'sub-task started'}"
-        if subtype == "task_progress":
-            desc = data.get("description") or ""
-            tokens = (data.get("usage") or {}).get("total_tokens")
-            suffix = f" ({tokens:,} tokens)" if tokens else ""
-            return f"  {desc}{suffix}" if desc else None
-        if subtype == "task_complete":
-            return f"✓ Agent done: {data.get('description') or ''}"
-        return None  # skip init, rate_limit, etc.
-
-    # Tool results (user role): only show errors
-    if event_type == "user":
-        message = data.get("message") if isinstance(data.get("message"), dict) else {}
-        for block in (message.get("content") or []):
-            if isinstance(block, dict) and block.get("is_error"):
-                err = block.get("content") or ""
-                if isinstance(err, list):
-                    err = " ".join(str(e.get("text", "")) if isinstance(e, dict) else str(e) for e in err)
-                return f"✗ Tool error: {str(err)[:200]}"
-        return None  # skip successful tool results
-
-    # Result event
-    if event_type == "result":
-        cost = data.get("total_cost_usd")
-        cost_str = f" | cost ${cost:.4f}" if isinstance(cost, (int, float)) else ""
-        usage = data.get("usage") or {}
-        tokens = sum(usage.get(k, 0) or 0 for k in ["input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"])
-        return f"✓ Done — {tokens:,} tokens{cost_str}"
-
-    return None  # skip everything else (rate_limit, system/init, etc.)
-
-
-def _drain_process_output(
-    proc: subprocess.Popen[str],
-    action_id: str,
-    task_id: str,
-    stdout_lines: list[str],
-    stderr_lines: list[str],
-    out_queue: "queue.Queue[tuple[str, str]]",
-    pending_lines: list[str],
-) -> None:
-    while True:
-        try:
-            stream_name, line = out_queue.get_nowait()
-        except queue.Empty:
-            break
-        clean = line.rstrip("\r\n")
-        if not clean:
-            continue
-        if stream_name == "stderr":
-            stderr_lines.append(clean)
-            rendered = f"stderr> {clean}"
-            pending_lines.append(rendered)
-            print(f"[task {task_id}] {rendered}", flush=True)
-        else:
-            stdout_lines.append(clean)
-            formatted = _format_stream_line(clean)
-            if formatted:
-                for part in formatted.splitlines():
-                    part = part.strip()
-                    if part:
-                        pending_lines.append(part)
-                        print(f"[task {task_id}] {part}", flush=True)
-    if (proc.poll() is not None and pending_lines) or len(pending_lines) >= 8:
-        post_action_progress(action_id, pending_lines[-40:])
-        pending_lines.clear()
-
-
-def _pipe_reader(pipe: Any, stream_name: str, out_queue: "queue.Queue[tuple[str, str]]") -> None:
-    try:
-        for line in iter(pipe.readline, ""):
-            out_queue.put((stream_name, line))
-    finally:
-        try:
-            pipe.close()
-        except Exception:
-            pass
-
-
 def _post_task_event(task_id: str, phase: str, status: str, provider: str, role: str, note: str) -> None:
     post_json_data(
         "/api/bridge/task-event",
@@ -1148,275 +638,6 @@ def _sync_task_to_progress(project_name: str, payload: dict[str, Any]) -> None:
         pass
 
 
-def _string_list(value: Any) -> list[str]:
-    if not isinstance(value, list):
-        return []
-    return [str(item).strip() for item in value if str(item).strip()]
-
-
-def _read_text_if_exists(path: Path, max_chars: int = 12000) -> str:
-    try:
-        text = path.read_text(encoding="utf-8", errors="replace")
-    except Exception:
-        return ""
-    if len(text) > max_chars:
-        return text[:max_chars] + "\n\n... truncated ..."
-    return text
-
-
-def _load_project_code_index(project_name: str, project_path: str) -> str:
-    local_index = Path(project_path).expanduser() / ".gcs" / "code-index.md"
-    hub_index = ROOT / "projects" / project_name / "code-index.md"
-    local_text = _read_text_if_exists(local_index, 50000)
-    if local_text:
-        return f"Source: {local_index}\n\n{local_text}"
-    hub_text = _read_text_if_exists(hub_index, 50000)
-    if hub_text:
-        return f"Source: {hub_index}\n\n{hub_text}"
-    return ""
-
-
-def _dict_value(value: Any) -> dict[str, Any]:
-    return value if isinstance(value, dict) else {}
-
-
-def _task_keyword_set(task: dict[str, Any], selected_skills: list[dict[str, Any]]) -> set[str]:
-    raw = " ".join([
-        str(task.get("name") or ""),
-        str(task.get("summary") or ""),
-        str(task.get("details") or ""),
-        str(task.get("moduleName") or ""),
-        str(task.get("featureName") or ""),
-        " ".join(_string_list(task.get("reqIds"))),
-        " ".join(str(skill.get("slug") or "") for skill in selected_skills),
-        " ".join(str(skill.get("name") or "") for skill in selected_skills),
-    ]).lower()
-    stop = {
-        "and", "the", "for", "with", "from", "this", "that", "task", "tasks",
-        "implement", "create", "update", "delete", "none", "null", "true", "false",
-    }
-    return {
-        token for token in re.findall(r"[a-z0-9][a-z0-9-]{2,}", raw)
-        if token not in stop and len(token) <= 40
-    }
-
-
-def _filter_code_index(code_index: str, task: dict[str, Any], selected_skills: list[dict[str, Any]], max_chars: int) -> str:
-    if not code_index:
-        return "No code-index.md found for this project yet. If structure is unclear, inspect the repository before editing."
-    keywords = _task_keyword_set(task, selected_skills)
-    if not keywords:
-        return code_index[:max_chars]
-    lines = code_index.splitlines()
-    chosen: list[str] = []
-    chosen_indexes: set[int] = set()
-    for index, line in enumerate(lines):
-        lower = line.lower()
-        if any(keyword in lower for keyword in keywords):
-            for nearby in range(max(0, index - 2), min(len(lines), index + 3)):
-                if nearby not in chosen_indexes:
-                    chosen_indexes.add(nearby)
-                    chosen.append(lines[nearby])
-        if sum(len(item) + 1 for item in chosen) >= max_chars:
-            break
-    if not chosen:
-        return code_index[:max_chars]
-    snippet = "\n".join(chosen)
-    if len(snippet) > max_chars:
-        snippet = snippet[:max_chars] + "\n\n... relevant code-index snippets truncated ..."
-    return snippet
-
-
-def _format_skill_guidance(skill_routing: dict[str, Any]) -> str:
-    selected = skill_routing.get("selected")
-    if not isinstance(selected, list) or not selected:
-        return "- No skill guidance selected. Routing still used 0 LLM tokens."
-    lines: list[str] = []
-    for skill in selected:
-        if not isinstance(skill, dict):
-            continue
-        reasons = skill.get("reasons") if isinstance(skill.get("reasons"), list) else []
-        reason_text = ", ".join(str(item) for item in reasons[:4]) or "deterministic score"
-        guidance = str(skill.get("guidance") or "").strip()
-        lines.extend([
-            f"### {skill.get('slug') or skill.get('name') or 'skill'}",
-            f"- Score: {skill.get('score', 0)}",
-            f"- Why selected: {reason_text}",
-            guidance or "- Use the skill category and task scope as compact guidance.",
-            "",
-        ])
-    return "\n".join(lines).strip()
-
-
-def _format_previous_failure(previous_failure: dict[str, Any]) -> str:
-    if not previous_failure:
-        return "No previous failed run for this task."
-    lines = [
-        f"- Updated at: {previous_failure.get('updatedAt') or 'unknown'}",
-        f"- Exit code: {previous_failure.get('exitCode') if previous_failure.get('exitCode') is not None else 'unknown'}",
-        f"- Artifact: {previous_failure.get('artifactPath') or 'none'}",
-        f"- Error: {previous_failure.get('error') or 'none'}",
-    ]
-    log_tail = previous_failure.get("logTail")
-    if isinstance(log_tail, list) and log_tail:
-        lines.append("")
-        lines.append("### Previous Log Tail")
-        lines.extend(str(item) for item in log_tail[-40:])
-    return "\n".join(lines)
-
-
-def _estimate_text_tokens(text: str) -> int:
-    return max(1, round(len(text) / 4))
-
-
-def _apply_prompt_budget(prompt: str, context_plan: dict[str, Any]) -> tuple[str, dict[str, Any]]:
-    budget = int(context_plan.get("maxPromptTokens") or 12000)
-    report: dict[str, Any] = {
-        "budgetTokens": budget,
-        "beforeTokens": _estimate_text_tokens(prompt),
-        "afterTokens": _estimate_text_tokens(prompt),
-        "trimmed": False,
-        "trimmedBlocks": [],
-    }
-    if report["beforeTokens"] <= budget:
-        return prompt, report
-
-    target_chars = max(2000, budget * 4)
-    # Task core, req IDs, acceptance criteria, and steps sit before code-index. Trim the
-    # expandable context blocks first so the required task contract stays intact.
-    markers = [
-        ("## Project Code Index", "## Risk Notes", "project_code_index"),
-        ("## Selected Skill Guidance", "## Task", "selected_skill_guidance"),
-    ]
-    next_prompt = prompt
-    for start_marker, end_marker, block_name in markers:
-        if len(next_prompt) <= target_chars:
-            break
-        start = next_prompt.find(start_marker)
-        end = next_prompt.find(end_marker, start + len(start_marker)) if start >= 0 else -1
-        if start < 0 or end < 0:
-            continue
-        block = next_prompt[start:end]
-        keep_chars = 1800 if block_name == "project_code_index" else 1400
-        if len(block) <= keep_chars:
-            continue
-        trimmed_block = block[:keep_chars].rstrip() + f"\n\n... {block_name} trimmed by prompt budget guard ...\n\n"
-        next_prompt = next_prompt[:start] + trimmed_block + next_prompt[end:]
-        report["trimmedBlocks"].append(block_name)
-
-    if len(next_prompt) > target_chars:
-        hard_keep = max(2000, target_chars - 600)
-        next_prompt = next_prompt[:hard_keep].rstrip() + "\n\n... prompt hard-trimmed by budget guard; task core was prioritized ...\n"
-        report["trimmedBlocks"].append("hard_tail")
-
-    report["afterTokens"] = _estimate_text_tokens(next_prompt)
-    report["trimmed"] = True
-    return next_prompt, report
-
-
-def _build_task_run_prompt(
-    payload: dict[str, Any],
-    project_name: str,
-    project_path: str,
-    task_id: str,
-    provider: str,
-    role: str,
-    phase: str,
-    model: str,
-) -> str:
-    task = payload.get("task") if isinstance(payload.get("task"), dict) else {}
-    req_ids = _string_list(task.get("reqIds"))
-    acceptance = _string_list(task.get("acceptanceCriteria"))
-    steps = _string_list(task.get("steps"))
-    deps = _string_list(task.get("deps"))
-    optimizer = _dict_value(payload.get("optimizer"))
-    skill_routing = _dict_value(payload.get("skillRouting"))
-    context_plan = _dict_value(payload.get("contextPlan"))
-    previous_failure = _dict_value(payload.get("previousFailure"))
-    selected_skills = skill_routing.get("selected") if isinstance(skill_routing.get("selected"), list) else []
-    selected_skill_dicts = [item for item in selected_skills if isinstance(item, dict)]
-    code_index_max = int(context_plan.get("codeIndexMaxChars") or 7000)
-    code_index = _filter_code_index(_load_project_code_index(project_name, project_path), task, selected_skill_dicts, code_index_max)
-
-    phase_instruction = {
-        "analysis": "Prepare a concise implementation brief. Do not modify source files unless required to create planning artifacts.",
-        "review": "Review the implementation against the task scope and acceptance criteria. Prefer findings, risks, and verification gaps.",
-        "implementation": "Implement the scoped task in the local project. Modify files as needed and verify the change.",
-    }.get(phase, "Implement the scoped task in the local project.")
-
-    step_block = "\n".join(f"{index + 1}. {step}" for index, step in enumerate(steps)) or "- No explicit steps were provided; derive a safe minimal plan from the task details."
-    acceptance_block = "\n".join(f"- {item}" for item in acceptance) or "- No explicit acceptance criteria were provided."
-    deps_block = "\n".join(f"- {item}" for item in deps) or "- None"
-
-    return "\n".join([
-        f"You are running as {provider} local agent for GCS.",
-        "",
-        "## Execution Mode",
-        phase_instruction,
-        "Follow the Suggested Steps in order. Announce each step before working on it, then summarize the result of that step.",
-        "Preserve unrelated user changes. Do not broaden scope beyond this task.",
-        "",
-        "## Project",
-        f"- Name: {project_name}",
-        f"- Path: {project_path}",
-        "",
-        "## Agent",
-        f"- Provider: {provider}",
-        f"- Role: {role}",
-        f"- Model: {model or 'provider default'}",
-        f"- Optimizer: {optimizer.get('mode') or 'auto_aggressive'} / {optimizer.get('contextMode') or context_plan.get('mode') or 'standard'}",
-        f"- Routing token cost: {skill_routing.get('tokenCost') or '0 LLM tokens used for routing'}",
-        f"- Estimated prompt tokens: {optimizer.get('estimatedPromptTokens') or 'unknown'}",
-        f"- Selected skills: {', '.join(str(skill.get('slug')) for skill in selected_skill_dicts if skill.get('slug')) or 'none'}",
-        f"- Omitted skills: {skill_routing.get('omittedCount') if 'omittedCount' in skill_routing else 'unknown'}",
-        "",
-        "## Optimizer Reason",
-        str(optimizer.get("reason") or "Deterministic routing selected the compact context plan before the model was called."),
-        "",
-        "## Selected Skill Guidance",
-        _format_skill_guidance(skill_routing),
-        "",
-        "## Task",
-        f"- ID: {task_id}",
-        f"- Name: {task.get('name') or ''}",
-        f"- Module: {task.get('moduleName') or ''}",
-        f"- Feature: {task.get('featureName') or ''}",
-        f"- Requirement IDs: {', '.join(req_ids) if req_ids else 'none'}",
-        f"- Priority: {task.get('priority') or 'unspecified'}",
-        f"- Estimate: {task.get('estimate') or 'unspecified'}",
-        "",
-        "## Summary",
-        str(task.get("summary") or ""),
-        "",
-        "## Details",
-        str(task.get("details") or ""),
-        "",
-        "## Acceptance Criteria",
-        acceptance_block,
-        "",
-        "## Suggested Steps",
-        step_block,
-        "",
-        "## Dependencies",
-        deps_block,
-        "",
-        "## Previous Failure Context",
-        _format_previous_failure(previous_failure),
-        "",
-        "## Project Code Index",
-        code_index or "No code-index.md found for this project yet. If structure is unclear, inspect the repository before editing.",
-        "",
-        "## Risk Notes",
-        str(task.get("risk") or "None"),
-        "",
-        "## Required Final Response",
-        "- State what changed.",
-        "- List changed files.",
-        "- List verification commands and results.",
-        "- If blocked, explain the blocker clearly and do not claim completion.",
-    ])
-
-
 def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
     action_id = str(action.get("id") or "")
     claim_token = str(action.get("claimToken") or "") or None
@@ -1463,11 +684,11 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
     if model:
         env["GCS_MODEL"] = model
 
-    optimizer = _dict_value(payload.get("optimizer"))
-    skill_routing = _dict_value(payload.get("skillRouting"))
-    context_plan = _dict_value(payload.get("contextPlan"))
-    prompt = _build_task_run_prompt(payload, project_name, project_path, task_id, provider, role, phase, model)
-    prompt, budget_report = _apply_prompt_budget(prompt, context_plan)
+    optimizer = dict_value(payload.get("optimizer"))
+    skill_routing = dict_value(payload.get("skillRouting"))
+    context_plan = dict_value(payload.get("contextPlan"))
+    prompt = build_task_run_prompt(payload, project_name, project_path, task_id, provider, role, phase, model, ROOT)
+    prompt, budget_report = apply_prompt_budget(prompt, context_plan)
     prompt_path = _safe_task_file(project_path, task_id, "prompt.md")
     prompt_path.parent.mkdir(parents=True, exist_ok=True)
     prompt_path.write_text(prompt, encoding="utf-8")
@@ -1481,8 +702,8 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
         "optimizer": optimizer,
         "skillRouting": skill_routing,
         "contextPlan": context_plan,
-        "previousFailure": _dict_value(payload.get("previousFailure")),
-        "estimatedPromptTokens": _estimate_text_tokens(prompt),
+        "previousFailure": dict_value(payload.get("previousFailure")),
+        "estimatedPromptTokens": estimate_text_tokens(prompt),
         "budgetReport": budget_report,
         "promptPath": rel_prompt,
         "promptPreview": prompt[:12000] + ("\n\n... prompt preview truncated ..." if len(prompt) > 12000 else ""),
@@ -1493,7 +714,7 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
     context_report_path.write_text(json.dumps(context_report, indent=2, ensure_ascii=False), encoding="utf-8")
     rel_context_report = str(context_report_path.relative_to(cwd)) if context_report_path.is_relative_to(cwd) else str(context_report_path)
     task_data = payload.get("task") if isinstance(payload.get("task"), dict) else {}
-    task_steps = _string_list(task_data.get("steps"))
+    task_steps = string_list(task_data.get("steps"))
     step_count = len(task_steps)
     selected_skills = skill_routing.get("selected") if isinstance(skill_routing.get("selected"), list) else []
     selected_skill_slugs = [str(skill.get("slug")) for skill in selected_skills if isinstance(skill, dict) and skill.get("slug")]
@@ -1531,7 +752,7 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
             cmd.extend(["--max-turns", os.environ["GCS_MAX_TURNS"]])
         if model:
             cmd.extend(["--model", model])
-        display_cmd = f"type {_quote_cmd_arg(str(prompt_path))} | {' '.join(_quote_cmd_arg(part) for part in cmd)}"
+        display_cmd = f"type {quote_cmd_arg(str(prompt_path))} | {' '.join(quote_cmd_arg(part) for part in cmd)}"
         post_action_progress(action_id, [f"CWD: {cwd}", f"CMD: {display_cmd}"])
         proc = subprocess.Popen(cmd, cwd=str(cwd), env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
         try:
@@ -1548,10 +769,17 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
         codex_args = os.environ.get("GCS_CODEX_TASK_ARGS", "exec --skip-git-repo-check").split()
         if "exec" in codex_args and "--skip-git-repo-check" not in codex_args:
             codex_args.insert(codex_args.index("exec") + 1, "--skip-git-repo-check")
-        cmd = [binary, *codex_args, prompt]
-        display_cmd = f"{' '.join(_quote_cmd_arg(part) for part in cmd[:-1])} <task-prompt>"
+        cmd = [binary, *codex_args]
+        display_cmd = f"{' '.join(quote_cmd_arg(part) for part in cmd)} < {quote_cmd_arg(str(prompt_path))}"
         post_action_progress(action_id, [f"CWD: {cwd}", f"CMD: {display_cmd}", f"Prompt file: {rel_prompt}"])
-        proc = subprocess.Popen(cmd, cwd=str(cwd), env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
+        proc = subprocess.Popen(cmd, cwd=str(cwd), env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
+        try:
+            assert proc.stdin is not None
+            proc.stdin.write(prompt)
+            proc.stdin.close()
+        except Exception as exc:
+            proc.kill()
+            raise ValueError(f"Failed to attach task prompt to Codex stdin: {exc}") from exc
     else:
         raise ValueError(f"unsupported run_task provider: {provider}")
 
@@ -1560,11 +788,11 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
     stderr_lines: list[str] = []
     stream_threads: list[threading.Thread] = []
     if proc.stdout:
-        thread = threading.Thread(target=_pipe_reader, args=(proc.stdout, "stdout", out_queue), daemon=True)
+        thread = threading.Thread(target=pipe_reader, args=(proc.stdout, "stdout", out_queue), daemon=True)
         thread.start()
         stream_threads.append(thread)
     if proc.stderr:
-        thread = threading.Thread(target=_pipe_reader, args=(proc.stderr, "stderr", out_queue), daemon=True)
+        thread = threading.Thread(target=pipe_reader, args=(proc.stderr, "stderr", out_queue), daemon=True)
         thread.start()
         stream_threads.append(thread)
 
@@ -1573,7 +801,7 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
     next_progress = time.time() + 30
     deadline = time.time() + timeout_sec
     while proc.poll() is None or not out_queue.empty():
-        _drain_process_output(proc, action_id, task_id, stdout_lines, stderr_lines, out_queue, pending_output_lines)
+        drain_process_output(proc, action_id, task_id, stdout_lines, stderr_lines, out_queue, pending_output_lines, post_action_progress)
         if pending_output_lines and time.time() >= next_output_flush:
             post_action_progress(action_id, pending_output_lines[-40:])
             pending_output_lines.clear()
@@ -1609,7 +837,7 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
 
     for thread in stream_threads:
         thread.join(timeout=1)
-    _drain_process_output(proc, action_id, task_id, stdout_lines, stderr_lines, out_queue, pending_output_lines)
+    drain_process_output(proc, action_id, task_id, stdout_lines, stderr_lines, out_queue, pending_output_lines, post_action_progress)
     if pending_output_lines:
         post_action_progress(action_id, pending_output_lines[-40:])
         pending_output_lines.clear()
@@ -1935,55 +1163,11 @@ def execute_file_action(action: dict[str, Any]) -> dict[str, Any]:
 
 
 def poll_file_actions() -> int:
-    device_key = local_device_identity()["deviceKey"]
-    ok, data = post_json_data("/api/bridge/file-actions/pending", {"deviceKey": device_key, "limit": 5}, timeout=8)
-    if not ok:
-        print(f"[file-actions] poll failed: {str(data)[:160]}", flush=True)
-        return 0
-
-    actions = data.get("actions") if isinstance(data, dict) else []
-    if not isinstance(actions, list) or not actions:
-        return 0
-
-    completed = 0
-    for action in actions:
-        if not isinstance(action, dict) or not action.get("id"):
-            continue
-        action_id = str(action["id"])
-        try:
-            result = execute_file_action(action)
-            action_status = "failed" if isinstance(result, dict) and int(result.get("exitCode") or 0) != 0 else "succeeded"
-            ok, detail = post_json_data(
-                "/api/bridge/file-actions/result",
-                {"id": action_id, "status": action_status, "deviceKey": device_key, "result": sanitize_json(result)},
-                timeout=8,
-            )
-            if ok:
-                completed += 1
-                print(f"[file-actions] completed {action_id}: {result.get('count', 0)} file(s)", flush=True)
-            else:
-                print(f"[file-actions] result failed {action_id}: {str(detail)[:160]}", flush=True)
-        except Exception as exc:
-            post_json_data(
-                "/api/bridge/file-actions/result",
-                {"id": action_id, "status": "failed", "deviceKey": device_key, "error": sanitize_text(str(exc))},
-                timeout=8,
-            )
-            print(f"[file-actions] failed {action_id}: {exc}", flush=True)
-    return completed
+    return FileActionPoller(CLIENT, local_device_identity, execute_file_action).poll(limit=5)
 
 
 def sync_logs(state: dict[str, int], from_end: bool) -> int:
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-    total = 0
-    for path in sorted(LOG_DIR.glob("global-*.jsonl")):
-        total += sync_log_file(path, state, from_end=from_end)
-    if total:
-        save_state(state)
-        print(f"[sync] sent {total} log entr{'y' if total == 1 else 'ies'}", flush=True)
-    else:
-        save_state(state)
-    return total
+    return sync_jsonl_logs(CLIENT, LOG_DIR, STATE_PATH, state, from_end=from_end)
 
 
 def main() -> int:
