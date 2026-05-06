@@ -92,6 +92,8 @@ export function RunTaskButton({ taskId, disabled }: { taskId: string; disabled?:
   const [copied, setCopied] = useState(false);
   const [phase, setPhase] = useState<(typeof PHASE_OPTIONS)[number]["value"]>("implementation");
   const [provider, setProvider] = useState<(typeof PROVIDER_OPTIONS)[number]["value"]>("auto");
+  const [model, setModel] = useState<string>("");
+  const [models, setModels] = useState<string[]>([]);
   const [optimizerMode, setOptimizerMode] = useState<(typeof OPTIMIZER_OPTIONS)[number]["value"]>("auto_aggressive");
   const [contextMode, setContextMode] = useState<(typeof CONTEXT_OPTIONS)[number]["value"]>("standard");
   const [preview, setPreview] = useState<RunPreview>(null);
@@ -122,6 +124,19 @@ export function RunTaskButton({ taskId, disabled }: { taskId: string; disabled?:
     }, 2500);
     return () => window.clearInterval(timer);
   }, [actionId, status?.status, taskId]);
+
+  useEffect(() => {
+    if (provider === "auto") { setModels([]); setModel(""); return; }
+    const providerKey = provider === "claude" ? "claude" : "codex";
+    fetch(`/api/models?provider=${providerKey}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((body: { models?: string[] }) => {
+        const list = body.models ?? [];
+        setModels(list);
+        setModel((prev) => (list.includes(prev) ? prev : ""));
+      })
+      .catch(() => { setModels([]); setModel(""); });
+  }, [provider]);
 
   useEffect(() => {
     let cancelled = false;
@@ -161,6 +176,7 @@ export function RunTaskButton({ taskId, disabled }: { taskId: string; disabled?:
         body: JSON.stringify({
           phase,
           ...(provider !== "auto" ? { provider } : {}),
+          ...(model ? { model } : {}),
           optimizerMode,
           ...(optimizerMode === "manual" ? { contextMode } : {}),
         }),
@@ -238,6 +254,7 @@ export function RunTaskButton({ taskId, disabled }: { taskId: string; disabled?:
         body: JSON.stringify({
           phase,
           ...(provider !== "auto" ? { provider } : {}),
+          ...(model ? { model } : {}),
           optimizerMode,
           ...(optimizerMode === "manual" ? { contextMode } : {}),
         }),
@@ -322,6 +339,18 @@ export function RunTaskButton({ taskId, disabled }: { taskId: string; disabled?:
           >
             {PROVIDER_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
+          {models.length > 0 && (
+            <select
+              value={model}
+              onChange={(event) => setModel(event.target.value)}
+              disabled={running}
+              className="rounded-xl border border-border bg-bg-base px-3 py-2 text-xs font-bold text-text outline-none transition-colors hover:bg-card-hover disabled:cursor-not-allowed disabled:opacity-50"
+              title="Model override"
+            >
+              <option value="">Auto model</option>
+              {models.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          )}
           <select
             value={optimizerMode}
             onChange={(event) => setOptimizerMode(event.target.value as typeof optimizerMode)}
