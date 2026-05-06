@@ -11,7 +11,52 @@ type RunStatus = {
   log: string[];
   artifactPath: string | null;
   exitCode: number | null;
+  actualTokens?: number | null;
+  optimizer?: OptimizerInfo | null;
+  skillRouting?: SkillRoutingInfo | null;
+  contextPlan?: ContextPlanInfo | null;
+  contextReportPath?: string | null;
+  contextReport?: Record<string, unknown> | null;
 } | null;
+
+type OptimizerInfo = {
+  mode?: string;
+  provider?: string;
+  model?: string | null;
+  modelSource?: string;
+  modelReason?: string;
+  contextMode?: string;
+  reason?: string;
+  estimatedPromptTokens?: number;
+  promptBudgetTokens?: number;
+};
+
+type SkillRoutingInfo = {
+  selected?: Array<{ slug?: string; name?: string; score?: number; reasons?: string[] }>;
+  omittedCount?: number;
+  availableCount?: number;
+  tokenCost?: string;
+};
+
+type ContextPlanInfo = {
+  mode?: string;
+  includedBlocks?: string[];
+  omittedBlocks?: string[];
+};
+
+type RunPreview = {
+  provider?: string;
+  role?: string | null;
+  optimizer?: OptimizerInfo | null;
+  skillRouting?: SkillRoutingInfo | null;
+  contextPlan?: ContextPlanInfo | null;
+} | null;
+
+function getContextReportValue(report: Record<string, unknown> | null | undefined, key: string) {
+  return report && typeof report[key] === "object" && report[key] !== null && !Array.isArray(report[key])
+    ? report[key] as Record<string, unknown>
+    : null;
+}
 
 const PHASE_OPTIONS = [
   { value: "implementation", label: "Implement" },
@@ -25,6 +70,19 @@ const PROVIDER_OPTIONS = [
   { value: "codex", label: "Codex local" },
 ] as const;
 
+const OPTIMIZER_OPTIONS = [
+  { value: "auto_aggressive", label: "Auto aggressive" },
+  { value: "balanced", label: "Balanced" },
+  { value: "quality", label: "Quality" },
+  { value: "manual", label: "Manual" },
+] as const;
+
+const CONTEXT_OPTIONS = [
+  { value: "minimal", label: "Minimal" },
+  { value: "standard", label: "Standard" },
+  { value: "deep", label: "Deep" },
+] as const;
+
 export function RunTaskButton({ taskId, disabled }: { taskId: string; disabled?: boolean }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -34,6 +92,10 @@ export function RunTaskButton({ taskId, disabled }: { taskId: string; disabled?:
   const [copied, setCopied] = useState(false);
   const [phase, setPhase] = useState<(typeof PHASE_OPTIONS)[number]["value"]>("implementation");
   const [provider, setProvider] = useState<(typeof PROVIDER_OPTIONS)[number]["value"]>("auto");
+  const [optimizerMode, setOptimizerMode] = useState<(typeof OPTIMIZER_OPTIONS)[number]["value"]>("auto_aggressive");
+  const [contextMode, setContextMode] = useState<(typeof CONTEXT_OPTIONS)[number]["value"]>("standard");
+  const [preview, setPreview] = useState<RunPreview>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,6 +123,35 @@ export function RunTaskButton({ taskId, disabled }: { taskId: string; disabled?:
     return () => window.clearInterval(timer);
   }, [actionId, status?.status, taskId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setPreviewLoading(true);
+      try {
+        const params = new URLSearchParams({
+          phase,
+          provider,
+          optimizerMode,
+          ...(optimizerMode === "manual" ? { contextMode } : {}),
+        });
+        const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/run/preview?${params.toString()}`, { cache: "no-store" });
+        const body = await res.json().catch(() => ({})) as RunPreview & { error?: string };
+        if (cancelled) return;
+        if (!res.ok) {
+          setPreview(null);
+          return;
+        }
+        setPreview(body);
+      } finally {
+        if (!cancelled) setPreviewLoading(false);
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [contextMode, optimizerMode, phase, provider, taskId]);
+
   function runTask() {
     setMessage(null);
     startTransition(async () => {
@@ -70,9 +161,19 @@ export function RunTaskButton({ taskId, disabled }: { taskId: string; disabled?:
         body: JSON.stringify({
           phase,
           ...(provider !== "auto" ? { provider } : {}),
+          optimizerMode,
+          ...(optimizerMode === "manual" ? { contextMode } : {}),
         }),
       });
-      const body = await res.json().catch(() => ({})) as { actionId?: string; error?: string; provider?: string; device?: string };
+      const body = await res.json().catch(() => ({})) as {
+        actionId?: string;
+        error?: string;
+        provider?: string;
+        device?: string;
+        optimizer?: OptimizerInfo;
+        skillRouting?: SkillRoutingInfo;
+        contextPlan?: ContextPlanInfo;
+      };
       if (!res.ok) {
         setMessage(body.error ?? "Failed to queue task.");
         return;
@@ -82,9 +183,16 @@ export function RunTaskButton({ taskId, disabled }: { taskId: string; disabled?:
         id: body.actionId ?? "",
         status: "pending",
         error: null,
-        log: [`Queued ${phase} with ${body.provider ?? "agent"} on ${body.device ?? "local bridge"}.`],
+        log: [
+          `Queued ${phase} with ${body.provider ?? "agent"} on ${body.device ?? "local bridge"}.`,
+          `Optimizer: ${body.optimizer?.mode ?? optimizerMode} / ${body.optimizer?.contextMode ?? contextMode}.`,
+          `Skill router: ${(body.skillRouting?.selected ?? []).map((skill) => skill.slug).filter(Boolean).join(", ") || "none"}; omitted ${body.skillRouting?.omittedCount ?? 0}; 0 LLM tokens used for routing.`,
+        ],
         artifactPath: null,
         exitCode: null,
+        optimizer: body.optimizer ?? null,
+        skillRouting: body.skillRouting ?? null,
+        contextPlan: body.contextPlan ?? null,
       });
     });
   }
@@ -130,6 +238,8 @@ export function RunTaskButton({ taskId, disabled }: { taskId: string; disabled?:
         body: JSON.stringify({
           phase,
           ...(provider !== "auto" ? { provider } : {}),
+          optimizerMode,
+          ...(optimizerMode === "manual" ? { contextMode } : {}),
         }),
       });
       if (!runRes.ok) {
@@ -158,6 +268,8 @@ export function RunTaskButton({ taskId, disabled }: { taskId: string; disabled?:
           body: JSON.stringify({
             phase,
             ...(provider !== "auto" ? { provider } : {}),
+            optimizerMode,
+            ...(optimizerMode === "manual" ? { contextMode } : {}),
           }),
         });
         if (!runRes.ok) {
@@ -176,6 +288,10 @@ export function RunTaskButton({ taskId, disabled }: { taskId: string; disabled?:
   const failed = status?.status === "failed";
   const cancelled = status?.status === "cancelled";
   const cmd = status?.log.find((line) => line.startsWith("CMD: "))?.slice(5);
+  const displayOptimizer = status?.optimizer ?? preview?.optimizer ?? null;
+  const displaySkillRouting = status?.skillRouting ?? preview?.skillRouting ?? null;
+  const displayContextPlan = status?.contextPlan ?? preview?.contextPlan ?? null;
+  const displayProvider = status?.optimizer?.provider ?? preview?.provider ?? provider;
 
   return (
     <div className="rounded-2xl border border-border bg-card p-4">
@@ -205,6 +321,24 @@ export function RunTaskButton({ taskId, disabled }: { taskId: string; disabled?:
             title="Local provider"
           >
             {PROVIDER_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+          <select
+            value={optimizerMode}
+            onChange={(event) => setOptimizerMode(event.target.value as typeof optimizerMode)}
+            disabled={running}
+            className="rounded-xl border border-border bg-bg-base px-3 py-2 text-xs font-bold text-text outline-none transition-colors hover:bg-card-hover disabled:cursor-not-allowed disabled:opacity-50"
+            title="Token optimizer mode"
+          >
+            {OPTIMIZER_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+          <select
+            value={contextMode}
+            onChange={(event) => setContextMode(event.target.value as typeof contextMode)}
+            disabled={running || optimizerMode !== "manual"}
+            className="rounded-xl border border-border bg-bg-base px-3 py-2 text-xs font-bold text-text outline-none transition-colors hover:bg-card-hover disabled:cursor-not-allowed disabled:opacity-50"
+            title="Manual context mode"
+          >
+            {CONTEXT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
           {cmd && (
             <button
@@ -265,6 +399,64 @@ export function RunTaskButton({ taskId, disabled }: { taskId: string; disabled?:
         <div className="mt-3 rounded-xl border border-accent/20 bg-accent/5 px-3 py-2">
           <p className="text-[10px] font-bold uppercase tracking-widest text-accent">Command</p>
           <code className="mt-1 block overflow-x-auto whitespace-pre py-1 font-mono text-[11px] text-text-muted">{cmd}</code>
+        </div>
+      )}
+      {(displayOptimizer || displaySkillRouting || displayContextPlan) && (
+        <div className="mt-3 rounded-xl border border-border bg-bg-base p-3">
+          <div className="flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-text-muted">
+            <span>{status ? "Run Optimizer" : "Optimizer Preview"}</span>
+            <span className="rounded border border-accent/30 bg-accent/10 px-2 py-0.5 text-accent">
+              {displayOptimizer?.mode ?? "auto_aggressive"} / {displayOptimizer?.contextMode ?? displayContextPlan?.mode ?? "standard"}
+            </span>
+            <span>{displayProvider}</span>
+            <span>{displayOptimizer?.model ? `model ${displayOptimizer.model}` : "provider model default"}</span>
+            <span>{displayOptimizer?.estimatedPromptTokens ? `${displayOptimizer.estimatedPromptTokens.toLocaleString()} est tokens` : "estimate pending"}</span>
+            {status?.actualTokens ? <span>{status.actualTokens.toLocaleString()} actual tokens</span> : null}
+            <span>{displaySkillRouting?.tokenCost ?? "0 LLM tokens used for routing"}</span>
+            {previewLoading && !status && <span>refreshing...</span>}
+          </div>
+          {displayOptimizer?.reason && <p className="mt-2 text-xs text-text-muted">{displayOptimizer.reason}</p>}
+          {displayOptimizer?.modelReason && <p className="mt-1 text-xs text-text-muted">{displayOptimizer.modelReason}</p>}
+          {getContextReportValue(status?.contextReport, "previousFailure") && (
+            <p className="mt-2 rounded-lg border border-in-progress/30 bg-in-progress/10 px-3 py-2 text-xs text-in-progress">
+              Retry context attached from previous failed run.
+            </p>
+          )}
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {(displaySkillRouting?.selected ?? []).slice(0, 8).map((skill) => (
+              <span key={skill.slug ?? skill.name} className="rounded border border-border bg-card px-2 py-1 font-mono text-[10px] text-text-muted" title={(skill.reasons ?? []).join(", ")}>
+                {skill.slug ?? skill.name} {typeof skill.score === "number" ? `(${skill.score})` : ""}
+              </span>
+            ))}
+            {typeof displaySkillRouting?.omittedCount === "number" && (
+              <span className="rounded border border-border bg-card px-2 py-1 text-[10px] text-text-muted">
+                {displaySkillRouting.omittedCount} omitted
+              </span>
+            )}
+          </div>
+          {status?.contextReportPath && (
+            <p className="mt-2 font-mono text-[10px] text-text-muted">Context report: {status.contextReportPath}</p>
+          )}
+          {status?.contextReport && (
+            <details className="mt-2 rounded-lg border border-border bg-card px-3 py-2">
+              <summary className="cursor-pointer text-[10px] font-bold uppercase tracking-widest text-accent">
+                View Context Report JSON
+              </summary>
+              {typeof status.contextReport.promptPreview === "string" && (
+                <details className="mt-2 rounded-lg border border-border bg-bg-base px-3 py-2">
+                  <summary className="cursor-pointer text-[10px] font-bold uppercase tracking-widest text-text-muted">
+                    View Prompt Preview
+                  </summary>
+                  <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap font-mono text-[10px] leading-relaxed text-text-muted">
+                    {status.contextReport.promptPreview}
+                  </pre>
+                </details>
+              )}
+              <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap font-mono text-[10px] leading-relaxed text-text-muted">
+                {JSON.stringify(status.contextReport, null, 2)}
+              </pre>
+            </details>
+          )}
         </div>
       )}
       {status && (

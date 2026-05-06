@@ -149,6 +149,42 @@ def remember_project_path(project_name: str, project_path: str) -> None:
     tmp_path.replace(LOCAL_PROJECT_PATHS)
 
 
+def command_path(command: str) -> str | None:
+    configured_keys = (f"GCS_{command.upper()}_BIN", f"{command.upper()}_BIN")
+    for env_key in configured_keys:
+        configured = os.environ.get(env_key)
+        if configured and Path(configured).exists():
+            return configured
+
+    resolved = shutil.which(command)
+    if resolved:
+        return resolved
+
+    if os.name == "nt":
+        try:
+            result = subprocess.run(
+                ["where.exe", command],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+                timeout=5,
+            )
+            if result.returncode == 0:
+                first = next((line.strip() for line in result.stdout.splitlines() if line.strip()), "")
+                if first:
+                    return first
+        except Exception:
+            pass
+    return None
+
+
+def command_available(command: str) -> bool:
+    return command_path(command) is not None
+
+
 def heartbeat(verbose: bool) -> bool:
     if not BRIDGE_TOKEN and not HOOK_SECRET:
         print("BRIDGE_TOKEN or HOOK_SECRET is not set; bridge cannot authenticate.", flush=True)
@@ -162,13 +198,15 @@ def heartbeat(verbose: bool) -> bool:
         {
             "deviceKey": device_key,
             "name": device_name,
-            "claudeAvailable": shutil.which("claude") is not None,
-            "codexAvailable": shutil.which("codex") is not None,
+            "claudeAvailable": command_available("claude"),
+            "codexAvailable": command_available("codex"),
             "projectPaths": collect_project_paths(),
             "metadata": {
                 "cwd": os.getcwd(),
                 "runner": "hooks/gcs_bridge_daemon.py",
                 "startedAt": datetime.now().isoformat(),
+                "claudePath": command_path("claude"),
+                "codexPath": command_path("codex"),
             },
         },
     )
@@ -1165,6 +1203,275 @@ def _sync_task_to_progress(project_name: str, payload: dict[str, Any]) -> None:
         pass
 
 
+def _string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item).strip() for item in value if str(item).strip()]
+
+
+def _read_text_if_exists(path: Path, max_chars: int = 12000) -> str:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        return ""
+    if len(text) > max_chars:
+        return text[:max_chars] + "\n\n... truncated ..."
+    return text
+
+
+def _load_project_code_index(project_name: str, project_path: str) -> str:
+    local_index = Path(project_path).expanduser() / ".gcs" / "code-index.md"
+    hub_index = ROOT / "projects" / project_name / "code-index.md"
+    local_text = _read_text_if_exists(local_index, 50000)
+    if local_text:
+        return f"Source: {local_index}\n\n{local_text}"
+    hub_text = _read_text_if_exists(hub_index, 50000)
+    if hub_text:
+        return f"Source: {hub_index}\n\n{hub_text}"
+    return ""
+
+
+def _dict_value(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def _task_keyword_set(task: dict[str, Any], selected_skills: list[dict[str, Any]]) -> set[str]:
+    raw = " ".join([
+        str(task.get("name") or ""),
+        str(task.get("summary") or ""),
+        str(task.get("details") or ""),
+        str(task.get("moduleName") or ""),
+        str(task.get("featureName") or ""),
+        " ".join(_string_list(task.get("reqIds"))),
+        " ".join(str(skill.get("slug") or "") for skill in selected_skills),
+        " ".join(str(skill.get("name") or "") for skill in selected_skills),
+    ]).lower()
+    stop = {
+        "and", "the", "for", "with", "from", "this", "that", "task", "tasks",
+        "implement", "create", "update", "delete", "none", "null", "true", "false",
+    }
+    return {
+        token for token in re.findall(r"[a-z0-9][a-z0-9-]{2,}", raw)
+        if token not in stop and len(token) <= 40
+    }
+
+
+def _filter_code_index(code_index: str, task: dict[str, Any], selected_skills: list[dict[str, Any]], max_chars: int) -> str:
+    if not code_index:
+        return "No code-index.md found for this project yet. If structure is unclear, inspect the repository before editing."
+    keywords = _task_keyword_set(task, selected_skills)
+    if not keywords:
+        return code_index[:max_chars]
+    lines = code_index.splitlines()
+    chosen: list[str] = []
+    chosen_indexes: set[int] = set()
+    for index, line in enumerate(lines):
+        lower = line.lower()
+        if any(keyword in lower for keyword in keywords):
+            for nearby in range(max(0, index - 2), min(len(lines), index + 3)):
+                if nearby not in chosen_indexes:
+                    chosen_indexes.add(nearby)
+                    chosen.append(lines[nearby])
+        if sum(len(item) + 1 for item in chosen) >= max_chars:
+            break
+    if not chosen:
+        return code_index[:max_chars]
+    snippet = "\n".join(chosen)
+    if len(snippet) > max_chars:
+        snippet = snippet[:max_chars] + "\n\n... relevant code-index snippets truncated ..."
+    return snippet
+
+
+def _format_skill_guidance(skill_routing: dict[str, Any]) -> str:
+    selected = skill_routing.get("selected")
+    if not isinstance(selected, list) or not selected:
+        return "- No skill guidance selected. Routing still used 0 LLM tokens."
+    lines: list[str] = []
+    for skill in selected:
+        if not isinstance(skill, dict):
+            continue
+        reasons = skill.get("reasons") if isinstance(skill.get("reasons"), list) else []
+        reason_text = ", ".join(str(item) for item in reasons[:4]) or "deterministic score"
+        guidance = str(skill.get("guidance") or "").strip()
+        lines.extend([
+            f"### {skill.get('slug') or skill.get('name') or 'skill'}",
+            f"- Score: {skill.get('score', 0)}",
+            f"- Why selected: {reason_text}",
+            guidance or "- Use the skill category and task scope as compact guidance.",
+            "",
+        ])
+    return "\n".join(lines).strip()
+
+
+def _format_previous_failure(previous_failure: dict[str, Any]) -> str:
+    if not previous_failure:
+        return "No previous failed run for this task."
+    lines = [
+        f"- Updated at: {previous_failure.get('updatedAt') or 'unknown'}",
+        f"- Exit code: {previous_failure.get('exitCode') if previous_failure.get('exitCode') is not None else 'unknown'}",
+        f"- Artifact: {previous_failure.get('artifactPath') or 'none'}",
+        f"- Error: {previous_failure.get('error') or 'none'}",
+    ]
+    log_tail = previous_failure.get("logTail")
+    if isinstance(log_tail, list) and log_tail:
+        lines.append("")
+        lines.append("### Previous Log Tail")
+        lines.extend(str(item) for item in log_tail[-40:])
+    return "\n".join(lines)
+
+
+def _estimate_text_tokens(text: str) -> int:
+    return max(1, round(len(text) / 4))
+
+
+def _apply_prompt_budget(prompt: str, context_plan: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    budget = int(context_plan.get("maxPromptTokens") or 12000)
+    report: dict[str, Any] = {
+        "budgetTokens": budget,
+        "beforeTokens": _estimate_text_tokens(prompt),
+        "afterTokens": _estimate_text_tokens(prompt),
+        "trimmed": False,
+        "trimmedBlocks": [],
+    }
+    if report["beforeTokens"] <= budget:
+        return prompt, report
+
+    target_chars = max(2000, budget * 4)
+    # Task core, req IDs, acceptance criteria, and steps sit before code-index. Trim the
+    # expandable context blocks first so the required task contract stays intact.
+    markers = [
+        ("## Project Code Index", "## Risk Notes", "project_code_index"),
+        ("## Selected Skill Guidance", "## Task", "selected_skill_guidance"),
+    ]
+    next_prompt = prompt
+    for start_marker, end_marker, block_name in markers:
+        if len(next_prompt) <= target_chars:
+            break
+        start = next_prompt.find(start_marker)
+        end = next_prompt.find(end_marker, start + len(start_marker)) if start >= 0 else -1
+        if start < 0 or end < 0:
+            continue
+        block = next_prompt[start:end]
+        keep_chars = 1800 if block_name == "project_code_index" else 1400
+        if len(block) <= keep_chars:
+            continue
+        trimmed_block = block[:keep_chars].rstrip() + f"\n\n... {block_name} trimmed by prompt budget guard ...\n\n"
+        next_prompt = next_prompt[:start] + trimmed_block + next_prompt[end:]
+        report["trimmedBlocks"].append(block_name)
+
+    if len(next_prompt) > target_chars:
+        hard_keep = max(2000, target_chars - 600)
+        next_prompt = next_prompt[:hard_keep].rstrip() + "\n\n... prompt hard-trimmed by budget guard; task core was prioritized ...\n"
+        report["trimmedBlocks"].append("hard_tail")
+
+    report["afterTokens"] = _estimate_text_tokens(next_prompt)
+    report["trimmed"] = True
+    return next_prompt, report
+
+
+def _build_task_run_prompt(
+    payload: dict[str, Any],
+    project_name: str,
+    project_path: str,
+    task_id: str,
+    provider: str,
+    role: str,
+    phase: str,
+    model: str,
+) -> str:
+    task = payload.get("task") if isinstance(payload.get("task"), dict) else {}
+    req_ids = _string_list(task.get("reqIds"))
+    acceptance = _string_list(task.get("acceptanceCriteria"))
+    steps = _string_list(task.get("steps"))
+    deps = _string_list(task.get("deps"))
+    optimizer = _dict_value(payload.get("optimizer"))
+    skill_routing = _dict_value(payload.get("skillRouting"))
+    context_plan = _dict_value(payload.get("contextPlan"))
+    previous_failure = _dict_value(payload.get("previousFailure"))
+    selected_skills = skill_routing.get("selected") if isinstance(skill_routing.get("selected"), list) else []
+    selected_skill_dicts = [item for item in selected_skills if isinstance(item, dict)]
+    code_index_max = int(context_plan.get("codeIndexMaxChars") or 7000)
+    code_index = _filter_code_index(_load_project_code_index(project_name, project_path), task, selected_skill_dicts, code_index_max)
+
+    phase_instruction = {
+        "analysis": "Prepare a concise implementation brief. Do not modify source files unless required to create planning artifacts.",
+        "review": "Review the implementation against the task scope and acceptance criteria. Prefer findings, risks, and verification gaps.",
+        "implementation": "Implement the scoped task in the local project. Modify files as needed and verify the change.",
+    }.get(phase, "Implement the scoped task in the local project.")
+
+    step_block = "\n".join(f"{index + 1}. {step}" for index, step in enumerate(steps)) or "- No explicit steps were provided; derive a safe minimal plan from the task details."
+    acceptance_block = "\n".join(f"- {item}" for item in acceptance) or "- No explicit acceptance criteria were provided."
+    deps_block = "\n".join(f"- {item}" for item in deps) or "- None"
+
+    return "\n".join([
+        f"You are running as {provider} local agent for GCS.",
+        "",
+        "## Execution Mode",
+        phase_instruction,
+        "Follow the Suggested Steps in order. Announce each step before working on it, then summarize the result of that step.",
+        "Preserve unrelated user changes. Do not broaden scope beyond this task.",
+        "",
+        "## Project",
+        f"- Name: {project_name}",
+        f"- Path: {project_path}",
+        "",
+        "## Agent",
+        f"- Provider: {provider}",
+        f"- Role: {role}",
+        f"- Model: {model or 'provider default'}",
+        f"- Optimizer: {optimizer.get('mode') or 'auto_aggressive'} / {optimizer.get('contextMode') or context_plan.get('mode') or 'standard'}",
+        f"- Routing token cost: {skill_routing.get('tokenCost') or '0 LLM tokens used for routing'}",
+        f"- Estimated prompt tokens: {optimizer.get('estimatedPromptTokens') or 'unknown'}",
+        f"- Selected skills: {', '.join(str(skill.get('slug')) for skill in selected_skill_dicts if skill.get('slug')) or 'none'}",
+        f"- Omitted skills: {skill_routing.get('omittedCount') if 'omittedCount' in skill_routing else 'unknown'}",
+        "",
+        "## Optimizer Reason",
+        str(optimizer.get("reason") or "Deterministic routing selected the compact context plan before the model was called."),
+        "",
+        "## Selected Skill Guidance",
+        _format_skill_guidance(skill_routing),
+        "",
+        "## Task",
+        f"- ID: {task_id}",
+        f"- Name: {task.get('name') or ''}",
+        f"- Module: {task.get('moduleName') or ''}",
+        f"- Feature: {task.get('featureName') or ''}",
+        f"- Requirement IDs: {', '.join(req_ids) if req_ids else 'none'}",
+        f"- Priority: {task.get('priority') or 'unspecified'}",
+        f"- Estimate: {task.get('estimate') or 'unspecified'}",
+        "",
+        "## Summary",
+        str(task.get("summary") or ""),
+        "",
+        "## Details",
+        str(task.get("details") or ""),
+        "",
+        "## Acceptance Criteria",
+        acceptance_block,
+        "",
+        "## Suggested Steps",
+        step_block,
+        "",
+        "## Dependencies",
+        deps_block,
+        "",
+        "## Previous Failure Context",
+        _format_previous_failure(previous_failure),
+        "",
+        "## Project Code Index",
+        code_index or "No code-index.md found for this project yet. If structure is unclear, inspect the repository before editing.",
+        "",
+        "## Risk Notes",
+        str(task.get("risk") or "None"),
+        "",
+        "## Required Final Response",
+        "- State what changed.",
+        "- List changed files.",
+        "- List verification commands and results.",
+        "- If blocked, explain the blocker clearly and do not claim completion.",
+    ])
+
+
 def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
     action_id = str(action.get("id") or "")
     payload = action.get("payload") if isinstance(action.get("payload"), dict) else {}
@@ -1210,19 +1517,65 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
     if model:
         env["GCS_MODEL"] = model
 
+    optimizer = _dict_value(payload.get("optimizer"))
+    skill_routing = _dict_value(payload.get("skillRouting"))
+    context_plan = _dict_value(payload.get("contextPlan"))
+    prompt = _build_task_run_prompt(payload, project_name, project_path, task_id, provider, role, phase, model)
+    prompt, budget_report = _apply_prompt_budget(prompt, context_plan)
+    prompt_path = _safe_task_file(project_path, task_id, "prompt.md")
+    prompt_path.parent.mkdir(parents=True, exist_ok=True)
+    prompt_path.write_text(prompt, encoding="utf-8")
+    rel_prompt = str(prompt_path.relative_to(cwd)) if prompt_path.is_relative_to(cwd) else str(prompt_path)
+    context_report = {
+        "taskId": task_id,
+        "project": project_name,
+        "provider": provider,
+        "role": role,
+        "model": model or None,
+        "optimizer": optimizer,
+        "skillRouting": skill_routing,
+        "contextPlan": context_plan,
+        "previousFailure": _dict_value(payload.get("previousFailure")),
+        "estimatedPromptTokens": _estimate_text_tokens(prompt),
+        "budgetReport": budget_report,
+        "promptPath": rel_prompt,
+        "promptPreview": prompt[:12000] + ("\n\n... prompt preview truncated ..." if len(prompt) > 12000 else ""),
+        "routingTokens": 0,
+    }
+    context_report_path = _safe_task_file(project_path, task_id, "context-report.json")
+    context_report_path.parent.mkdir(parents=True, exist_ok=True)
+    context_report_path.write_text(json.dumps(context_report, indent=2, ensure_ascii=False), encoding="utf-8")
+    rel_context_report = str(context_report_path.relative_to(cwd)) if context_report_path.is_relative_to(cwd) else str(context_report_path)
+    task_data = payload.get("task") if isinstance(payload.get("task"), dict) else {}
+    task_steps = _string_list(task_data.get("steps"))
+    step_count = len(task_steps)
+    selected_skills = skill_routing.get("selected") if isinstance(skill_routing.get("selected"), list) else []
+    selected_skill_slugs = [str(skill.get("slug")) for skill in selected_skills if isinstance(skill, dict) and skill.get("slug")]
+    step_lines = [
+        f"Prompt file: {rel_prompt}",
+        f"Context report: {rel_context_report}",
+        f"Optimizer: {optimizer.get('mode', 'auto_aggressive')} / {optimizer.get('contextMode') or context_plan.get('mode', 'standard')} - {optimizer.get('reason', 'deterministic plan')}",
+        f"Skill router: {', '.join(selected_skill_slugs) if selected_skill_slugs else 'none'}; omitted {skill_routing.get('omittedCount', 0)}; 0 LLM tokens used for routing.",
+        f"Estimated prompt tokens: {context_report['estimatedPromptTokens']}",
+        f"Prompt budget: {budget_report['afterTokens']}/{budget_report['budgetTokens']} tokens; trimmed={budget_report['trimmed']}.",
+        f"Task steps attached: {step_count}",
+    ]
+    if provider == "codex":
+        step_lines.append("Codex CLI mode: one `codex exec` per task; task steps are embedded in the prompt.")
+    for index, step in enumerate(task_steps[:8], start=1):
+        step_lines.append(f"Step {index}: {step}")
+    if step_count > 8:
+        step_lines.append(f"... {step_count - 8} more step(s) included in prompt.")
+    post_action_progress(action_id, step_lines)
+
     prompt_handle = None
     if provider == "claude":
-        binary = os.environ.get("GCS_CLAUDE_BIN") or shutil.which("claude")
+        binary = command_path("claude")
         if not binary:
             raise ValueError("claude executable not found in PATH")
-        # Strip project prefix to get relative task ID for /run-task skill
-        relative_task_id = task_id
-        if task_id.startswith(f"{project_name}-"):
-            relative_task_id = task_id[len(project_name) + 1:]
-        phase_cmd = "run-task" if phase == "implementation" else f"run-task --phase {phase}"
-        slash_cmd = f"/{phase_cmd} {relative_task_id}"
         cmd = [
-            binary, "-p", slash_cmd,
+            binary, "-p",
+            "--input-format", "text",
             "--output-format", "stream-json",
             "--verbose",
             "--dangerously-skip-permissions",
@@ -1232,11 +1585,18 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
             cmd.extend(["--max-turns", os.environ["GCS_MAX_TURNS"]])
         if model:
             cmd.extend(["--model", model])
-        display_cmd = f"cd /d {_quote_cmd_arg(str(ROOT))} && {' '.join(_quote_cmd_arg(part) for part in cmd)}"
+        display_cmd = f"cd /d {_quote_cmd_arg(str(cwd))} && type {_quote_cmd_arg(str(prompt_path))} | {' '.join(_quote_cmd_arg(part) for part in cmd)}"
         post_action_progress(action_id, [f"CMD: {display_cmd}"])
-        proc = subprocess.Popen(cmd, cwd=str(ROOT), env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
+        proc = subprocess.Popen(cmd, cwd=str(cwd), env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
+        try:
+            assert proc.stdin is not None
+            proc.stdin.write(prompt)
+            proc.stdin.close()
+        except Exception as exc:
+            proc.kill()
+            raise ValueError(f"Failed to attach task prompt to Claude stdin: {exc}") from exc
     elif provider == "codex":
-        binary = os.environ.get("GCS_CODEX_BIN") or shutil.which("codex")
+        binary = command_path("codex")
         if not binary:
             raise ValueError("codex executable not found in PATH")
         cmd = [binary, *os.environ.get("GCS_CODEX_TASK_ARGS", "exec").split(), prompt]
@@ -1323,6 +1683,10 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
     if provider == "codex" and not total_tokens:
         total_tokens = max(1, round(len(prompt) / 4)) + min(4000, max(0, round(duration_min * 180)))
     total_cost = cli_result.get("total_cost_usd") if isinstance(cli_result.get("total_cost_usd"), (int, float)) else None
+    context_report["actualTokens"] = total_tokens
+    context_report["durationMin"] = duration_min
+    context_report["exitCode"] = returncode
+    context_report_path.write_text(json.dumps(context_report, indent=2, ensure_ascii=False), encoding="utf-8")
 
     # For stream-json output, cli_result["result"] contains the actual text response.
     # Fall back to raw combined output (plain-text or non-JSON mode).
@@ -1373,7 +1737,12 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
             "durationMin": duration_min,
             "totalTokens": total_tokens,
             "totalCostUSD": float(total_cost or 0),
-            "sessionNotes": f"Local {provider} {phase} run for {task_id} exited with code {returncode}.",
+            "sessionNotes": (
+                f"Local {provider} {phase} run for {task_id} exited with code {returncode}. "
+                f"Optimizer={optimizer.get('mode', 'auto_aggressive')}/{optimizer.get('contextMode') or context_plan.get('mode', 'standard')}; "
+                f"skills={', '.join(selected_skill_slugs) if selected_skill_slugs else 'none'}; routing=0 LLM tokens; "
+                f"contextReport={rel_context_report}."
+            ),
             "risks": [] if returncode == 0 else [f"{provider} exit code {returncode}"],
         },
         timeout=8,
@@ -1382,9 +1751,24 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
         f"Finished local {provider} task run with exit code {returncode}.",
         f"Artifact: {rel_artifact}",
         f"Tokens: {total_tokens}",
+        f"Context report: {rel_context_report}",
     ]
     post_action_progress(action_id, log_lines)
-    return {"exitCode": returncode, "artifactPath": rel_artifact, "durationMin": duration_min, "tokens": total_tokens, "log": log_lines}
+    return {
+        "exitCode": returncode,
+        "artifactPath": rel_artifact,
+        "durationMin": duration_min,
+        "tokens": total_tokens,
+        "actualTokens": total_tokens,
+        "contextReportPath": rel_context_report,
+        "contextReport": context_report,
+        "skillFeedback": {
+            "selectedSkills": selected_skill_slugs,
+            "status": "success" if returncode == 0 else "failed",
+            "failureReason": None if returncode == 0 else f"{provider} exit code {returncode}",
+        },
+        "log": log_lines,
+    }
 
 
 _CONVENTION_DETECTORS: list[dict[str, Any]] = [

@@ -2,6 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import type { PrismaClient } from "@prisma/client";
 import type { Dirent } from "fs";
+import { createHash } from "crypto";
 
 type Db = PrismaClient;
 
@@ -108,12 +109,21 @@ function inferCategory(filePath: string): string {
 }
 
 function roleCompatibility(category: string, tags: string[]) {
+  if (category === "learning") return ["ba", "dev", "reviewer", "qa", "researcher"];
   if (category === "analysis" || tags.includes("ba")) return ["ba", "reviewer"];
   if (category === "frameworks") return ["dev", "qa"];
   if (tags.includes("qa") || tags.includes("testing")) return ["qa", "dev"];
   if (tags.includes("review")) return ["reviewer"];
   if (tags.includes("design")) return ["design"];
   return ["researcher"];
+}
+
+function contentHash(text: string) {
+  return createHash("sha256").update(text).digest("hex").slice(0, 16);
+}
+
+function normalizeSkillSlug(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "skill";
 }
 
 function taskPhaseFromStatus(status: string) {
@@ -378,6 +388,7 @@ type SeedSkill = {
   description: string;
   category: string;
   sourcePath: string | null;
+  content: string | null;
   tags: string[];
   roleCompatibility: string[];
   isImported: boolean;
@@ -411,6 +422,7 @@ async function syncSkillsAndRoles(db: Db, workspaceId: string, root: string, res
       description: existing.description || skill.description,
       category: existing.category === "marketplace" && skill.category !== "marketplace" ? skill.category : existing.category,
       sourcePath: hasLocalWrapper ? (existingIsWrapper ? existing.sourcePath : skill.sourcePath) : (existing.sourcePath ?? skill.sourcePath),
+      content: existing.content ?? skill.content,
       tags: Array.from(new Set([...existing.tags, ...skill.tags])),
       roleCompatibility: Array.from(new Set([...existing.roleCompatibility, ...skill.roleCompatibility])),
       isImported: existing.isImported || skill.isImported || hasLocalWrapper,
@@ -421,17 +433,58 @@ async function syncSkillsAndRoles(db: Db, workspaceId: string, root: string, res
   for (const file of await collectSkillFiles(resolveRoot(root, "skills"))) {
     const text = await readMarkdown(file);
     const frontmatter = parseFrontmatter(text);
-    const name = frontmatter.name ?? path.basename(path.dirname(file));
+    const name = normalizeSkillSlug(frontmatter.name ?? path.basename(path.dirname(file)));
     const category = inferCategory(file);
-    const tags = [category, name];
+    const tags = [category, name, `hash:${contentHash(text)}`];
     mergeSkill({
       name,
       description: frontmatter.description ?? `${name} skill`,
       category,
       sourcePath: path.relative(root, file).replace(/\\/g, "/"),
+      content: text,
       tags,
       roleCompatibility: roleCompatibility(category, tags),
       isImported: category === "imported",
+      isRemote: false,
+    });
+  }
+
+  for (const file of await collectSkillFiles(resolveRoot(root, ".codex", "skills"))) {
+    const text = await readMarkdown(file);
+    const frontmatter = parseFrontmatter(text);
+    const name = normalizeSkillSlug(frontmatter.name ?? path.basename(path.dirname(file)));
+    const category = "generated-role";
+    const tags = [category, name, "codex", `hash:${contentHash(text)}`];
+    mergeSkill({
+      name,
+      description: frontmatter.description ?? `${name} generated Codex role skill`,
+      category,
+      sourcePath: path.relative(root, file).replace(/\\/g, "/"),
+      content: text,
+      tags,
+      roleCompatibility: roleCompatibility(category, tags),
+      isImported: false,
+      isRemote: false,
+    });
+  }
+
+  const learningDir = resolveRoot(root, "agents", "learning");
+  const learningFiles = (await fs.readdir(learningDir).catch(() => [])).filter((file) => file.endsWith(".md"));
+  for (const file of learningFiles) {
+    const full = resolveRoot(learningDir, file);
+    const text = await readMarkdown(full);
+    const name = normalizeSkillSlug(file.replace(/\.md$/, ""));
+    const category = "learning";
+    const tags = [category, name, `hash:${contentHash(text)}`];
+    mergeSkill({
+      name,
+      description: `${name} reusable learning note`,
+      category,
+      sourcePath: path.relative(root, full).replace(/\\/g, "/"),
+      content: text,
+      tags,
+      roleCompatibility: roleCompatibility(category, tags),
+      isImported: false,
       isRemote: false,
     });
   }
@@ -442,10 +495,11 @@ async function syncSkillsAndRoles(db: Db, workspaceId: string, root: string, res
   for (const item of marketplace?.skills ?? []) {
     const tags = [...(item.tags ?? []), ...(item.source ? [`source:${item.source}`] : [])];
     mergeSkill({
-      name: item.name,
+      name: normalizeSkillSlug(item.name),
       description: item.description,
       category: "marketplace",
       sourcePath: item.source ?? null,
+      content: null,
       tags,
       roleCompatibility: roleCompatibility("marketplace", tags),
       isImported: true,
@@ -464,6 +518,7 @@ async function syncSkillsAndRoles(db: Db, workspaceId: string, root: string, res
         category: skill.category,
         sourcePath: skill.sourcePath,
         description: skill.description,
+        content: skill.content,
         providerCompatibility: ["claude", "codex", "chatgpt"],
         roleCompatibility: skill.roleCompatibility,
         tags: skill.tags,
@@ -474,6 +529,7 @@ async function syncSkillsAndRoles(db: Db, workspaceId: string, root: string, res
         category: skill.category,
         sourcePath: skill.sourcePath,
         description: skill.description,
+        content: skill.content,
         providerCompatibility: ["claude", "codex", "chatgpt"],
         roleCompatibility: skill.roleCompatibility,
         tags: skill.tags,

@@ -358,6 +358,18 @@
 - Added provider and phase filters to Project Run Queue. The API now accepts `provider=all|claude|codex` and `phase=all|analysis|implementation|review`, applies them at the database query level, and the UI exposes provider/phase selects that reset pagination and scoped counts.
 - Cleaned up lint blockers in the framework ingest and bridge prompt-context API routes by removing unused request/role variables and replacing `any` catch handlers with `unknown` plus safe error messages.
 - Added full run-log inspection from Project Run Queue. A new authenticated `/api/projects/:name/run-queue/:actionId` endpoint returns the stored command, full action log, artifact path, device, status, and exit code; the queue UI now opens this in a modal with `Copy CMD` and `Copy Log`.
+- Hardened local provider availability for task runs. The bridge now detects Windows CLI availability with `where.exe` and optional `GCS_<PROVIDER>_BIN`/`<PROVIDER>_BIN` overrides, and `/api/tasks/:id/run` now returns structured device/path/provider diagnostics when a selected local provider is unavailable for a project.
+- Clarified Codex CLI task execution. Local Codex now writes a `.gcs/tasks/<taskId>/prompt.md` artifact, embeds the generated task steps and acceptance criteria into one `codex exec` prompt, logs the step preview to the dashboard, and resolves `codex`/`claude` with the same path logic used by bridge heartbeat.
+- Added project memory/context injection for task prompts. Dashboard prompt-context now includes recent project session memory and `projects/<project>/code-index.md`; local bridge task prompts prefer `<project>/.gcs/code-index.md` and fall back to the hub code index so Claude/Codex can recover project structure without rescanning from zero.
+- Added the zero-token skill router and token-saving optimizer. `/api/tasks/:id/run` now accepts `optimizerMode` and optional manual `contextMode`, scores all stored skill definitions deterministically from task/project/role signals, and queues only compact selected-skill guidance while logging `0 LLM tokens used for routing`.
+- Added optimizer/context artifacts for every local task run. The bridge writes `.gcs/tasks/<taskId>/prompt.md` and `.gcs/tasks/<taskId>/context-report.json`, injects only relevant code-index snippets, streams the selected skill/router summary to the dashboard, and records actual tokens plus skill feedback in the action result.
+- Updated Task Detail and Project Run Queue UI to expose optimizer mode, context mode, selected skill chips, omitted skill count, estimated prompt tokens, actual tokens, and context-report path so token-saving decisions are visible without opening raw DB rows.
+- Extended Token Analytics with optimizer telemetry from local bridge actions: top token-heavy task runs, estimated vs actual token totals, selected-skill counts, and context-mode distribution for the selected date range.
+- Added automatic skill brain refresh. Task runs now refresh skill/role metadata from repo sources before deterministic routing, `repo-sync` stores full skill content plus `hash:<sha256>` tags, and Library exposes a `Refresh Brain` action backed by `/api/skills/refresh`.
+- Added context-report inspection in the UI. Task Detail and Run Queue full-log modals can display the stored `contextReport` JSON directly, so prompt budget, selected skills, omitted blocks, and routing metadata can be reviewed without opening local files.
+- Added a hard prompt-budget guard in the bridge. Before invoking Claude/Codex, the bridge estimates prompt tokens and trims expandable blocks (`Project Code Index`, then compact skill guidance) while preserving task core, reqIds, acceptance criteria, and suggested steps. The `contextReport` now includes `budgetReport` and a `promptPreview` visible from Task Detail and Run Queue.
+- Added retry-aware context injection. When a task is rerun after a failed/cancelled local run, the dashboard attaches the previous failure error, exit code, artifact path, and log tail; the optimizer escalates context, the bridge injects a `Previous Failure Context` prompt block, and the UI marks that retry context was attached.
+- Added a zero-token run preview endpoint at `/api/tasks/:id/run/preview`. The Task Detail run panel now previews the provider, optimizer mode, context mode, chosen model, selected skills, omitted skill count, and estimated prompt tokens before the user queues the task.
 
 ## Checks
 
@@ -369,6 +381,37 @@
 - `npx prisma generate`
 - `npx prisma migrate deploy`
 - `python -m py_compile hooks/gcs_bridge_daemon.py`
+- `python -m py_compile hooks/gcs_bridge_daemon.py`
+- `npm run lint`
+- `python -m py_compile hooks/gcs_bridge_daemon.py`
+- `npx tsc --noEmit`
+- `npm run lint`
+- `npm run build`
+- `npm run lint`
+- `python -m py_compile hooks/gcs_bridge_daemon.py`
+- `npx tsc --noEmit`
+- `npm run build`
+- `npx tsc --noEmit`
+- `npm run lint`
+- `python -m py_compile hooks/gcs_bridge_daemon.py`
+- `npm run build`
+- `python -m py_compile hooks/gcs_bridge_daemon.py`
+- `npx tsc --noEmit`
+- `npm run lint`
+- `npm run build`
+- `python -m py_compile hooks/gcs_bridge_daemon.py`
+- `npm run lint`
+- `npx tsc --noEmit`
+- `npm run build`
+- `python -m py_compile hooks/gcs_bridge_daemon.py`
+- `npm run lint`
+- `npx tsc --noEmit`
+- `npm run build`
+- `python -m py_compile hooks/gcs_bridge_daemon.py`
+- `npx prisma generate`
+- `npm run lint`
+- `npx tsc --noEmit`
+- `npm run build`
 - `npx tsc --noEmit`
 - `npm run lint`
 - `npm run build`

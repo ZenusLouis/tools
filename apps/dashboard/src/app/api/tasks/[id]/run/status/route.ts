@@ -13,12 +13,15 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       payload: { path: ["taskId"], equals: id },
     },
     orderBy: { updatedAt: "desc" },
-    select: { id: true, status: true, error: true, result: true, createdAt: true, updatedAt: true, completedAt: true },
+    select: { id: true, status: true, error: true, payload: true, result: true, createdAt: true, updatedAt: true, completedAt: true },
   });
 
   if (!action) return NextResponse.json({ action: null });
   const result = action.result && typeof action.result === "object" && !Array.isArray(action.result)
     ? action.result as Record<string, unknown>
+    : {};
+  const payload = action.payload && typeof action.payload === "object" && !Array.isArray(action.payload)
+    ? action.payload as Record<string, unknown>
     : {};
   return NextResponse.json({
     action: {
@@ -28,6 +31,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       log: Array.isArray(result.log) ? result.log : [],
       artifactPath: typeof result.artifactPath === "string" ? result.artifactPath : null,
       exitCode: typeof result.exitCode === "number" ? result.exitCode : null,
+      actualTokens: typeof result.actualTokens === "number" ? result.actualTokens : typeof result.tokens === "number" ? result.tokens : null,
+      optimizer: payload.optimizer ?? result.optimizer ?? null,
+      skillRouting: payload.skillRouting ?? result.skillRouting ?? null,
+      contextPlan: payload.contextPlan ?? result.contextPlan ?? null,
+      contextReportPath: typeof result.contextReportPath === "string" ? result.contextReportPath : null,
+      contextReport: result.contextReport ?? null,
       createdAt: action.createdAt,
       updatedAt: action.updatedAt,
       completedAt: action.completedAt,

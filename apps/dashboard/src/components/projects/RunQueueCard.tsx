@@ -26,9 +26,14 @@ type QueueAction = {
   provider: string | null;
   phase: string | null;
   role: string | null;
+  optimizer: OptimizerInfo | null;
+  skillRouting: SkillRoutingInfo | null;
+  contextPlan: ContextPlanInfo | null;
   deviceName: string | null;
   artifactPath: string | null;
   exitCode: number | null;
+  actualTokens: number | null;
+  contextReportPath: string | null;
   lastLogLine: string | null;
   logTail: string[];
   createdAt: string;
@@ -44,14 +49,42 @@ type QueueActionDetail = {
   provider: string | null;
   phase: string | null;
   role: string | null;
+  optimizer: OptimizerInfo | null;
+  skillRouting: SkillRoutingInfo | null;
+  contextPlan: ContextPlanInfo | null;
   deviceName: string | null;
   artifactPath: string | null;
   exitCode: number | null;
+  actualTokens: number | null;
+  contextReportPath: string | null;
+  contextReport: Record<string, unknown> | null;
   command: string | null;
   log: string[];
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
+};
+
+type OptimizerInfo = {
+  mode?: string;
+  contextMode?: string;
+  model?: string | null;
+  modelSource?: string;
+  modelReason?: string;
+  estimatedPromptTokens?: number;
+  reason?: string;
+};
+
+type SkillRoutingInfo = {
+  selected?: Array<{ slug?: string; score?: number; reasons?: string[] }>;
+  omittedCount?: number;
+  tokenCost?: string;
+};
+
+type ContextPlanInfo = {
+  mode?: string;
+  includedBlocks?: string[];
+  omittedBlocks?: string[];
 };
 
 type QueueFilter = "all" | "live" | "failed" | "done";
@@ -105,6 +138,12 @@ function timeLabel(value: string) {
 
 function commandFromLog(action: QueueAction) {
   return action.logTail.find((line) => line.startsWith("CMD: "))?.slice(5) ?? null;
+}
+
+function contextReportObject(report: Record<string, unknown> | null | undefined, key: string) {
+  return report && typeof report[key] === "object" && report[key] !== null && !Array.isArray(report[key])
+    ? report[key] as Record<string, unknown>
+    : null;
 }
 
 export function RunQueueCard({ projectName }: { projectName: string }) {
@@ -416,8 +455,25 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
                     {action.provider && <span className="font-bold uppercase text-text">{action.provider}</span>}
                     {action.phase && <span>{action.phase}</span>}
                     {action.deviceName && <span>{action.deviceName}</span>}
+                    {action.optimizer && <span>{action.optimizer.mode ?? "auto"} / {action.optimizer.contextMode ?? action.contextPlan?.mode ?? "standard"}</span>}
+                    {action.optimizer?.model && <span>{action.optimizer.model}</span>}
+                    {typeof action.actualTokens === "number" && <span>{action.actualTokens.toLocaleString()} tokens</span>}
                     <span>{timeLabel(action.updatedAt)}</span>
                   </div>
+                  {action.skillRouting?.selected?.length ? (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {action.skillRouting.selected.slice(0, 5).map((skill) => (
+                        <span key={skill.slug} className="rounded border border-border bg-card px-1.5 py-0.5 font-mono text-[9px] text-text-muted" title={(skill.reasons ?? []).join(", ")}>
+                          {skill.slug}{typeof skill.score === "number" ? ` ${skill.score}` : ""}
+                        </span>
+                      ))}
+                      {typeof action.skillRouting.omittedCount === "number" && (
+                        <span className="rounded border border-border bg-card px-1.5 py-0.5 text-[9px] text-text-muted">
+                          {action.skillRouting.omittedCount} omitted
+                        </span>
+                      )}
+                    </div>
+                  ) : null}
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
                   {(action.logTail.length > 0 || action.artifactPath) && (
@@ -579,11 +635,67 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
                   <span>Device: <b className="text-text">{detailAction.deviceName ?? "unknown"}</b></span>
                   <span>Exit: <b className="text-text">{detailAction.exitCode ?? "--"}</b></span>
                   <span>Lines: <b className="text-text">{detailAction.log.length}</b></span>
+                  <span>Optimizer: <b className="text-text">{detailAction.optimizer?.mode ?? "--"}</b></span>
+                  <span>Context: <b className="text-text">{detailAction.optimizer?.contextMode ?? detailAction.contextPlan?.mode ?? "--"}</b></span>
+                  <span>Model: <b className="text-text">{detailAction.optimizer?.model ?? "--"}</b></span>
+                  <span>Estimate: <b className="text-text">{detailAction.optimizer?.estimatedPromptTokens?.toLocaleString() ?? "--"}</b></span>
+                  <span>Actual: <b className="text-text">{detailAction.actualTokens?.toLocaleString() ?? "--"}</b></span>
                 </div>
+                {detailAction.skillRouting?.selected?.length ? (
+                  <div className="mb-3 rounded border border-border bg-card px-3 py-2">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted">
+                      Skill Router - {detailAction.skillRouting.tokenCost ?? "0 LLM tokens used for routing"}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {detailAction.skillRouting.selected.map((skill) => (
+                        <span key={skill.slug} className="rounded border border-border bg-bg-base px-2 py-1 font-mono text-[10px] text-text-muted" title={(skill.reasons ?? []).join(", ")}>
+                          {skill.slug}{typeof skill.score === "number" ? ` (${skill.score})` : ""}
+                        </span>
+                      ))}
+                      {typeof detailAction.skillRouting.omittedCount === "number" && (
+                        <span className="rounded border border-border bg-bg-base px-2 py-1 text-[10px] text-text-muted">
+                          {detailAction.skillRouting.omittedCount} omitted
+                        </span>
+                      )}
+                    </div>
+                    {detailAction.optimizer?.reason && <p className="mt-2 text-[11px] text-text-muted">{detailAction.optimizer.reason}</p>}
+                    {detailAction.optimizer?.modelReason && <p className="mt-1 text-[11px] text-text-muted">{detailAction.optimizer.modelReason}</p>}
+                    {contextReportObject(detailAction.contextReport, "previousFailure") && (
+                      <p className="mt-2 rounded border border-in-progress/30 bg-in-progress/10 px-2 py-1 text-[11px] text-in-progress">
+                        Retry context attached from previous failed run.
+                      </p>
+                    )}
+                  </div>
+                ) : null}
                 {detailAction.artifactPath && (
                   <p className="mb-3 truncate rounded border border-border bg-card px-3 py-2 font-mono text-[11px] text-done" title={detailAction.artifactPath}>
                     {detailAction.artifactPath}
                   </p>
+                )}
+                {detailAction.contextReportPath && (
+                  <p className="mb-3 truncate rounded border border-border bg-card px-3 py-2 font-mono text-[11px] text-text-muted" title={detailAction.contextReportPath}>
+                    Context report: {detailAction.contextReportPath}
+                  </p>
+                )}
+                {detailAction.contextReport && (
+                  <details className="mb-3 rounded border border-border bg-card px-3 py-2">
+                    <summary className="cursor-pointer text-[10px] font-bold uppercase tracking-widest text-accent">
+                      View Context Report JSON
+                    </summary>
+                    {typeof detailAction.contextReport.promptPreview === "string" && (
+                      <details className="mt-2 rounded-lg border border-border bg-bg-base px-3 py-2">
+                        <summary className="cursor-pointer text-[10px] font-bold uppercase tracking-widest text-text-muted">
+                          View Prompt Preview
+                        </summary>
+                        <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-card p-3 font-mono text-[10px] leading-relaxed text-text-muted">
+                          {detailAction.contextReport.promptPreview}
+                        </pre>
+                      </details>
+                    )}
+                    <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-bg-base p-3 font-mono text-[10px] leading-relaxed text-text-muted">
+                      {JSON.stringify(detailAction.contextReport, null, 2)}
+                    </pre>
+                  </details>
                 )}
                 <pre className="max-h-[58vh] overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-card p-3 font-mono text-[11px] leading-relaxed text-text-muted">
                   {detailAction.log.length ? detailAction.log.join("\n") : detailAction.error ?? "No process output captured."}

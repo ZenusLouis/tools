@@ -1,0 +1,59 @@
+{
+  "project": "omnibooking",
+  "modules": [
+    {
+      "name": "Core Platform",
+      "features": [
+        {
+          "name": "Audit Logging & Notifications",
+          "tasks": [
+            {
+              "id": "omnibooking-M0-F2-T2",
+              "name": "In-app notifications with variable-substitution templates",
+              "summary": "Create notification_templates and notifications tables; emit in-app notifications on booking confirmed, payment success/failure, and check-in events with template variable substitution.",
+              "details": "Template variables: bookingNo, movieTitle, showtime, guestName, roomNo, etc. (CORE-OPS-004). Notification service substitutes variables at creation time. Admin can update templates affecting future messages only. User can mark notifications read. Page 6.",
+              "acceptanceCriteria": [
+                "Booking confirmed event creates notification with correct variable values",
+                "Template change affects future notifications, not existing ones",
+                "User can mark notifications read; unread count visible in header"
+              ],
+              "steps": [
+                "Create notification_templates and notifications tables",
+                "Implement TemplateRenderer with Mustache/simple token substitution",
+                "Publish NotificationEvent from booking/payment/check-in services",
+                "Write NotificationService subscriber creating notification rows",
+                "Angular notification bell polling GET /notifications/unread-count"
+              ],
+              "status": "in-progress"
+            }
+          ]
+        },
+        {
+          "name": "File Management",
+          "tasks": [
+            {
+              "id": "omnibooking-M0-F3-T1",
+              "name": "File metadata storage with type/size validation and object-storage upload",
+              "summary": "Store file metadata (originalFilename, storageKey, MIME, size, domain, entityId, uploadedBy) separately from object storage; validate file type and size before accepting upload.",
+              "details": "file_metadata table referenced by movie posters, hotel images, PDFs (CORE-OPS-005 to CORE-OPS-008). Movie/hotel images accept allowed image MIME types; PDFs accepted for specific document fields. Size limit configurable per file category. Files listable and downloadable by permission. Return 422 with reason on invalid upload. Page 7.",
+              "acceptanceCriteria": [
+                "Upload with disallowed MIME type returns 422 validation error",
+                "Upload exceeding size limit returns 422 with size constraint message",
+                "Uploaded file metadata queryable by domain and entityId",
+                "Files downloadable by users with appropriate permission"
+              ],
+              "steps": [
+                "Create file_metadata table",
+                "Implement FileValidationService checking MIME whitelist and size cap",
+                "Write POST /files/upload multipart endpoint storing to object storage and inserting metadata",
+                "Expose GET /files?domain=&entityId= and GET /files/:id/download",
+                "Integrate with movie poster and hotel image upload flows"
+              ],
+              "status": "in-progress"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

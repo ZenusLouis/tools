@@ -28,6 +28,8 @@ type SourceSummary = {
 export function AgentLibraryClient({ roles, skills, sourceSummary }: { roles: Role[]; skills: Skill[]; sourceSummary: SourceSummary }) {
   const [skillList, setSkillList] = useState(skills);
   const [importingSkill, setImportingSkill] = useState("");
+  const [refreshingBrain, setRefreshingBrain] = useState(false);
+  const [refreshMessage, setRefreshMessage] = useState("");
   const [importError, setImportError] = useState<Record<string, string>>({});
   const [importDone, setImportDone] = useState<Set<string>>(new Set(skills.map((s) => s.slug)));
   const [selectedRole, setSelectedRole] = useState<Role | null>(roles[0] ?? null);
@@ -86,6 +88,29 @@ export function AgentLibraryClient({ roles, skills, sourceSummary }: { roles: Ro
     });
   }
 
+  function refreshSkillBrain() {
+    setRefreshingBrain(true);
+    setRefreshMessage("");
+    startTransition(async () => {
+      try {
+        const res = await fetch("/api/skills/refresh", { method: "POST" });
+        const body = await res.json().catch(() => ({})) as { skills?: number; roles?: number; error?: string };
+        if (!res.ok) {
+          setRefreshMessage(body.error ?? "Skill brain refresh failed.");
+          return;
+        }
+        const next = await fetch("/api/skills", { cache: "no-store" }).then((r) => r.json());
+        if (Array.isArray(next)) setSkillList(next);
+        setImportDone(new Set(Array.isArray(next) ? next.map((s: Skill) => s.slug) : skills.map((s) => s.slug)));
+        setRefreshMessage(`Refreshed ${body.skills ?? 0} skills and ${body.roles ?? 0} roles.`);
+      } catch {
+        setRefreshMessage("Skill brain refresh failed.");
+      } finally {
+        setRefreshingBrain(false);
+      }
+    });
+  }
+
   return (
     <div className="mx-auto grid max-w-[1500px] grid-cols-1 gap-6 xl:grid-cols-[380px_1fr]">
       <section className="rounded-xl border border-border bg-card p-4">
@@ -94,8 +119,24 @@ export function AgentLibraryClient({ roles, skills, sourceSummary }: { roles: Ro
             <p className="text-[10px] font-bold uppercase tracking-widest text-accent">Library</p>
             <h2 className="text-sm font-bold text-text">Active Bot Roles</h2>
           </div>
-          <a href="/create" className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-accent hover:bg-accent/10">Create Role</a>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={refreshSkillBrain}
+              disabled={refreshingBrain}
+              className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-text-muted hover:bg-card-hover hover:text-text disabled:opacity-50"
+            >
+              {refreshingBrain ? <Loader2 size={12} className="animate-spin" /> : null}
+              Refresh Brain
+            </button>
+            <a href="/create" className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-accent hover:bg-accent/10">Create Role</a>
+          </div>
         </div>
+        {refreshMessage && (
+          <p className={`mb-3 rounded-lg border px-3 py-2 text-xs ${refreshMessage.includes("failed") ? "border-blocked/30 bg-blocked/10 text-blocked" : "border-done/30 bg-done/10 text-done"}`}>
+            {refreshMessage}
+          </p>
+        )}
         <div className="flex max-h-[calc(100vh-12rem)] flex-col gap-2 overflow-y-auto pr-1">
           {roles.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border bg-bg-base p-3 text-xs text-text-muted">
