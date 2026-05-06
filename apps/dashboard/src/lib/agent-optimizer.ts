@@ -205,6 +205,18 @@ function scoreSkill(skill: SkillBrainRow, input: TaskOptimizerInput, tokens: Set
     score += 35;
     reasons.push("attached to role");
   }
+  if (skill.category === "trusted-upstream" || skill.tags.includes("trusted-upstream")) {
+    score += 10;
+    reasons.push("trusted upstream");
+  }
+  const priorityTag = skill.tags.find((tag) => tag.startsWith("priority:"));
+  if (priorityTag) {
+    const priority = Number(priorityTag.split(":")[1]);
+    if (Number.isFinite(priority)) {
+      score += Math.min(12, Math.max(0, Math.round(priority / 10)));
+      reasons.push(`source priority ${priority}`);
+    }
+  }
   if (skill.providerCompatibility.map(normalize).includes(input.provider)) {
     score += 14;
     reasons.push("provider match");

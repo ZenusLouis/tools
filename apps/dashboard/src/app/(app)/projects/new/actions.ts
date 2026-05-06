@@ -6,6 +6,7 @@ import type { Dirent } from "fs";
 import { readJSON, writeJSON } from "@/lib/fs/json";
 import { resolvePath } from "@/lib/fs/resolve";
 import { requireCurrentUser } from "@/lib/auth";
+import { buildBridgePayload } from "@/lib/bridge-actions";
 import { db } from "@/lib/db";
 
 type Registry = Record<string, string>;
@@ -292,7 +293,9 @@ export async function createProject(input: CreateProjectInput): Promise<{ error?
       data: {
         workspaceId: user.workspaceId,
         type: "sync_project_metadata",
-        payload: {
+        payloadVersion: 1,
+        actionType: "sync_project_metadata",
+        payload: buildBridgePayload("sync_project_metadata", {
           projectName: name,
           projectPath: trimmedFolderPath,
           files: [
@@ -309,14 +312,16 @@ export async function createProject(input: CreateProjectInput): Promise<{ error?
               content: indexContent,
             },
           ],
-        },
+        }),
       },
     });
     await db.bridgeFileAction.create({
       data: {
         workspaceId: user.workspaceId,
         type: "generate_code_index",
-        payload: { projectName: name, projectPath: trimmedFolderPath },
+        payloadVersion: 1,
+        actionType: "generate_code_index",
+        payload: buildBridgePayload("generate_code_index", { projectName: name, projectPath: trimmedFolderPath }),
       },
     });
   }

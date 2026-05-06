@@ -3,12 +3,13 @@ import { AlertTriangle, CheckCircle2, GitCommit, History, RefreshCw, Sparkles, T
 import type { ActivityItem } from "@/lib/activity";
 import { timeAgo } from "@/lib/activity";
 
-type ActivityType = "commit" | "complete" | "analysis" | "index" | "alert" | "openai-sync" | "chat" | "project";
+type ActivityType = "commit" | "complete" | "analysis" | "index" | "alert" | "openai-sync" | "chat" | "audit" | "project";
 
 function detectType(item: ActivityItem): ActivityType {
   const note = (item.note ?? "").toLowerCase();
   const sType = item.sessionType ?? "";
   if (item.commitHash) return "commit";
+  if (sType === "audit") return note.includes("fail") || note.includes("cancel") || note.includes("expired") ? "alert" : "audit";
   if (sType === "chat") return "chat";
   if (sType === "openai-sync") return "openai-sync";
   if (sType === "project-event" && note.includes("analysis")) return "analysis";
@@ -28,6 +29,7 @@ const TYPE_CONFIG: Record<ActivityType, {
   analysis:    { icon: Sparkles,     iconClass: "text-accent",       bgClass: "bg-accent/20",       borderClass: "border-accent/30",       label: "Analysis" },
   "openai-sync":{ icon: TrendingUp,  iconClass: "text-emerald-400",  bgClass: "bg-emerald-400/10",  borderClass: "border-emerald-400/20",  label: "OpenAI Sync" },
   chat:        { icon: Sparkles,     iconClass: "text-accent",       bgClass: "bg-accent/20",       borderClass: "border-accent/30",       label: "Chat" },
+  audit:       { icon: History,      iconClass: "text-text-muted",   bgClass: "bg-card-hover",      borderClass: "border-border",          label: "Audit" },
   index:       { icon: Database,     iconClass: "text-text-muted",   bgClass: "bg-card-hover",      borderClass: "border-border",          label: "Re-indexed" },
   alert:       { icon: AlertTriangle,iconClass: "text-in-progress",  bgClass: "bg-in-progress/20",  borderClass: "border-in-progress/30",  label: "Alert" },
   project:     { icon: RefreshCw,    iconClass: "text-text-muted",   bgClass: "bg-card-hover",      borderClass: "border-border",          label: "Event" },

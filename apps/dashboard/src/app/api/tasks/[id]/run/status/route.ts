@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { requireCurrentUser } from "@/lib/auth";
+import { expireStaleBridgeActions } from "@/lib/bridge-actions";
 import { db } from "@/lib/db";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireCurrentUser();
   const { id } = await params;
+  await expireStaleBridgeActions(user.workspaceId);
 
   const action = await db.bridgeFileAction.findFirst({
     where: {

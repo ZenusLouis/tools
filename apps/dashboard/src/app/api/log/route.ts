@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { z } from "zod";
 import { bridgeTokenFromHeaders, verifyBridgeRequest } from "@/lib/bridge-auth";
+import { sanitizeText } from "@/lib/sanitize";
 
 const HOOK_SECRET = process.env.HOOK_SECRET;
 
@@ -100,18 +101,18 @@ export async function POST(req: NextRequest) {
         role: entry.role,
         model: entry.model,
         transcriptPath: entry.transcriptPath,
-        cwd: entry.cwd,
+        cwd: entry.cwd ? sanitizeText(entry.cwd) : undefined,
         type: "session",
         project: entry.project,
         date: new Date(entry.date),
         tasksCompleted: entry.tasksCompleted,
         commitHash: entry.commitHash ?? null,
-        sessionNotes: entry.sessionNotes ?? null,
+        sessionNotes: entry.sessionNotes ? sanitizeText(entry.sessionNotes) : null,
         totalTokens: entry.totalTokens ?? null,
         totalCostUSD: entry.totalCostUSD ?? null,
         durationMin: entry.durationMin ?? null,
-        risks: entry.risks,
-        lessonSaved: entry.lessonSaved ?? null,
+        risks: entry.risks.map((risk) => sanitizeText(risk)),
+        lessonSaved: entry.lessonSaved ? sanitizeText(entry.lessonSaved) : null,
       },
     }));
   }

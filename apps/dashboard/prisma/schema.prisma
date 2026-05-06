@@ -157,6 +157,12 @@ model Workspace {
   commandTemplates CommandTemplate[]
   bridgeFileActions BridgeFileAction[]
   bridgeProjectPaths BridgeProjectPath[]
+  runTelemetries RunTelemetry[]
+  snapshotExports SnapshotExport[]
+  importJobs ImportJob[]
+  memoryNodes MemoryNode[]
+  memoryEdges MemoryEdge[]
+  auditLogs AuditLog[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
@@ -217,6 +223,15 @@ model BridgeFileAction {
   deviceId    String?
   type        String
   status      String   @default("pending")
+  payloadVersion Int    @default(0)
+  resultVersion  Int?
+  actionType   String?
+  claimToken   String?
+  leaseExpiresAt DateTime?
+  heartbeatAt  DateTime?
+  attempt      Int      @default(0)
+  maxAttempts  Int      @default(1)
+  cancelRequestedAt DateTime?
   payload     Json     @default("{}")
   result      Json?
   error       String?
@@ -224,6 +239,8 @@ model BridgeFileAction {
   completedAt DateTime?
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   device      BridgeDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  runTelemetries RunTelemetry[]
+  auditLogs   AuditLog[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -231,6 +248,9 @@ model BridgeFileAction {
   @@index([deviceId])
   @@index([status])
   @@index([type])
+  @@index([actionType])
+  @@index([leaseExpiresAt])
+  @@index([heartbeatAt])
   @@index([createdAt])
 }
 
@@ -458,4 +478,148 @@ model ApiKey {
 
   @@index([service])
   @@index([workspaceId])
+}
+
+model RunTelemetry {
+  id              String   @id @default(cuid())
+  workspaceId      String
+  actionId         String?
+  taskId           String?
+  projectName      String?
+  provider         String
+  model            String?
+  role             String?
+  source           String   @default("run_task")
+  optimizerMode    String?
+  contextMode      String?
+  selectedSkills   String[] @default([])
+  skillScores      Json     @default("{}")
+  estimatedTokens  Int?
+  actualTokens     Int?
+  providerTokens   Int?
+  codexCredits     Float?
+  normalizedCostUsd Float?
+  status           String
+  failureReason    String?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  durationMs       Int?
+  metadata         Json     @default("{}")
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  action           BridgeFileAction? @relation(fields: [actionId], references: [id], onDelete: SetNull)
+  createdAt        DateTime @default(now())
+
+  @@index([workspaceId])
+  @@index([actionId])
+  @@index([taskId])
+  @@index([projectName])
+  @@index([provider])
+  @@index([source])
+  @@index([createdAt])
+}
+
+model SnapshotExport {
+  id              String   @id @default(cuid())
+  workspaceId      String
+  projectName      String?
+  deviceId         String?
+  kind            String
+  schemaVersion   Int      @default(1)
+  snapshotVersion Int      @default(1)
+  filePath        String?
+  hash            String?
+  status          String   @default("exported")
+  metadata        Json     @default("{}")
+  exportedAt      DateTime @default(now())
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([projectName])
+  @@index([deviceId])
+  @@index([kind])
+  @@index([exportedAt])
+}
+
+model ImportJob {
+  id             String   @id @default(cuid())
+  workspaceId     String
+  sourceType      String
+  sourcePath      String?
+  sourceUrl       String?
+  status          String   @default("pending")
+  conflictPolicy  String   @default("db_wins")
+  summary         Json     @default("{}")
+  error           String?
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([workspaceId])
+  @@index([sourceType])
+  @@index([status])
+}
+
+model MemoryNode {
+  id          String   @id @default(cuid())
+  workspaceId String
+  projectName String?
+  kind        String
+  key         String
+  title       String
+  body        String   @db.Text
+  tags        String[] @default([])
+  reqIds      String[] @default([])
+  sourcePath  String?
+  metadata    Json     @default("{}")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  outgoing    MemoryEdge[] @relation("MemoryEdgeFrom")
+  incoming    MemoryEdge[] @relation("MemoryEdgeTo")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId])
+  @@index([projectName])
+  @@index([kind])
+}
+
+model MemoryEdge {
+  id          String   @id @default(cuid())
+  workspaceId String
+  fromNodeId  String
+  toNodeId    String
+  relation    String
+  weight      Float    @default(1)
+  metadata    Json     @default("{}")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  fromNode    MemoryNode @relation("MemoryEdgeFrom", fields: [fromNodeId], references: [id], onDelete: Cascade)
+  toNode      MemoryNode @relation("MemoryEdgeTo", fields: [toNodeId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([workspaceId, fromNodeId, toNodeId, relation])
+  @@index([workspaceId])
+  @@index([fromNodeId])
+  @@index([toNodeId])
+  @@index([relation])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String?
+  actionId    String?
+  actorType   String   @default("system")
+  event       String
+  targetType  String?
+  targetId    String?
+  metadata    Json     @default("{}")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  bridgeAction BridgeFileAction? @relation(fields: [actionId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  @@index([workspaceId])
+  @@index([userId])
+  @@index([actionId])
+  @@index([event])
+  @@index([createdAt])
 }

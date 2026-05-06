@@ -11,6 +11,7 @@ export type ActivityItem = {
   note: string | null;
   sessionType: string | null;
   provider: string | null;
+  auditEvent?: string | null;
 };
 
 export function timeAgo(dateStr: string): string {
@@ -28,7 +29,7 @@ export function timeAgo(dateStr: string): string {
 export async function getRecentActivity(limit = 5, workspaceId?: string, since?: Date): Promise<ActivityItem[]> {
   const start = since ?? new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
 
-  const [sessions, chatSessions, projects] = await Promise.all([
+  const [sessions, chatSessions, auditLogs, projects] = await Promise.all([
     db.session.findMany({
       where: { date: { gte: start }, ...(workspaceId ? { workspaceId } : {}) },
       orderBy: { date: "desc" },
@@ -39,6 +40,11 @@ export async function getRecentActivity(limit = 5, workspaceId?: string, since?:
       orderBy: { updatedAt: "desc" },
       take: limit,
       include: { messages: { orderBy: { createdAt: "desc" }, take: 1 } },
+    }),
+    db.auditLog.findMany({
+      where: { createdAt: { gte: start }, ...(workspaceId ? { workspaceId } : {}) },
+      orderBy: { createdAt: "desc" },
+      take: limit * 3,
     }),
     db.project.findMany({
       where: workspaceId ? { OR: [{ workspaceId }, { workspaceId: null }] } : undefined,
@@ -61,6 +67,24 @@ export async function getRecentActivity(limit = 5, workspaceId?: string, since?:
       note: chat.messages[0]?.content?.slice(0, 120) ?? null,
       sessionType: "chat",
       provider: chat.provider ?? null,
+      auditEvent: null,
+    });
+  }
+
+  for (const audit of auditLogs) {
+    const targetProject = audit.targetType === "Project" && audit.targetId ? audit.targetId : "Workspace";
+    const projectExists = projectNames.has(targetProject);
+    items.push({
+      taskId: null,
+      project: targetProject,
+      projectExists,
+      href: projectExists ? `/projects/${encodeURIComponent(targetProject)}` : "/settings",
+      date: audit.createdAt.toISOString(),
+      commitHash: null,
+      note: audit.event.replace(/_/g, " "),
+      sessionType: "audit",
+      provider: audit.actorType,
+      auditEvent: audit.event,
     });
   }
 
@@ -83,6 +107,7 @@ export async function getRecentActivity(limit = 5, workspaceId?: string, since?:
         note: s.sessionNotes ?? null,
         sessionType: s.type,
         provider: s.provider,
+        auditEvent: null,
       });
       continue;
     }
@@ -98,6 +123,7 @@ export async function getRecentActivity(limit = 5, workspaceId?: string, since?:
         note: s.sessionNotes,
         sessionType: s.type,
         provider: s.provider,
+        auditEvent: null,
       });
     }
   }

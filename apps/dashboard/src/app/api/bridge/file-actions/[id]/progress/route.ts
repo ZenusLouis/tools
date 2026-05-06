@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { leaseDate } from "@/lib/bridge-actions";
 import { bridgeTokenFromHeaders, verifyBridgeRequest } from "@/lib/bridge-auth";
+import { sanitizeLogLines } from "@/lib/sanitize";
 
 const HOOK_SECRET = process.env.HOOK_SECRET;
 
@@ -28,8 +30,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   // Append new lines to existing log (keep last 200 lines max)
   const prev = (action.result as { log?: string[] } | null)?.log ?? [];
-  const log = [...prev, ...parsed.data.lines].slice(-200);
-  await db.bridgeFileAction.update({ where: { id }, data: { result: { log } } });
+  const log = sanitizeLogLines([...prev, ...parsed.data.lines]);
+  await db.bridgeFileAction.update({
+    where: { id },
+    data: {
+      status: action.status === "claimed" ? "running" : action.status,
+      heartbeatAt: new Date(),
+      leaseExpiresAt: leaseDate(),
+      result: { log },
+    },
+  });
 
   return NextResponse.json({ ok: true });
 }

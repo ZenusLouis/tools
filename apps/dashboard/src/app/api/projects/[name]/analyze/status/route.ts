@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { requireCurrentUser } from "@/lib/auth";
+import { expireStaleBridgeActions } from "@/lib/bridge-actions";
 import { db } from "@/lib/db";
 
 const STALE_ANALYSIS_MS = Math.max(5, Number(process.env.GCS_ANALYSIS_STALE_MINUTES ?? "30") || 30) * 60 * 1000;
@@ -49,6 +50,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ name
   const { name } = await params;
   const projectName = decodeURIComponent(name);
   const actionId = req.nextUrl.searchParams.get("actionId");
+  await expireStaleBridgeActions(user.workspaceId);
 
   const count = await db.task.count({
     where: { feature: { module: { projectName } }, workspaceId: user.workspaceId },
@@ -74,9 +76,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ name
     if ((action?.status === "running" || action?.status === "claimed") && log.length === 0) {
       log = ["Local bridge picked up the analysis action.", "Claude is generating modules and tasks..."];
     }
-    if (action?.status === "failed" || action?.status === "cancelled") {
+    if (action?.status === "failed" || action?.status === "cancelled" || action?.status === "expired") {
       failed = true;
-      errorMsg = action.error ?? (action.status === "cancelled" ? "Cancelled by user" : "Bridge action failed");
+      errorMsg = action.error ?? (action.status === "cancelled" ? "Cancelled by user" : action.status === "expired" ? "Bridge action expired" : "Bridge action failed");
     }
     return NextResponse.json({ actionId: action?.id ?? actionId, ready: count > 0, created: count, log, failed, error: errorMsg, status, updatedAt, summary, analysisTranscript: result?.analysisTranscript ?? null });
   } else {
@@ -98,9 +100,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ name
     if ((action?.status === "running" || action?.status === "claimed" || action?.status === "pending") && log.length === 0) {
       log = ["Queued - waiting for local Claude...", "Local bridge will continue even if you leave this page."];
     }
-    if (action?.status === "failed" || action?.status === "cancelled") {
+    if (action?.status === "failed" || action?.status === "cancelled" || action?.status === "expired") {
       failed = true;
-      errorMsg = action.error ?? (action.status === "cancelled" ? "Cancelled by user" : "Bridge action failed");
+      errorMsg = action.error ?? (action.status === "cancelled" ? "Cancelled by user" : action.status === "expired" ? "Bridge action expired" : "Bridge action failed");
     }
     return NextResponse.json({ actionId: action?.id ?? null, ready: count > 0, created: count, log, failed, error: errorMsg, status, updatedAt, summary, runnerLabel: result?.runnerLabel ?? "Claude", analysisTranscript: result?.analysisTranscript ?? null });
   }

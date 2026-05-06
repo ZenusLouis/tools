@@ -18,12 +18,6 @@ interface Props {
   searchParams: Promise<{ range?: string; page?: string; provider?: string; source?: string }>;
 }
 
-function objectValue(value: unknown) {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {};
-}
-
 function rangeStart(range: DateRange) {
   const now = new Date();
   const start = new Date(now);
@@ -63,35 +57,39 @@ export default async function TokensPage({ searchParams }: Props) {
     }),
     listApiKeys(user.workspaceId),
   ]);
-  const runActions = await db.bridgeFileAction.findMany({
+  const runTelemetries = await db.runTelemetry.findMany({
     where: {
       workspaceId: user.workspaceId,
-      type: "run_task",
-      updatedAt: { gte: rangeStart(dateRange) },
+      source: "run_task",
+      createdAt: { gte: rangeStart(dateRange) },
     },
-    orderBy: { updatedAt: "desc" },
+    orderBy: { createdAt: "desc" },
     take: 200,
-    select: { payload: true, result: true, status: true, updatedAt: true },
+    select: {
+      taskId: true,
+      provider: true,
+      optimizerMode: true,
+      contextMode: true,
+      estimatedTokens: true,
+      actualTokens: true,
+      selectedSkills: true,
+      status: true,
+      createdAt: true,
+      metadata: true,
+    },
   });
-  const taskRuns = runActions.map((action) => {
-    const payload = objectValue(action.payload);
-    const result = objectValue(action.result);
-    const optimizer = objectValue(payload.optimizer ?? result.optimizer);
-    const skillRouting = objectValue(payload.skillRouting ?? result.skillRouting);
-    const task = objectValue(payload.task);
-    return {
-      taskId: typeof payload.taskId === "string" ? payload.taskId : "unknown",
-      taskName: typeof task.name === "string" ? task.name : "Task run",
-      provider: typeof payload.provider === "string" ? payload.provider : "agent",
-      mode: typeof optimizer.mode === "string" ? optimizer.mode : "auto_aggressive",
-      contextMode: typeof optimizer.contextMode === "string" ? optimizer.contextMode : "standard",
-      estimatedTokens: typeof optimizer.estimatedPromptTokens === "number" ? optimizer.estimatedPromptTokens : 0,
-      actualTokens: typeof result.actualTokens === "number" ? result.actualTokens : typeof result.tokens === "number" ? result.tokens : 0,
-      selectedSkills: Array.isArray(skillRouting.selected) ? skillRouting.selected.length : 0,
-      status: action.status,
-      updatedAt: action.updatedAt,
-    };
-  });
+  const taskRuns = runTelemetries.map((run) => ({
+    taskId: run.taskId ?? "unknown",
+    taskName: run.taskId ?? "Task run",
+    provider: run.provider,
+    mode: run.optimizerMode ?? "auto_aggressive",
+    contextMode: run.contextMode ?? "standard",
+    estimatedTokens: run.estimatedTokens ?? 0,
+    actualTokens: run.actualTokens ?? 0,
+    selectedSkills: run.selectedSkills.length,
+    status: run.status,
+    updatedAt: run.createdAt,
+  }));
   const topTokenRuns = [...taskRuns].sort((a, b) => b.actualTokens - a.actualTokens).slice(0, 5);
   const estimateTotal = taskRuns.reduce((sum, row) => sum + row.estimatedTokens, 0);
   const actualTotal = taskRuns.reduce((sum, row) => sum + row.actualTokens, 0);

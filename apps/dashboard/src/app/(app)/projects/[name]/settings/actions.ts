@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { readJSON, writeJSON } from "@/lib/fs/json";
 import { resolvePath, getClaudeRoot } from "@/lib/fs/resolve";
 import { ContextJSON } from "@/lib/settings";
+import { buildBridgePayload } from "@/lib/bridge-actions";
 import { db } from "@/lib/db";
 import { requireCurrentUser } from "@/lib/auth";
 
@@ -121,7 +122,9 @@ export async function saveSettings(_prev: unknown, formData: FormData): Promise<
         workspaceId: user.workspaceId,
         deviceId: target.deviceId,
         type: "sync_project_metadata",
-        payload: {
+        payloadVersion: 1,
+        actionType: "sync_project_metadata",
+        payload: buildBridgePayload("sync_project_metadata", {
           projectName,
           projectPath: target.path,
           files: [
@@ -130,7 +133,7 @@ export async function saveSettings(_prev: unknown, formData: FormData): Promise<
               content: JSON.stringify(updated, null, 2),
             },
           ],
-        },
+        }),
       },
     });
   }

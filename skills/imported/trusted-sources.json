@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "slug": "addyosmani-agent-skills",
+      "url": "https://github.com/addyosmani/agent-skills",
+      "priority": 90,
+      "kind": "engineering-lifecycle",
+      "importMode": "metadata-wrapper",
+      "description": "Production-grade engineering lifecycle skills for spec, plan, build, test, review, and ship workflows."
+    },
+    {
+      "slug": "midudev-autoskills",
+      "url": "https://github.com/midudev/autoskills",
+      "priority": 85,
+      "kind": "skill-discovery",
+      "importMode": "metadata-wrapper",
+      "description": "Auto-discovery and curated skill registry patterns for agent skill installation and routing."
+    },
+    {
+      "slug": "kepano-obsidian-skills",
+      "url": "https://github.com/kepano/obsidian-skills",
+      "priority": 80,
+      "kind": "knowledge-graph",
+      "importMode": "metadata-wrapper",
+      "description": "Obsidian-oriented knowledge and workflow skills for graph-based agent memory and note operations."
+    }
+  ]
+}

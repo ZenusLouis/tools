@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { createClaimToken, expireStaleBridgeActions, getActionType, leaseDate } from "@/lib/bridge-actions";
 import { bridgeTokenFromHeaders, verifyBridgeRequest } from "@/lib/bridge-auth";
 
 const PendingSchema = z.object({
@@ -22,6 +23,7 @@ export async function POST(req: NextRequest) {
 
   const parsed = PendingSchema.safeParse(await req.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues }, { status: 400 });
+  await expireStaleBridgeActions(ctx.workspaceId);
 
   let deviceId = ctx.deviceId;
   if (!deviceId && parsed.data.deviceKey) {
@@ -55,17 +57,44 @@ export async function POST(req: NextRequest) {
   }) : [];
   const actions = [...analysisActions, ...otherActions];
 
+  const claimToken = createClaimToken();
+  const leaseExpiresAt = leaseDate();
+  const now = new Date();
   if (actions.length > 0) {
     await db.bridgeFileAction.updateMany({
       where: { id: { in: actions.map((action) => action.id) }, status: "pending" },
-      data: { status: "running", deviceId, claimedAt: new Date() },
+      data: {
+        status: "claimed",
+        deviceId,
+        claimedAt: now,
+        heartbeatAt: now,
+        leaseExpiresAt,
+        claimToken,
+        attempt: { increment: 1 },
+      },
     });
+    await db.auditLog.createMany({
+      data: actions.map((action) => ({
+        workspaceId: ctx.workspaceId,
+        actionId: action.id,
+        actorType: "bridge",
+        event: "bridge_action_claimed",
+        targetType: "BridgeFileAction",
+        targetId: action.id,
+        metadata: { type: action.type, deviceId, leaseExpiresAt },
+      })),
+      skipDuplicates: true,
+    }).catch(() => null);
   }
 
   return NextResponse.json({
     actions: actions.map((action) => ({
       id: action.id,
       type: action.type,
+      actionType: getActionType(action.type, action.payload),
+      payloadVersion: 1,
+      claimToken,
+      leaseExpiresAt,
       payload: action.payload,
       createdAt: action.createdAt,
     })),

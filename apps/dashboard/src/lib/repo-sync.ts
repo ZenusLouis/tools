@@ -507,6 +507,32 @@ async function syncSkillsAndRoles(db: Db, workspaceId: string, root: string, res
     });
   }
 
+  const trustedSources = await readJSON<{ sources?: Array<{ slug: string; url: string; priority?: number; kind?: string; description?: string; importMode?: string }> }>(
+    resolveRoot(root, "skills", "imported", "trusted-sources.json"),
+  );
+  for (const source of trustedSources?.sources ?? []) {
+    if (!source.slug || !source.url) continue;
+    const slug = normalizeSkillSlug(source.slug);
+    const tags = [
+      "trusted-upstream",
+      `source:${source.url}`,
+      `priority:${source.priority ?? 50}`,
+      ...(source.kind ? [`kind:${source.kind}`] : []),
+      ...(source.importMode ? [`import:${source.importMode}`] : []),
+    ];
+    mergeSkill({
+      name: slug,
+      description: source.description ?? `${slug} trusted upstream skill source`,
+      category: "trusted-upstream",
+      sourcePath: source.url,
+      content: null,
+      tags,
+      roleCompatibility: ["ba", "dev", "reviewer", "qa", "researcher", "design"],
+      isImported: true,
+      isRemote: true,
+    });
+  }
+
   const skills = Array.from(skillsBySlug.values());
   for (const skill of skills) {
     await db.skillDefinition.upsert({

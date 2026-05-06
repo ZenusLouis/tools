@@ -14,6 +14,7 @@ type ActivityItem = {
   note: string | null;
   commitHash: string | null;
   sessionType: string | null;
+  auditEvent?: string | null;
 };
 
 function timeAgo(date: string) {
@@ -108,7 +109,7 @@ export function TopBarControls() {
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-semibold text-text">
-                      {item.taskId ? "Task update" : item.sessionType === "chat" ? "Chat" : item.projectExists ? "Project event" : "Workspace log"}
+                      {item.taskId ? "Task update" : item.sessionType === "chat" ? "Chat" : item.sessionType === "audit" ? "Audit" : item.projectExists ? "Project event" : "Workspace log"}
                     </span>
                     <span className="text-[10px] text-text-muted">{timeAgo(item.date)}</span>
                   </div>

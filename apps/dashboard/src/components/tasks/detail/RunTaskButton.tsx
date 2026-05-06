@@ -113,7 +113,7 @@ export function RunTaskButton({ taskId, disabled }: { taskId: string; disabled?:
 
   useEffect(() => {
     if (!actionId) return;
-    if (status?.status && !["pending", "running"].includes(status.status)) return;
+    if (status?.status && !["pending", "claimed", "running"].includes(status.status)) return;
     const timer = window.setInterval(async () => {
       const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/run/status`, { cache: "no-store" });
       if (!res.ok) return;

@@ -94,7 +94,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       where: {
         workspaceId: user.workspaceId,
         type: "run_task",
-        status: { in: ["failed", "cancelled"] },
+        status: { in: ["failed", "cancelled", "expired"] },
         payload: { path: ["taskId"], equals: task.id },
       },
     }),
@@ -103,7 +103,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         workspaceId: user.workspaceId,
         type: "run_task",
         payload: { path: ["projectName"], equals: project.name },
-        status: { in: ["succeeded", "failed", "cancelled"] },
+        status: { in: ["succeeded", "failed", "cancelled", "expired"] },
       },
       orderBy: { updatedAt: "desc" },
       take: 100,
@@ -113,7 +113,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       where: {
         workspaceId: user.workspaceId,
         type: "run_task",
-        status: { in: ["failed", "cancelled"] },
+        status: { in: ["failed", "cancelled", "expired"] },
         payload: { path: ["taskId"], equals: task.id },
       },
       orderBy: { updatedAt: "desc" },

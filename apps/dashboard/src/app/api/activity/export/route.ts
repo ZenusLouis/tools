@@ -14,12 +14,26 @@ export async function GET() {
     orderBy: { date: "desc" },
     take: 500,
   });
+  const [runTelemetries, auditLogs] = await Promise.all([
+    db.runTelemetry.findMany({
+      where: { workspaceId: user.workspaceId },
+      orderBy: { createdAt: "desc" },
+      take: 500,
+    }),
+    db.auditLog.findMany({
+      where: { workspaceId: user.workspaceId },
+      orderBy: { createdAt: "desc" },
+      take: 500,
+    }),
+  ]);
 
   const body = JSON.stringify({
     exportedAt: new Date().toISOString(),
     workspaceId: user.workspaceId,
     sessions,
     toolUsage,
+    runTelemetries,
+    auditLogs,
   }, null, 2);
 
   return new NextResponse(body, {

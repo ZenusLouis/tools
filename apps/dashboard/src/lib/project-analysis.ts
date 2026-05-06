@@ -1,6 +1,7 @@
 import fs from "fs/promises";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import { buildBridgePayload } from "@/lib/bridge-actions";
 import { getApiKeyByService } from "@/lib/api-keys";
 import { resolvePath } from "@/lib/fs/resolve";
 
@@ -286,11 +287,13 @@ async function queueProgressSync(project: ProjectWithLatestPath, workspaceId: st
         workspaceId,
         deviceId: target.deviceId,
         type: "sync_project_metadata",
-        payload: {
+        payloadVersion: 1,
+        actionType: "sync_project_metadata",
+        payload: buildBridgePayload("sync_project_metadata", {
           projectName: project.name,
           projectPath: target.path,
           files: [{ relativePath: ".gcs/progress.json", content }],
-        },
+        }),
       },
     });
   }
@@ -391,7 +394,10 @@ export async function analyzeProjectForWorkspace(
         workspaceId,
         deviceId: bridgeDevice.id,
         type: "run_analysis",
-        payload: {
+        payloadVersion: 1,
+        actionType: "run_analysis",
+        maxAttempts: 1,
+        payload: buildBridgePayload("run_analysis", {
           projectName,
           frameworks: analysisProject.frameworks,
           docs,
@@ -399,9 +405,20 @@ export async function analyzeProjectForWorkspace(
           runnerLabel: selectedRunner,
           skillSlugs: analysisRole?.skills.map((s) => s.slug) ?? [],
           callbackPath: `/api/projects/${encodeURIComponent(projectName)}/analyze/result`,
-        },
+        }),
       },
     });
+    await db.auditLog.create({
+      data: {
+        workspaceId,
+        actionId: action.id,
+        actorType: "user",
+        event: "bridge_action_queued",
+        targetType: "BridgeFileAction",
+        targetId: action.id,
+        metadata: { type: "run_analysis", projectName, provider: selectedProvider },
+      },
+    }).catch(() => null);
     return { ok: true as const, pending: true as const, actionId: action.id, created: 0, source: "bridge" as const, provider: selectedProvider, runnerLabel: selectedRunner };
   }
 

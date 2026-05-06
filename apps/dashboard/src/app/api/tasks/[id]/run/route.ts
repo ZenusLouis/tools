@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireCurrentUser } from "@/lib/auth";
 import { buildTaskOptimizerPlan, CONTEXT_MODES, OPTIMIZER_MODES } from "@/lib/agent-optimizer";
+import { buildBridgePayload } from "@/lib/bridge-actions";
 import { db } from "@/lib/db";
 import { resolvePath } from "@/lib/fs/resolve";
 import { syncWorkspaceFromRepo } from "@/lib/repo-sync";
@@ -222,7 +223,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     where: {
       workspaceId: user.workspaceId,
       type: "run_task",
-      status: { in: ["pending", "running"] },
+      status: { in: ["pending", "claimed", "running"] },
       payload: { path: ["taskId"], equals: task.id },
     },
   });
@@ -232,7 +233,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       workspaceId: user.workspaceId,
       deviceId: target.deviceId,
       type: "run_task",
-      payload: {
+      payloadVersion: 1,
+      actionType: "run_task",
+      maxAttempts: 1,
+      payload: buildBridgePayload("run_task", {
         taskId: task.id,
         projectName: project.name,
         projectPath: target.path,
@@ -246,9 +250,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         contextPlan: optimizerPlan.contextPlan,
         previousFailure,
         task: taskCore,
-      },
+      }),
     },
   });
+  await db.auditLog.create({
+    data: {
+      workspaceId: user.workspaceId,
+      userId: user.id,
+      actionId: action.id,
+      actorType: "user",
+      event: "bridge_action_queued",
+      targetType: "BridgeFileAction",
+      targetId: action.id,
+      metadata: { type: "run_task", taskId: task.id, provider, phase: parsed.data.phase },
+    },
+  }).catch(() => null);
 
   await db.task.update({
     where: { id: task.id },

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireCurrentUser } from "@/lib/auth";
+import { expireStaleBridgeActions } from "@/lib/bridge-actions";
 import { db } from "@/lib/db";
 
 function objectValue(value: unknown) {
@@ -21,6 +22,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ name: st
   const status = url.searchParams.get("status");
   const provider = url.searchParams.get("provider");
   const phase = url.searchParams.get("phase");
+  await expireStaleBridgeActions(user.workspaceId);
 
   const project = await db.project.findFirst({
     where: { name: projectName, OR: [{ workspaceId: user.workspaceId }, { workspaceId: null }] },
@@ -29,8 +31,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ name: st
   if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
 
   const statusFilter =
-    status === "live" ? ["pending", "running"] :
-    status === "failed" ? ["failed", "cancelled"] :
+    status === "live" ? ["pending", "claimed", "running"] :
+    status === "failed" ? ["failed", "cancelled", "expired"] :
     status === "done" ? ["succeeded"] :
     null;
   const providerFilter = provider === "claude" || provider === "codex" ? provider : null;
@@ -53,8 +55,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ name: st
   const [total, allCount, liveCount, failedCount, doneCount, actions] = await Promise.all([
     db.bridgeFileAction.count({ where }),
     db.bridgeFileAction.count({ where: baseWhere }),
-    db.bridgeFileAction.count({ where: { ...baseWhere, status: { in: ["pending", "running"] } } }),
-    db.bridgeFileAction.count({ where: { ...baseWhere, status: { in: ["failed", "cancelled"] } } }),
+    db.bridgeFileAction.count({ where: { ...baseWhere, status: { in: ["pending", "claimed", "running"] } } }),
+    db.bridgeFileAction.count({ where: { ...baseWhere, status: { in: ["failed", "cancelled", "expired"] } } }),
     db.bridgeFileAction.count({ where: { ...baseWhere, status: "succeeded" } }),
     db.bridgeFileAction.findMany({
       where,

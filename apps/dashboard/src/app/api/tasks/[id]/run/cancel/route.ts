@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { requireCurrentUser } from "@/lib/auth";
+import { normalizeBridgeResult } from "@/lib/bridge-actions";
 import { db } from "@/lib/db";
 
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -17,10 +18,10 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     where: {
       workspaceId: user.workspaceId,
       type: "run_task",
-      status: { in: ["pending", "running"] },
+      status: { in: ["pending", "claimed", "running"] },
       payload: { path: ["taskId"], equals: id },
     },
-    select: { id: true, result: true },
+    select: { id: true, result: true, status: true },
   });
 
   if (actions.length === 0) {
@@ -28,22 +29,31 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   }
 
   for (const action of actions) {
-    const previous =
-      action.result && typeof action.result === "object" && !Array.isArray(action.result)
-        ? action.result as Record<string, unknown>
-        : {};
-    const previousLog = Array.isArray(previous.log) ? previous.log.filter((line): line is string => typeof line === "string") : [];
+    const now = new Date();
+    const immediate = action.status === "pending" || action.status === "claimed";
     await db.bridgeFileAction.update({
       where: { id: action.id },
       data: {
-        status: "cancelled",
-        completedAt: new Date(),
-        result: {
-          ...previous,
-          log: [...previousLog, "Cancellation requested from dashboard."].slice(-200),
-        },
+        status: immediate ? "cancelled" : action.status,
+        cancelRequestedAt: now,
+        completedAt: immediate ? now : undefined,
+        result: normalizeBridgeResult(action.result, {
+          log: ["Cancellation requested from dashboard."],
+        }, immediate ? "cancelled" : action.status, { cancelRequestedAt: now.toISOString() }),
       },
     });
+    await db.auditLog.create({
+      data: {
+        workspaceId: user.workspaceId,
+        userId: user.id,
+        actionId: action.id,
+        actorType: "user",
+        event: "bridge_action_cancel_requested",
+        targetType: "BridgeFileAction",
+        targetId: action.id,
+        metadata: { taskId: id, previousStatus: action.status },
+      },
+    }).catch(() => null);
   }
 
   await db.task.update({

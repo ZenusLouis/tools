@@ -1,4 +1,5 @@
 import { revalidatePath } from "next/cache";
+import { buildBridgePayload } from "@/lib/bridge-actions";
 import { db } from "@/lib/db";
 
 type ProjectWithLatestPath = {
@@ -63,7 +64,9 @@ export async function recordReindexProject(projectName: string, workspaceId: str
         workspaceId,
         type: "generate_code_index",
         deviceId: onlineDevice?.deviceId ?? null,
-        payload: { projectName, projectPath },
+        payloadVersion: 1,
+        actionType: "generate_code_index",
+        payload: buildBridgePayload("generate_code_index", { projectName, projectPath }),
       },
     });
   }

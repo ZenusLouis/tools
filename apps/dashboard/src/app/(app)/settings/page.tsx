@@ -5,6 +5,7 @@ import { TopBar } from "@/components/layout/TopBar";
 import { ApiKeysPanel } from "@/components/settings/ApiKeysPanel";
 import { BridgePanel } from "@/components/settings/BridgePanel";
 import { GlobalSettingsClient } from "@/components/settings/GlobalSettingsClient";
+import { RepoSnapshotPanel } from "@/components/settings/RepoSnapshotPanel";
 import { requireCurrentUser } from "@/lib/auth";
 import { listApiKeys } from "@/lib/api-keys";
 import { getMcpProfiles } from "@/lib/mcp";
@@ -31,6 +32,8 @@ export default async function SettingsPage() {
           </div>
 
           <GlobalSettingsClient profiles={profiles} />
+
+          <RepoSnapshotPanel />
 
           <section className="rounded-xl border border-border bg-card p-6">
             <ApiKeysPanel initialKeys={apiKeys} />

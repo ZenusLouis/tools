@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireCurrentUser } from "@/lib/auth";
+import { buildBridgePayload } from "@/lib/bridge-actions";
 
 type ProjectWithLatestPath = {
   name: string;
@@ -174,7 +175,9 @@ async function queueProgressSync(project: ProjectWithLatestPath, workspaceId: st
         workspaceId,
         deviceId: target.deviceId,
         type: "sync_project_metadata",
-        payload: {
+        payloadVersion: 1,
+        actionType: "sync_project_metadata",
+        payload: buildBridgePayload("sync_project_metadata", {
           projectName: project.name,
           projectPath: target.path,
           files: [
@@ -183,7 +186,7 @@ async function queueProgressSync(project: ProjectWithLatestPath, workspaceId: st
               content,
             },
           ],
-        },
+        }),
       },
     });
   }

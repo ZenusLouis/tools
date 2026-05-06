@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { normalizeBridgeResult, telemetryFromActionResult } from "@/lib/bridge-actions";
 import { bridgeTokenFromHeaders, verifyBridgeRequest } from "@/lib/bridge-auth";
 
 const ResultSchema = z.object({
   id: z.string().min(1),
-  status: z.enum(["succeeded", "failed"]),
+  status: z.enum(["succeeded", "failed", "cancelled", "expired"]),
   deviceKey: z.string().min(1).max(120).optional(),
   result: z.record(z.string(), z.unknown()).optional(),
   error: z.string().max(4000).optional(),
@@ -38,36 +39,60 @@ export async function POST(req: NextRequest) {
 
   const action = await db.bridgeFileAction.findFirst({
     where: { id: parsed.data.id, workspaceId: ctx.workspaceId },
-    select: { id: true, type: true, payload: true, result: true, status: true },
+    select: { id: true, type: true, payload: true, result: true, status: true, claimedAt: true, createdAt: true },
   });
   if (!action) return NextResponse.json({ error: "Action not found" }, { status: 404 });
-  if (action.status === "cancelled") {
+  if (action.status === "cancelled" && parsed.data.status !== "cancelled") {
     return NextResponse.json({ ok: true, ignored: true });
   }
 
-  const previousResult =
-    action.result && typeof action.result === "object" && !Array.isArray(action.result)
-      ? action.result as Record<string, unknown>
-      : {};
   const incomingResult = parsed.data.result ?? {};
-  const prevLog = Array.isArray(previousResult.log) ? previousResult.log as string[] : [];
-  const newLog = Array.isArray(incomingResult.log) ? incomingResult.log as string[] : [];
-  const nextResult = {
-    ...previousResult,
-    ...incomingResult,
-    log: [...prevLog, ...newLog].slice(-200),
-  } as Prisma.InputJsonValue;
+  const completedAt = new Date();
+  const nextResult = normalizeBridgeResult(action.result, incomingResult, parsed.data.status, {
+    actionType: action.type,
+    completedAt: completedAt.toISOString(),
+  }) as Prisma.InputJsonValue;
 
   await db.bridgeFileAction.update({
     where: { id: action.id },
     data: {
       status: parsed.data.status,
+      resultVersion: 1,
       result: nextResult,
       error: parsed.data.error ?? null,
       deviceId,
-      completedAt: new Date(),
+      completedAt,
+      heartbeatAt: completedAt,
+      leaseExpiresAt: null,
     },
   });
+  await db.auditLog.create({
+    data: {
+      workspaceId: ctx.workspaceId,
+      actionId: action.id,
+      actorType: "bridge",
+      event: `bridge_action_${parsed.data.status}`,
+      targetType: "BridgeFileAction",
+      targetId: action.id,
+      metadata: { type: action.type, deviceId },
+    },
+  }).catch(() => null);
+
+  const resultObject = nextResult as Record<string, unknown>;
+  if (action.type === "run_task") {
+    const telemetry = telemetryFromActionResult({
+      workspaceId: ctx.workspaceId,
+      actionId: action.id,
+      type: action.type,
+      payload: action.payload,
+      result: resultObject,
+      status: parsed.data.status,
+      error: parsed.data.error ?? null,
+      startedAt: action.claimedAt ?? action.createdAt,
+      completedAt,
+    });
+    await db.runTelemetry.create({ data: telemetry }).catch(() => null);
+  }
 
   if (parsed.data.status === "succeeded" && action.type === "sync_project_metadata" && deviceId) {
     const payload = action.payload;

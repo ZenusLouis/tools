@@ -17,11 +17,13 @@ import sys
 import threading
 import time
 import urllib.request
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from gcs_env import ROOT, bridge_user_agent, load_dashboard_env, local_device_identity
+from gcs_bridge.sanitizer import sanitize_json, sanitize_text
 
 
 load_dashboard_env()
@@ -33,7 +35,6 @@ LOG_DIR = ROOT / "logs"
 STATE_PATH = ROOT / "hooks" / ".gcs_bridge_state.json"
 PROJECTS_DIR = ROOT / "projects"
 LOCAL_PROJECT_PATHS = ROOT / "hooks" / ".gcs_project_paths.json"
-
 
 def headers() -> dict[str, str]:
     result = {"Content-Type": "application/json", "User-Agent": bridge_user_agent()}
@@ -92,7 +93,17 @@ def get_json(path: str, timeout: int = 8) -> tuple[bool, dict[str, Any] | str]:
 def post_action_progress(action_id: str, lines: list[str], timeout: int = 4) -> None:
     if not action_id or not lines:
         return
-    post_json(f"/api/bridge/file-actions/{action_id}/progress", {"lines": lines}, timeout=timeout)
+    post_json(f"/api/bridge/file-actions/{action_id}/progress", {"lines": [sanitize_text(line) for line in lines]}, timeout=timeout)
+
+
+def refresh_action_lease(action_id: str, claim_token: str | None = None, timeout: int = 4) -> bool:
+    if not action_id:
+        return False
+    payload = {"claimToken": claim_token} if claim_token else {}
+    ok, data = post_json_data(f"/api/bridge/file-actions/{action_id}/lease", payload, timeout=timeout)
+    if ok and isinstance(data, dict):
+        return not bool(data.get("cancelled"))
+    return ok
 
 
 def is_action_cancelled(action_id: str, timeout: int = 3) -> bool:
@@ -638,6 +649,7 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
     )
 
     action_id = str(action.get("id") or "")
+    claim_token = str(action.get("claimToken") or "") or None
     post_action_progress(action_id, [
         f"Started local Claude analysis for {project_name}.",
         f"Document path: {brd_path or 'none'}",
@@ -725,6 +737,10 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
         now = time.time()
         if now >= next_heartbeat:
             next_heartbeat = now + 30
+            if not refresh_action_lease(action_id, claim_token):
+                process.kill()
+                post_action_progress(action_id, ["Cancelled locally."])
+                raise ValueError("Analysis cancelled by user")
             heartbeat(False)
 
         if now >= next_running_progress:
@@ -1474,6 +1490,7 @@ def _build_task_run_prompt(
 
 def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
     action_id = str(action.get("id") or "")
+    claim_token = str(action.get("claimToken") or "") or None
     payload = action.get("payload") if isinstance(action.get("payload"), dict) else {}
     project_name = str(payload.get("projectName") or "local")
     project_path = str(payload.get("projectPath") or "")
@@ -1647,6 +1664,13 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
         if time.time() >= next_progress:
             remaining = max(0, int(deadline - time.time()))
             post_action_progress(action_id, [f"Local {provider} still running... timeout in ~{remaining // 60}m {remaining % 60}s."])
+            if not refresh_action_lease(action_id, claim_token):
+                proc.kill()
+                if prompt_handle:
+                    prompt_handle.close()
+                post_action_progress(action_id, ["Task run cancelled from dashboard."])
+                _post_task_event(task_id, "blocked", "blocked", provider, role, "Task run cancelled from dashboard.")
+                return {"cancelled": True, "exitCode": -1, "log": ["Task run cancelled from dashboard."]}
             heartbeat(False)
             next_progress = time.time() + 60
         time.sleep(0.5)
@@ -1755,6 +1779,7 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
     ]
     post_action_progress(action_id, log_lines)
     return {
+        "resultVersion": 1,
         "exitCode": returncode,
         "artifactPath": rel_artifact,
         "durationMin": duration_min,
@@ -1998,7 +2023,7 @@ def poll_file_actions() -> int:
             action_status = "failed" if isinstance(result, dict) and int(result.get("exitCode") or 0) != 0 else "succeeded"
             ok, detail = post_json_data(
                 "/api/bridge/file-actions/result",
-                {"id": action_id, "status": action_status, "deviceKey": device_key, "result": result},
+                {"id": action_id, "status": action_status, "deviceKey": device_key, "result": sanitize_json(result)},
                 timeout=8,
             )
             if ok:
@@ -2009,7 +2034,7 @@ def poll_file_actions() -> int:
         except Exception as exc:
             post_json_data(
                 "/api/bridge/file-actions/result",
-                {"id": action_id, "status": "failed", "deviceKey": device_key, "error": str(exc)},
+                {"id": action_id, "status": "failed", "deviceKey": device_key, "error": sanitize_text(str(exc))},
                 timeout=8,
             )
             print(f"[file-actions] failed {action_id}: {exc}", flush=True)
