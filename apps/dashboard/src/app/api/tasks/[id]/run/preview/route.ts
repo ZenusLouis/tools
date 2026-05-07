@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireCurrentUser } from "@/lib/auth";
 import { buildTaskOptimizerPlan, CONTEXT_MODES, OPTIMIZER_MODES } from "@/lib/agent-optimizer";
 import { db } from "@/lib/db";
+import { findRelatedMemory } from "@/lib/memory-retrieval";
 
 const QuerySchema = z.object({
   phase: z.enum(["implementation", "review", "analysis"]).default("implementation"),
@@ -82,8 +83,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         slug: true,
         name: true,
         category: true,
+        sourceType: true,
+        sourcePriority: true,
         description: true,
         content: true,
+        compactGuidance: true,
         providerCompatibility: true,
         roleCompatibility: true,
         tags: true,
@@ -160,6 +164,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     skillFeedback,
     previousFailure,
   });
+  const memoryLimit = optimizerPlan.contextPlan.mode === "deep" ? 8 : optimizerPlan.contextPlan.mode === "minimal" ? 2 : 4;
+  const relatedMemory = await findRelatedMemory({
+    workspaceId: user.workspaceId,
+    projectName: project.name,
+    task: taskCore,
+    limit: memoryLimit,
+  }).catch(() => []);
+  const contextPlan = {
+    ...optimizerPlan.contextPlan,
+    relatedMemoryCount: relatedMemory.length,
+    includedBlocks: relatedMemory.length
+      ? [...optimizerPlan.contextPlan.includedBlocks, "related_memory_snippets"]
+      : optimizerPlan.contextPlan.includedBlocks,
+    omittedBlocks: relatedMemory.length
+      ? optimizerPlan.contextPlan.omittedBlocks
+      : [...optimizerPlan.contextPlan.omittedBlocks, "no related memory matched this task"],
+  };
 
   return NextResponse.json({
     ok: true,
@@ -167,6 +188,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     role: role?.slug ?? null,
     optimizer: optimizerPlan.optimizer,
     skillRouting: optimizerPlan.skillRouting,
-    contextPlan: optimizerPlan.contextPlan,
+    contextPlan,
   });
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { bridgeTokenFromHeaders, verifyBridgeRequest } from "@/lib/bridge-auth";
+import { sanitizeJson, sanitizeText } from "@/lib/sanitize";
 
 const ArtifactSchema = z.object({
   project: z.string().min(1),
@@ -40,11 +41,35 @@ export async function POST(req: NextRequest) {
       project: parsed.data.project,
       date: new Date(),
       tasksCompleted: [],
-      sessionNotes: `Artifact synced: ${parsed.data.kind} -> ${parsed.data.path}`,
-      filesChanged: { artifact: parsed.data },
+      sessionNotes: sanitizeText(`Artifact synced: ${parsed.data.kind} -> ${parsed.data.path}`),
+      filesChanged: {
+        artifact: sanitizeJson({
+          project: parsed.data.project,
+          taskId: parsed.data.taskId,
+          kind: parsed.data.kind,
+          path: parsed.data.path,
+          contentLength: parsed.data.content?.length ?? 0,
+        }),
+      },
     },
   });
 
+  await db.auditLog.create({
+    data: {
+      workspaceId: ctx.workspaceId,
+      actorType: "bridge",
+      event: "local_file_artifact_synced",
+      targetType: "Task",
+      targetId: parsed.data.taskId,
+      metadata: sanitizeJson({
+        project: parsed.data.project,
+        kind: parsed.data.kind,
+        path: sanitizeText(parsed.data.path),
+        contentLength: parsed.data.content?.length ?? 0,
+        deviceId: ctx.deviceId,
+      }),
+    },
+  }).catch(() => null);
+
   return NextResponse.json({ ok: true });
 }
-

@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { Zap } from "lucide-react";
 import { formatCredits, formatNumber } from "@/lib/format";
+import { primaryMeterValue, type MeterTotals } from "@/lib/token-accounting";
 
 
 type ProviderBreakdown = {
@@ -36,10 +37,12 @@ function displayValue(item: ProviderBreakdown) {
 
 export function TokenUsageCard({
   total,
+  meterTotals,
   rangeLabel,
   breakdown,
 }: {
   total: number;
+  meterTotals: MeterTotals;
   rangeLabel: string;
   breakdown: ProviderBreakdown[];
 }) {
@@ -47,8 +50,9 @@ export function TokenUsageCard({
   const topProvider = [...breakdown].sort((a, b) => b.tokens - a.tokens)[0];
   const topLabel = topProvider && topProvider.tokens > 0 ? PROVIDER_UI[topProvider.provider].label : "No usage";
   const totalCredits = breakdown.reduce((sum, item) => sum + item.credits, 0);
-  const primaryValue = formatNumber(total);
-  const primaryLabel = `Tokens ${rangeLabel}`;
+  const primary = primaryMeterValue(meterTotals);
+  const primaryValue = formatNumber(primary.value);
+  const primaryLabel = `${primary.label} ${rangeLabel}`;
 
   return (
     <motion.div
@@ -63,7 +67,7 @@ export function TokenUsageCard({
         <span className="text-[10px] font-bold text-in-progress">{topLabel}</span>
       </div>
 
-      <p className="break-words text-3xl font-black tracking-tight text-white sm:text-4xl" title={totalCredits > 0 ? `${formatNumber(total)} token equivalent; ${formatCredits(totalCredits)}` : formatNumber(total)}>
+      <p className="break-words text-3xl font-black tracking-tight text-white sm:text-4xl" title={totalCredits > 0 ? `${formatNumber(total)} tracked units; ${formatCredits(totalCredits)}` : formatNumber(total)}>
         {primaryValue}
       </p>
       <p className="mt-1 text-xs font-medium text-text-muted">{primaryLabel}</p>
@@ -71,7 +75,7 @@ export function TokenUsageCard({
       <div className="mt-4">
         <div className="mb-1 flex justify-between text-[10px] font-semibold">
           <span className="text-in-progress">Provider split</span>
-          <span className="text-text-muted">usage</span>
+          <span className="text-text-muted">tracked usage</span>
         </div>
         <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-bg-base">
           {breakdown.map((item) => {

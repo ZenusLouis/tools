@@ -84,7 +84,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                     {projects.length} active projects
                   </span>
                   <span className="text-border">/</span>
-                  <span>{formatNumber(stats.tokenCount)} tokens used {copy}</span>
+                  <span>{formatNumber(stats.tokenCount)} tracked usage units {copy}</span>
                 </p>
                 <p className="mt-3 max-w-2xl text-sm leading-relaxed text-text-muted">
                   {projects.length > 0
@@ -120,6 +120,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             <StatCard label={`Tasks Done ${label}`} value={stats.tasksCompleted} variant="tasks" badge={stats.tasksCompleted > 0 ? "done" : undefined} />
             <TokenUsageCard
               total={stats.tokenCount}
+              meterTotals={stats.meterTotals}
               rangeLabel={label}
               breakdown={stats.tokenBreakdown}
             />

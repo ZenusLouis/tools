@@ -37,6 +37,15 @@ function CopyButton({ text }: { text: string }) {
 }
 
 function statusForServer(server: McpServer): { label: string; dot: string; badge: string; pulse: boolean } {
+  if (server.runtime?.state === "local_required") {
+    return { label: "Bridge Required", dot: "bg-in-progress", badge: "bg-in-progress/10 text-in-progress", pulse: false };
+  }
+  if (server.runtime?.state === "configured" || server.runtime?.state === "online") {
+    return { label: server.runtime.state === "online" ? "Online" : "Configured", dot: "bg-done", badge: "bg-done/10 text-done", pulse: true };
+  }
+  if (server.runtime?.state === "offline") {
+    return { label: "Offline", dot: "bg-blocked", badge: "bg-blocked/10 text-blocked", pulse: false };
+  }
   if ((server.type === "http" && server.url) || (server.type === "stdio" && server.command)) {
     return { label: "Active", dot: "bg-done", badge: "bg-done/10 text-done", pulse: true };
   }
@@ -91,6 +100,15 @@ export function McpServerList({ servers }: Props) {
                       <span className="rounded border border-border bg-card-hover px-2 py-0.5 font-mono text-[10px]">{server.type}</span>
                       <span className="max-w-64 truncate font-mono opacity-70">{server.url ?? server.command ?? "--"}</span>
                     </div>
+                    {server.runtime?.availableTools?.length ? (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {server.runtime.availableTools.slice(0, 4).map((tool) => (
+                          <span key={tool} className="rounded bg-bg-base px-1.5 py-0.5 font-mono text-[9px] text-text-muted">
+                            {tool}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
                 <CopyButton text={buildMcpAddCommand(server)} />
@@ -117,6 +135,30 @@ export function McpServerList({ servers }: Props) {
             <div className="rounded-lg border border-border bg-bg-base p-3">
               <dt className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Endpoint</dt>
               <dd className="mt-2 break-all font-mono text-xs text-text">{selected.url ?? selected.command ?? "Not configured"}</dd>
+            </div>
+            <div className="rounded-lg border border-border bg-bg-base p-3">
+              <dt className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Runtime</dt>
+              <dd className="mt-2 text-xs text-text">{selected.runtime?.label ?? "Runtime status unknown"}</dd>
+              {selected.runtime?.requiresBridge && (
+                <p className="mt-2 text-[11px] text-text-muted">This server is local stdio. Keep the GCS bridge online on the machine that owns the project path.</p>
+              )}
+            </div>
+            {selected.runtime?.availableTools?.length ? (
+              <div className="rounded-lg border border-border bg-bg-base p-3">
+                <dt className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Available Tools</dt>
+                <dd className="mt-2 flex flex-wrap gap-1.5">
+                  {selected.runtime.availableTools.map((tool) => (
+                    <span key={tool} className="rounded border border-border bg-card px-2 py-1 font-mono text-[10px] text-text-muted">
+                      {tool}
+                    </span>
+                  ))}
+                </dd>
+              </div>
+            ) : null}
+            <div className="rounded-lg border border-border bg-bg-base p-3">
+              <dt className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Last Call / Error</dt>
+              <dd className="mt-2 break-all font-mono text-xs text-text">{selected.runtime?.lastCall ?? "No MCP call audited yet."}</dd>
+              {selected.runtime?.lastError && <dd className="mt-2 break-all font-mono text-xs text-blocked">{selected.runtime.lastError}</dd>}
             </div>
             {selected.args && selected.args.length > 0 && (
               <div className="rounded-lg border border-border bg-bg-base p-3">

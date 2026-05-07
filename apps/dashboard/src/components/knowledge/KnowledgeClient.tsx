@@ -17,6 +17,8 @@ type MemoryResult = {
   excerpt: string;
   tags: string[];
   reqIds: string[];
+  score?: number;
+  reasons?: string[];
 };
 
 interface Props {
@@ -49,7 +51,7 @@ export function KnowledgeClient({ lessons, frameworks, projectDecisions, project
       const res = await fetch("/api/memory/refresh", { method: "POST" });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "Refresh failed");
-      setMemoryStatus(`Refreshed ${Number(body.result?.nodes ?? 0).toLocaleString()} memory nodes with 0 routing tokens.`);
+      setMemoryStatus(`Refreshed ${Number(body.result?.nodes ?? 0).toLocaleString()} memory nodes and ${Number(body.result?.edges ?? 0).toLocaleString()} edges with 0 routing tokens.`);
     } catch (error) {
       setMemoryStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -83,7 +85,7 @@ export function KnowledgeClient({ lessons, frameworks, projectDecisions, project
       const res = await fetch("/api/memory/export-obsidian", { method: "POST" });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "Export failed");
-      setMemoryStatus(`Exported ${Number(body.result?.files ?? 0).toLocaleString()} Obsidian files to ${body.result?.vaultDir ?? ".gcs/obsidian"}.`);
+      setMemoryStatus(`Exported ${Number(body.result?.files ?? 0).toLocaleString()} Obsidian files (${Number(body.result?.edges ?? 0).toLocaleString()} edges) to ${body.result?.vaultDir ?? ".gcs/obsidian"}.`);
     } catch (error) {
       setMemoryStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -213,9 +215,14 @@ export function KnowledgeClient({ lessons, frameworks, projectDecisions, project
                 <article key={item.id} className="rounded-xl border border-border bg-card p-4">
                   <div className="flex items-center justify-between gap-3">
                     <p className="truncate text-sm font-bold text-text">{item.title}</p>
-                    <span className="rounded bg-bg-base px-2 py-0.5 text-[10px] uppercase tracking-wide text-text-muted">{item.kind}</span>
+                    <span className="rounded bg-bg-base px-2 py-0.5 text-[10px] uppercase tracking-wide text-text-muted">
+                      {item.kind}{typeof item.score === "number" ? ` · ${item.score}` : ""}
+                    </span>
                   </div>
                   <p className="mt-1 text-xs text-text-muted">{item.projectName ?? "workspace"}</p>
+                  {item.reasons?.length ? (
+                    <p className="mt-2 text-[11px] text-in-progress">{item.reasons.slice(0, 3).join(" · ")}</p>
+                  ) : null}
                   <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-text-muted">{item.excerpt}</p>
                   <div className="mt-3 flex flex-wrap gap-1">
                     {[...item.reqIds, ...item.tags.slice(0, 4)].map((tag) => (

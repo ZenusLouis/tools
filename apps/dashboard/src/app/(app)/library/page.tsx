@@ -24,6 +24,26 @@ type RecommendedImports = {
   recommendations?: Array<{ name: string; sourceName: string; sourcePath: string; description: string; recommendedFor: string[]; score: number }>;
 };
 
+const skillSelect = {
+  id: true,
+  name: true,
+  slug: true,
+  category: true,
+  sourceType: true,
+  sourcePriority: true,
+  contentHash: true,
+  importMode: true,
+  trustedSourceSlug: true,
+  sourcePath: true,
+  compactGuidance: true,
+  description: true,
+  providerCompatibility: true,
+  roleCompatibility: true,
+  tags: true,
+  isImported: true,
+  isRemote: true,
+} as const;
+
 async function readJSON<T>(filePath: string): Promise<T | null> {
   try {
     return JSON.parse(await fs.readFile(filePath, "utf-8")) as T;
@@ -37,8 +57,8 @@ export default async function LibraryPage() {
   await ensureWorkspaceAgentDefaults(user.workspaceId);
 
   const [roles, skills, sourceCatalog, marketplace, inventory, recommended] = await Promise.all([
-    db.agentRole.findMany({ where: { workspaceId: user.workspaceId }, include: { skills: true }, orderBy: { name: "asc" } }),
-    db.skillDefinition.findMany({ where: { workspaceId: user.workspaceId }, orderBy: [{ category: "asc" }, { name: "asc" }] }),
+    db.agentRole.findMany({ where: { workspaceId: user.workspaceId }, include: { skills: { select: skillSelect } }, orderBy: { name: "asc" } }),
+    db.skillDefinition.findMany({ where: { workspaceId: user.workspaceId }, select: skillSelect, orderBy: [{ sourcePriority: "desc" }, { category: "asc" }, { name: "asc" }] }),
     readJSON<SourceCatalog>(resolvePath("agents", "sources", "github-skill-sources.json")),
     readJSON<Marketplace>(resolvePath("skills", "imported", "marketplace.json")),
     readJSON<Inventory>(resolvePath("skills", "imported", "github-inventory.json")),

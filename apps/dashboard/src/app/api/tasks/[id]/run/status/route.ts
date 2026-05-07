@@ -3,6 +3,14 @@ import { requireCurrentUser } from "@/lib/auth";
 import { expireStaleBridgeActions } from "@/lib/bridge-actions";
 import { db } from "@/lib/db";
 
+function numberValue(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function stringValue(value: unknown) {
+  return typeof value === "string" ? value : null;
+}
+
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireCurrentUser();
   const { id } = await params;
@@ -32,8 +40,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       error: action.error,
       log: Array.isArray(result.log) ? result.log : [],
       artifactPath: typeof result.artifactPath === "string" ? result.artifactPath : null,
-      exitCode: typeof result.exitCode === "number" ? result.exitCode : null,
-      actualTokens: typeof result.actualTokens === "number" ? result.actualTokens : typeof result.tokens === "number" ? result.tokens : null,
+      exitCode: numberValue(result.exitCode),
+      actualTokens: numberValue(result.actualTokens) ?? numberValue(result.tokens),
+      providerTokens: numberValue(result.providerTokens),
+      codexCredits: numberValue(result.codexCredits),
+      normalizedCostUsd: numberValue(result.normalizedCostUsd) ?? numberValue(result.totalCostUSD),
+      tokenMeter: stringValue(result.tokenMeter),
       optimizer: payload.optimizer ?? result.optimizer ?? null,
       skillRouting: payload.skillRouting ?? result.skillRouting ?? null,
       contextPlan: payload.contextPlan ?? result.contextPlan ?? null,

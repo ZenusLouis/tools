@@ -29,6 +29,17 @@ export async function POST(req: NextRequest) {
   });
 
   await db.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+  await db.auditLog.create({
+    data: {
+      workspaceId: membership.workspaceId,
+      userId: user.id,
+      actorType: "user",
+      event: "user_login",
+      targetType: "User",
+      targetId: user.id,
+      metadata: { email: user.email },
+    },
+  }).catch(() => null);
 
   const res = NextResponse.json({
     user: { id: user.id, email: user.email, name: user.name },
@@ -43,4 +54,3 @@ export async function POST(req: NextRequest) {
   });
   return res;
 }
-

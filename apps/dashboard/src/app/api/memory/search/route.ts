@@ -6,6 +6,11 @@ function tokens(value: string) {
   return Array.from(new Set((value.toLowerCase().match(/[a-z0-9][a-z0-9-]{2,}/g) ?? []).slice(0, 12)));
 }
 
+function excerpt(value: string, maxChars = 420) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  return normalized.length > maxChars ? `${normalized.slice(0, maxChars).trim()} ...` : normalized;
+}
+
 export async function GET(req: NextRequest) {
   const user = await requireCurrentUser();
   const url = new URL(req.url);
@@ -25,25 +30,32 @@ export async function GET(req: NextRequest) {
   const scored = nodes
     .map((node) => {
       const corpus = `${node.title} ${node.body} ${node.tags.join(" ")} ${node.reqIds.join(" ")}`.toLowerCase();
+      const matchedTokens = queryTokens.filter((token) => corpus.includes(token));
       const score = queryTokens.reduce((sum, token) => sum + (corpus.includes(token) ? 1 : 0), 0)
         + (projectName && node.projectName === projectName ? 2 : 0)
         + (reqId && node.reqIds.includes(reqId) ? 5 : 0);
-      return { node, score };
+      return { node, score, matchedTokens };
     })
     .filter((row) => !q || row.score > 0)
-    .sort((a, b) => b.score - a.score)
+    .sort((a, b) => b.score - a.score || a.node.title.localeCompare(b.node.title))
     .slice(0, 30)
-    .map(({ node, score }) => ({
+    .map(({ node, score, matchedTokens }) => ({
       id: node.id,
       kind: node.kind,
       key: node.key,
       title: node.title,
-      bodyPreview: node.body.slice(0, 500),
+      excerpt: excerpt(node.body),
+      bodyPreview: excerpt(node.body),
       tags: node.tags,
       reqIds: node.reqIds,
       projectName: node.projectName,
       sourcePath: node.sourcePath,
       score,
+      reasons: [
+        ...(matchedTokens.length ? [`keyword ${matchedTokens.slice(0, 5).join(", ")}`] : []),
+        ...(projectName && node.projectName === projectName ? ["project match"] : []),
+        ...(reqId && node.reqIds.includes(reqId) ? ["reqId match"] : []),
+      ],
     }));
-  return NextResponse.json({ results: scored, routingTokens: 0 });
+  return NextResponse.json({ results: scored, count: scored.length, routingTokens: 0 });
 }

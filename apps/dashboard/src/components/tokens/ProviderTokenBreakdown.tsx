@@ -35,6 +35,7 @@ export function ProviderTokenBreakdown({ breakdown }: { breakdown: ProviderBreak
               <div>
                 <p className="text-3xl font-black tabular-nums text-text" title={item.tokens.toLocaleString()}>{formatCompactNumber(item.tokens)}</p>
                 <p className="mt-1 text-xs text-text-muted">{formatCurrency(item.cost)} estimated</p>
+                <p className="mt-0.5 text-[10px] text-text-muted">{item.meterLabel}</p>
               </div>
               <div className="text-right text-[11px] text-text-muted">
                 <p>session {item.sessionTokens.toLocaleString()}</p>

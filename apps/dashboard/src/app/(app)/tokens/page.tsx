@@ -129,6 +129,7 @@ export default async function TokensPage({ searchParams }: Props) {
           <HeroMetric
             totalTokens={analytics.totalTokens}
             totalCost={analytics.totalCost}
+            meterTotals={analytics.meterTotals}
           />
 
           <ProviderTokenBreakdown breakdown={analytics.providerBreakdown} />

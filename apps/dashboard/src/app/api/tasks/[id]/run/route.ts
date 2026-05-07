@@ -6,6 +6,7 @@ import { buildTaskOptimizerPlan, CONTEXT_MODES, OPTIMIZER_MODES } from "@/lib/ag
 import { buildBridgePayload } from "@/lib/bridge-actions";
 import { db } from "@/lib/db";
 import { resolvePath } from "@/lib/fs/resolve";
+import { findRelatedMemory } from "@/lib/memory-retrieval";
 import { syncWorkspaceFromRepo } from "@/lib/repo-sync";
 
 const BodySchema = z.object({
@@ -110,8 +111,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         slug: true,
         name: true,
         category: true,
+        sourceType: true,
+        sourcePriority: true,
         description: true,
         content: true,
+        compactGuidance: true,
         providerCompatibility: true,
         roleCompatibility: true,
         tags: true,
@@ -189,6 +193,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     skillFeedback,
     previousFailure,
   });
+  const memoryLimit = optimizerPlan.contextPlan.mode === "deep" ? 8 : optimizerPlan.contextPlan.mode === "minimal" ? 2 : 4;
+  const relatedMemory = await findRelatedMemory({
+    workspaceId: user.workspaceId,
+    projectName: project.name,
+    task: taskCore,
+    limit: memoryLimit,
+  }).catch(() => []);
+  const contextPlan = {
+    ...optimizerPlan.contextPlan,
+    relatedMemoryCount: relatedMemory.length,
+    includedBlocks: relatedMemory.length
+      ? [...optimizerPlan.contextPlan.includedBlocks, "related_memory_snippets"]
+      : optimizerPlan.contextPlan.includedBlocks,
+    omittedBlocks: relatedMemory.length
+      ? optimizerPlan.contextPlan.omittedBlocks
+      : [...optimizerPlan.contextPlan.omittedBlocks, "no related memory matched this task"],
+  };
   const selectedModel = typeof optimizerPlan.optimizer.model === "string" && optimizerPlan.optimizer.model
     ? optimizerPlan.optimizer.model
     : role?.defaultModel ?? null;
@@ -247,7 +268,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         skills: optimizerPlan.skillRouting.selected.map((skill) => skill.slug),
         optimizer: optimizerPlan.optimizer,
         skillRouting: optimizerPlan.skillRouting,
-        contextPlan: optimizerPlan.contextPlan,
+        contextPlan,
+        relatedMemory,
         previousFailure,
         task: taskCore,
       }),
@@ -262,7 +284,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       event: "bridge_action_queued",
       targetType: "BridgeFileAction",
       targetId: action.id,
-      metadata: { type: "run_task", taskId: task.id, provider, phase: parsed.data.phase },
+      metadata: {
+        type: "run_task",
+        taskId: task.id,
+        provider,
+        phase: parsed.data.phase,
+        optimizerMode: optimizerPlan.optimizer.mode,
+        contextMode: optimizerPlan.optimizer.contextMode,
+        relatedMemoryCount: relatedMemory.length,
+        retryEscalation: optimizerPlan.optimizer.retryEscalation ?? null,
+      },
     },
   }).catch(() => null);
 
@@ -283,7 +314,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       date: new Date(),
       tasksCompleted: [],
       cwd: target.path,
-      sessionNotes: `Queued ${provider} ${parsed.data.phase} run for ${task.id}. Optimizer=${optimizerPlan.optimizer.mode}/${optimizerPlan.optimizer.contextMode}; model=${selectedModel ?? "provider default"}; skills=${optimizerPlan.skillRouting.selected.map((skill) => skill.slug).join(", ") || "none"}; routing=0 LLM tokens.`,
+      sessionNotes: `Queued ${provider} ${parsed.data.phase} run for ${task.id}. Optimizer=${optimizerPlan.optimizer.mode}/${optimizerPlan.optimizer.contextMode}; model=${selectedModel ?? "provider default"}; skills=${optimizerPlan.skillRouting.selected.map((skill) => skill.slug).join(", ") || "none"}; relatedMemory=${relatedMemory.length}; routing=0 LLM tokens.${optimizerPlan.optimizer.retryEscalation?.enabled ? ` Retry escalation=${optimizerPlan.optimizer.retryEscalation.reason}` : ""}`,
     },
   });
 
@@ -297,6 +328,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     device: target.device.name,
     optimizer: optimizerPlan.optimizer,
     skillRouting: optimizerPlan.skillRouting,
-    contextPlan: optimizerPlan.contextPlan,
+    contextPlan,
   });
 }

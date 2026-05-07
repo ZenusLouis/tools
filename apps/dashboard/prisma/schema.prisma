@@ -276,12 +276,19 @@ model SkillDefinition {
   name                  String
   slug                  String
   category              String
+  sourceType            String   @default("local")
+  sourcePriority        Int      @default(50)
+  contentHash           String?
+  importMode            String?
+  trustedSourceSlug     String?
   sourcePath            String?
   content               String?  @db.Text
+  compactGuidance       String?  @db.Text
   description           String
   providerCompatibility String[] @default([])
   roleCompatibility     String[] @default([])
   tags                  String[] @default([])
+  metadata              Json     @default("{}")
   isImported            Boolean  @default(false)
   isRemote              Boolean  @default(false)
   workspace             Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -292,6 +299,8 @@ model SkillDefinition {
   @@unique([workspaceId, slug])
   @@index([workspaceId])
   @@index([category])
+  @@index([sourceType])
+  @@index([contentHash])
 }
 
 model AgentRole {

@@ -12,6 +12,10 @@ type RunStatus = {
   artifactPath: string | null;
   exitCode: number | null;
   actualTokens?: number | null;
+  providerTokens?: number | null;
+  codexCredits?: number | null;
+  normalizedCostUsd?: number | null;
+  tokenMeter?: string | null;
   optimizer?: OptimizerInfo | null;
   skillRouting?: SkillRoutingInfo | null;
   contextPlan?: ContextPlanInfo | null;
@@ -29,10 +33,27 @@ type OptimizerInfo = {
   reason?: string;
   estimatedPromptTokens?: number;
   promptBudgetTokens?: number;
+  retryEscalation?: {
+    enabled?: boolean;
+    retryCount?: number;
+    previousFailureAttached?: boolean;
+    helperSkill?: string | null;
+    reason?: string;
+  };
+};
+
+type SkillRouteItem = {
+  slug?: string;
+  name?: string;
+  score?: number;
+  reasons?: string[];
+  sourceType?: string | null;
+  sourcePriority?: number | null;
 };
 
 type SkillRoutingInfo = {
-  selected?: Array<{ slug?: string; name?: string; score?: number; reasons?: string[] }>;
+  selected?: SkillRouteItem[];
+  topCandidates?: SkillRouteItem[];
   omittedCount?: number;
   availableCount?: number;
   tokenCost?: string;
@@ -42,6 +63,8 @@ type ContextPlanInfo = {
   mode?: string;
   includedBlocks?: string[];
   omittedBlocks?: string[];
+  retryEscalation?: string | null;
+  relatedMemoryCount?: number;
 };
 
 type RunPreview = {
@@ -56,6 +79,18 @@ function getContextReportValue(report: Record<string, unknown> | null | undefine
   return report && typeof report[key] === "object" && report[key] !== null && !Array.isArray(report[key])
     ? report[key] as Record<string, unknown>
     : null;
+}
+
+function statusUsageLabel(status: RunStatus, provider: string | undefined) {
+  if (!status || typeof status.actualTokens !== "number") return null;
+  if (provider === "codex" || status.tokenMeter === "thread_meter") {
+    const cost = typeof status.normalizedCostUsd === "number" ? ` / $${status.normalizedCostUsd.toFixed(4)}` : "";
+    return `${status.actualTokens.toLocaleString()} thread tokens${cost}`;
+  }
+  if (status.tokenMeter === "provider_reported") {
+    return `${(status.providerTokens ?? status.actualTokens).toLocaleString()} provider tokens`;
+  }
+  return `${status.actualTokens.toLocaleString()} hook tokens`;
 }
 
 const PHASE_OPTIONS = [
@@ -126,7 +161,7 @@ export function RunTaskButton({ taskId, disabled }: { taskId: string; disabled?:
   }, [actionId, status?.status, taskId]);
 
   useEffect(() => {
-    if (provider === "auto") { setModels([]); setModel(""); return; }
+    if (provider === "auto") return;
     const providerKey = provider === "claude" ? "claude" : "codex";
     fetch(`/api/models?provider=${providerKey}`, { cache: "no-store" })
       .then((r) => r.json())
@@ -309,6 +344,7 @@ export function RunTaskButton({ taskId, disabled }: { taskId: string; disabled?:
   const displaySkillRouting = status?.skillRouting ?? preview?.skillRouting ?? null;
   const displayContextPlan = status?.contextPlan ?? preview?.contextPlan ?? null;
   const displayProvider = status?.optimizer?.provider ?? preview?.provider ?? provider;
+  const displayUsage = statusUsageLabel(status, displayProvider);
 
   return (
     <div className="rounded-2xl border border-border bg-card p-4">
@@ -332,7 +368,14 @@ export function RunTaskButton({ taskId, disabled }: { taskId: string; disabled?:
           </select>
           <select
             value={provider}
-            onChange={(event) => setProvider(event.target.value as typeof provider)}
+            onChange={(event) => {
+              const nextProvider = event.target.value as typeof provider;
+              setProvider(nextProvider);
+              if (nextProvider === "auto") {
+                setModels([]);
+                setModel("");
+              }
+            }}
             disabled={running}
             className="rounded-xl border border-border bg-bg-base px-3 py-2 text-xs font-bold text-text outline-none transition-colors hover:bg-card-hover disabled:cursor-not-allowed disabled:opacity-50"
             title="Local provider"
@@ -440,12 +483,19 @@ export function RunTaskButton({ taskId, disabled }: { taskId: string; disabled?:
             <span>{displayProvider}</span>
             <span>{displayOptimizer?.model ? `model ${displayOptimizer.model}` : "provider model default"}</span>
             <span>{displayOptimizer?.estimatedPromptTokens ? `${displayOptimizer.estimatedPromptTokens.toLocaleString()} est tokens` : "estimate pending"}</span>
-            {status?.actualTokens ? <span>{status.actualTokens.toLocaleString()} actual tokens</span> : null}
+            <span>{displayContextPlan?.relatedMemoryCount ?? 0} memory</span>
+            {displayUsage ? <span>{displayUsage}</span> : null}
             <span>{displaySkillRouting?.tokenCost ?? "0 LLM tokens used for routing"}</span>
             {previewLoading && !status && <span>refreshing...</span>}
           </div>
           {displayOptimizer?.reason && <p className="mt-2 text-xs text-text-muted">{displayOptimizer.reason}</p>}
           {displayOptimizer?.modelReason && <p className="mt-1 text-xs text-text-muted">{displayOptimizer.modelReason}</p>}
+          {(displayOptimizer?.retryEscalation?.enabled || displayContextPlan?.retryEscalation) && (
+            <p className="mt-2 rounded-lg border border-in-progress/30 bg-in-progress/10 px-3 py-2 text-xs text-in-progress">
+              {displayOptimizer?.retryEscalation?.reason ?? displayContextPlan?.retryEscalation}
+              {displayOptimizer?.retryEscalation?.helperSkill ? ` Helper skill: ${displayOptimizer.retryEscalation.helperSkill}.` : ""}
+            </p>
+          )}
           {getContextReportValue(status?.contextReport, "previousFailure") && (
             <p className="mt-2 rounded-lg border border-in-progress/30 bg-in-progress/10 px-3 py-2 text-xs text-in-progress">
               Retry context attached from previous failed run.
@@ -455,6 +505,7 @@ export function RunTaskButton({ taskId, disabled }: { taskId: string; disabled?:
             {(displaySkillRouting?.selected ?? []).slice(0, 8).map((skill) => (
               <span key={skill.slug ?? skill.name} className="rounded border border-border bg-card px-2 py-1 font-mono text-[10px] text-text-muted" title={(skill.reasons ?? []).join(", ")}>
                 {skill.slug ?? skill.name} {typeof skill.score === "number" ? `(${skill.score})` : ""}
+                {skill.sourceType ? ` · ${skill.sourceType}` : ""}
               </span>
             ))}
             {typeof displaySkillRouting?.omittedCount === "number" && (
@@ -463,6 +514,21 @@ export function RunTaskButton({ taskId, disabled }: { taskId: string; disabled?:
               </span>
             )}
           </div>
+          {displaySkillRouting?.topCandidates?.length ? (
+            <details className="mt-2 rounded-lg border border-border bg-card px-3 py-2">
+              <summary className="cursor-pointer text-[10px] font-bold uppercase tracking-widest text-text-muted">
+                Top omitted candidates
+              </summary>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {displaySkillRouting.topCandidates.slice(0, 8).map((skill) => (
+                  <span key={skill.slug ?? skill.name} className="rounded border border-border bg-bg-base px-2 py-1 font-mono text-[10px] text-text-muted" title={(skill.reasons ?? []).join(", ")}>
+                    {skill.slug ?? skill.name} {typeof skill.score === "number" ? `(${skill.score})` : ""}
+                    {skill.sourceType ? ` · ${skill.sourceType}` : ""}
+                  </span>
+                ))}
+              </div>
+            </details>
+          ) : null}
           {status?.contextReportPath && (
             <p className="mt-2 font-mono text-[10px] text-text-muted">Context report: {status.contextReportPath}</p>
           )}

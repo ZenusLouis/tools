@@ -9,7 +9,7 @@ interface Props {
   apiKeys: Array<{ id: string; name: string; service: string }>;
 }
 
-const USAGE_SERVICES = new Set(["openai_admin", "openai_usage", "openai"]);
+const USAGE_SERVICES = new Set(["openai_admin", "openai_usage"]);
 
 export function SyncOpenAIButton({ lastSyncedAt, apiKeys }: Props) {
   const router = useRouter();
@@ -44,7 +44,7 @@ export function SyncOpenAIButton({ lastSyncedAt, apiKeys }: Props) {
   // Auto-sync if last sync > 1 hour ago (or never)
   useEffect(() => {
     const stale = !lastSyncedAt || Date.now() - new Date(lastSyncedAt).getTime() > 60 * 60 * 1000;
-    if (!stale) return;
+    if (!stale || usageKeys.length === 0) return;
     const timer = window.setTimeout(() => {
       void doSync(7);
     }, 0);
@@ -73,12 +73,12 @@ export function SyncOpenAIButton({ lastSyncedAt, apiKeys }: Props) {
           )}
         </select>
         {([7, 30] as const).map((d) => (
-          <button key={d} type="button" onClick={() => doSync(d)} disabled={pending}
+          <button key={d} type="button" onClick={() => doSync(d)} disabled={pending || usageKeys.length === 0}
             className="px-2.5 py-1.5 text-xs font-semibold text-text-muted hover:bg-card-hover hover:text-text transition-colors disabled:opacity-50 border-r border-border">
             {d}d
           </button>
         ))}
-        <button type="button" onClick={() => doSync(7)} disabled={pending}
+        <button type="button" onClick={() => doSync(7)} disabled={pending || usageKeys.length === 0}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-accent hover:bg-accent/10 transition-colors disabled:opacity-50">
           <RefreshCw size={12} className={pending ? "animate-spin" : ""} />
           {pending ? "Syncing…" : "OpenAI"}

@@ -122,6 +122,19 @@ function contentHash(text: string) {
   return createHash("sha256").update(text).digest("hex").slice(0, 16);
 }
 
+function compactSkillGuidance(text: string, fallback: string) {
+  const body = text
+    .replace(/^---[\s\S]*?---\s*/m, "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => /^[-*]\s+/.test(line) || /^#{2,4}\s+/.test(line) || /must|should|avoid|verify|check|use/i.test(line))
+    .slice(0, 10)
+    .join("\n");
+  const value = body || fallback;
+  return value.length > 900 ? `${value.slice(0, 900).trim()}...` : value;
+}
+
 function normalizeSkillSlug(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "skill";
 }
@@ -387,8 +400,14 @@ type SeedSkill = {
   name: string;
   description: string;
   category: string;
+  sourceType: string;
+  sourcePriority: number;
+  contentHash: string | null;
+  importMode: string | null;
+  trustedSourceSlug: string | null;
   sourcePath: string | null;
   content: string | null;
+  compactGuidance: string | null;
   tags: string[];
   roleCompatibility: string[];
   isImported: boolean;
@@ -421,8 +440,14 @@ async function syncSkillsAndRoles(db: Db, workspaceId: string, root: string, res
       name: existing.name,
       description: existing.description || skill.description,
       category: existing.category === "marketplace" && skill.category !== "marketplace" ? skill.category : existing.category,
+      sourceType: existing.sourcePriority >= skill.sourcePriority ? existing.sourceType : skill.sourceType,
+      sourcePriority: Math.max(existing.sourcePriority, skill.sourcePriority),
+      contentHash: existing.contentHash ?? skill.contentHash,
+      importMode: existing.importMode ?? skill.importMode,
+      trustedSourceSlug: existing.trustedSourceSlug ?? skill.trustedSourceSlug,
       sourcePath: hasLocalWrapper ? (existingIsWrapper ? existing.sourcePath : skill.sourcePath) : (existing.sourcePath ?? skill.sourcePath),
       content: existing.content ?? skill.content,
+      compactGuidance: existing.compactGuidance ?? skill.compactGuidance,
       tags: Array.from(new Set([...existing.tags, ...skill.tags])),
       roleCompatibility: Array.from(new Set([...existing.roleCompatibility, ...skill.roleCompatibility])),
       isImported: existing.isImported || skill.isImported || hasLocalWrapper,
@@ -435,13 +460,21 @@ async function syncSkillsAndRoles(db: Db, workspaceId: string, root: string, res
     const frontmatter = parseFrontmatter(text);
     const name = normalizeSkillSlug(frontmatter.name ?? path.basename(path.dirname(file)));
     const category = inferCategory(file);
-    const tags = [category, name, `hash:${contentHash(text)}`];
+    const hash = contentHash(text);
+    const sourceType = category === "imported" ? "generic-imported" : "local-custom";
+    const tags = [category, name, `hash:${hash}`, `source-type:${sourceType}`];
     mergeSkill({
       name,
       description: frontmatter.description ?? `${name} skill`,
       category,
+      sourceType,
+      sourcePriority: category === "imported" ? 45 : 90,
+      contentHash: hash,
+      importMode: "full",
+      trustedSourceSlug: null,
       sourcePath: path.relative(root, file).replace(/\\/g, "/"),
       content: text,
+      compactGuidance: compactSkillGuidance(text, frontmatter.description ?? `${name} skill`),
       tags,
       roleCompatibility: roleCompatibility(category, tags),
       isImported: category === "imported",
@@ -454,13 +487,20 @@ async function syncSkillsAndRoles(db: Db, workspaceId: string, root: string, res
     const frontmatter = parseFrontmatter(text);
     const name = normalizeSkillSlug(frontmatter.name ?? path.basename(path.dirname(file)));
     const category = "generated-role";
-    const tags = [category, name, "codex", `hash:${contentHash(text)}`];
+    const hash = contentHash(text);
+    const tags = [category, name, "codex", `hash:${hash}`, "source-type:role-generated"];
     mergeSkill({
       name,
       description: frontmatter.description ?? `${name} generated Codex role skill`,
       category,
+      sourceType: "role-generated",
+      sourcePriority: 80,
+      contentHash: hash,
+      importMode: "full",
+      trustedSourceSlug: null,
       sourcePath: path.relative(root, file).replace(/\\/g, "/"),
       content: text,
+      compactGuidance: compactSkillGuidance(text, frontmatter.description ?? `${name} generated Codex role skill`),
       tags,
       roleCompatibility: roleCompatibility(category, tags),
       isImported: false,
@@ -475,13 +515,20 @@ async function syncSkillsAndRoles(db: Db, workspaceId: string, root: string, res
     const text = await readMarkdown(full);
     const name = normalizeSkillSlug(file.replace(/\.md$/, ""));
     const category = "learning";
-    const tags = [category, name, `hash:${contentHash(text)}`];
+    const hash = contentHash(text);
+    const tags = [category, name, `hash:${hash}`, "source-type:learning"];
     mergeSkill({
       name,
       description: `${name} reusable learning note`,
       category,
+      sourceType: "learning",
+      sourcePriority: 70,
+      contentHash: hash,
+      importMode: "full",
+      trustedSourceSlug: null,
       sourcePath: path.relative(root, full).replace(/\\/g, "/"),
       content: text,
+      compactGuidance: compactSkillGuidance(text, `${name} reusable learning note`),
       tags,
       roleCompatibility: roleCompatibility(category, tags),
       isImported: false,
@@ -493,13 +540,20 @@ async function syncSkillsAndRoles(db: Db, workspaceId: string, root: string, res
     resolveRoot(root, "skills", "imported", "marketplace.json"),
   );
   for (const item of marketplace?.skills ?? []) {
-    const tags = [...(item.tags ?? []), ...(item.source ? [`source:${item.source}`] : [])];
+    const hash = contentHash(`${item.name}\n${item.description}\n${item.source ?? ""}`);
+    const tags = [...(item.tags ?? []), ...(item.source ? [`source:${item.source}`] : []), `hash:${hash}`, "source-type:curated-marketplace"];
     mergeSkill({
       name: normalizeSkillSlug(item.name),
       description: item.description,
       category: "marketplace",
+      sourceType: "curated-marketplace",
+      sourcePriority: 55,
+      contentHash: hash,
+      importMode: "metadata",
+      trustedSourceSlug: null,
       sourcePath: item.source ?? null,
       content: null,
+      compactGuidance: item.description,
       tags,
       roleCompatibility: roleCompatibility("marketplace", tags),
       isImported: true,
@@ -520,12 +574,19 @@ async function syncSkillsAndRoles(db: Db, workspaceId: string, root: string, res
       ...(source.kind ? [`kind:${source.kind}`] : []),
       ...(source.importMode ? [`import:${source.importMode}`] : []),
     ];
+    const hash = contentHash(`${source.slug}\n${source.url}\n${source.description ?? ""}`);
     mergeSkill({
       name: slug,
       description: source.description ?? `${slug} trusted upstream skill source`,
       category: "trusted-upstream",
+      sourceType: "trusted-upstream",
+      sourcePriority: source.priority ?? 75,
+      contentHash: hash,
+      importMode: source.importMode ?? "metadata",
+      trustedSourceSlug: slug,
       sourcePath: source.url,
       content: null,
+      compactGuidance: source.description ?? `${slug} trusted upstream skill source`,
       tags,
       roleCompatibility: ["ba", "dev", "reviewer", "qa", "researcher", "design"],
       isImported: true,
@@ -542,23 +603,47 @@ async function syncSkillsAndRoles(db: Db, workspaceId: string, root: string, res
         name: skill.name,
         slug: skill.name,
         category: skill.category,
+        sourceType: skill.sourceType,
+        sourcePriority: skill.sourcePriority,
+        contentHash: skill.contentHash,
+        importMode: skill.importMode,
+        trustedSourceSlug: skill.trustedSourceSlug,
         sourcePath: skill.sourcePath,
         description: skill.description,
         content: skill.content,
+        compactGuidance: skill.compactGuidance,
         providerCompatibility: ["claude", "codex", "chatgpt"],
         roleCompatibility: skill.roleCompatibility,
         tags: skill.tags,
+        metadata: {
+          sourceType: skill.sourceType,
+          sourcePriority: skill.sourcePriority,
+          importMode: skill.importMode,
+          trustedSourceSlug: skill.trustedSourceSlug,
+        },
         isImported: skill.isImported,
         isRemote: skill.isRemote,
       },
       update: {
         category: skill.category,
+        sourceType: skill.sourceType,
+        sourcePriority: skill.sourcePriority,
+        contentHash: skill.contentHash,
+        importMode: skill.importMode,
+        trustedSourceSlug: skill.trustedSourceSlug,
         sourcePath: skill.sourcePath,
         description: skill.description,
         content: skill.content,
+        compactGuidance: skill.compactGuidance,
         providerCompatibility: ["claude", "codex", "chatgpt"],
         roleCompatibility: skill.roleCompatibility,
         tags: skill.tags,
+        metadata: {
+          sourceType: skill.sourceType,
+          sourcePriority: skill.sourcePriority,
+          importMode: skill.importMode,
+          trustedSourceSlug: skill.trustedSourceSlug,
+        },
         isImported: skill.isImported,
         isRemote: skill.isRemote,
       },

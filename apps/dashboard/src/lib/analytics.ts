@@ -1,6 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
-import { estimateProviderCredits, TOKEN_METER_META } from "@/lib/token-accounting";
+import { addMeterUsage, emptyMeterTotals, estimateProviderCredits, TOKEN_METER_META, type MeterTotals } from "@/lib/token-accounting";
 
 export type DateRange = "today" | "week" | "month" | "year";
 export type ToolBreakdown = { tool: string; tokens: number; percent: number };
@@ -19,11 +19,12 @@ export type ProviderBreakdown = {
   creditNote: string;
 };
 export type DailyUsage = { date: string; label: string; tokens: number; cost: number };
-export type SessionRow = { date: string; time: string; timestamp: string; provider: string; role: string | null; model: string | null; project: string; tasksCompleted: number; tokens: number; cost: number; credits: number; creditBasis: string; creditNote: string; durationMin: number | null; source: "session" | "tool"; tool?: string; taskId?: string | null };
+export type SessionRow = { date: string; time: string; timestamp: string; provider: string; role: string | null; model: string | null; project: string; tasksCompleted: number; tokens: number; cost: number; credits: number; creditBasis: string; creditNote: string; durationMin: number | null; source: "session" | "tool" | "run"; tool?: string; taskId?: string | null };
 export type SessionPagination = { page: number; pageSize: number; total: number; totalPages: number };
 export type AnalyticsData = {
   totalTokens: number;
   totalCost: number;
+  meterTotals: MeterTotals;
   providerBreakdown: ProviderBreakdown[];
   toolBreakdown: ToolBreakdown[];
   dailyUsage: DailyUsage[];
@@ -68,9 +69,10 @@ export async function getAnalytics(
 ): Promise<AnalyticsData> {
   const since = rangeStart(range);
 
-  const [sessions, toolUsage] = await Promise.all([
+  const [sessions, toolUsage, runTelemetry] = await Promise.all([
     db.session.findMany({ where: { date: { gte: since }, ...(workspaceId ? { workspaceId } : {}) }, orderBy: { date: "desc" }, take: 5000 }),
     db.toolUsage.findMany({ where: { date: { gte: since }, ...(workspaceId ? { workspaceId } : {}) }, orderBy: { date: "asc" }, take: 10000 }),
+    db.runTelemetry.findMany({ where: { createdAt: { gte: since }, ...(workspaceId ? { workspaceId } : {}) }, orderBy: { createdAt: "desc" }, take: 5000 }),
   ]);
 
   const providers = ["claude", "codex", "chatgpt"] as const;
@@ -85,25 +87,32 @@ export async function getAnalytics(
         ? providerSessions.map((session) => estimateProviderCredits(provider, session.totalTokens ?? 0, session.model))
         : []),
     ];
+    const providerReportedCost = provider === "chatgpt"
+      ? providerSessions.reduce((sum, session) => sum + (session.totalCostUSD ?? 0), 0)
+      : 0;
     const firstCredit = credits.find((item) => item.credits > 0) ?? estimateProviderCredits(provider, 0);
     return {
       provider,
       sessionTokens,
       toolTokens,
       tokens: provider === "codex" ? toolTokens : Math.max(sessionTokens, toolTokens),
-      credits: credits.reduce((sum, item) => sum + item.credits, 0),
+      credits: provider === "chatgpt" ? providerReportedCost : credits.reduce((sum, item) => sum + item.credits, 0),
       creditBasis: firstCredit.basis,
-      creditNote: firstCredit.note,
+      creditNote: provider === "chatgpt" ? "Cost comes from OpenAI organization usage/cost sync when available." : firstCredit.note,
       ...TOKEN_METER_META[provider],
     };
   });
   const totalTokens = rawProviderBreakdown.reduce((sum, row) => sum + row.tokens, 0);
-  const totalCost = totalTokens * (COST_PER_MILLION / 1_000_000);
   const providerBreakdown: ProviderBreakdown[] = rawProviderBreakdown.map((row) => ({
     ...row,
     percent: totalTokens > 0 ? Math.round((row.tokens / totalTokens) * 100) : 0,
-    cost: row.tokens * (COST_PER_MILLION / 1_000_000),
+    cost: row.credits,
   }));
+  const meterTotals = providerBreakdown.reduce(
+    (totals, item) => addMeterUsage(totals, item.meterKind, item.tokens, item.credits),
+    emptyMeterTotals(),
+  );
+  const totalCost = meterTotals.estimatedCostUsd;
 
   // Tool breakdown
   const toolMap = new Map<string, number>();
@@ -166,7 +175,7 @@ export async function getAnalytics(
         project: s.project,
         tasksCompleted: s.tasksCompleted.length,
         tokens: s.totalTokens ?? 0,
-        cost: (s.totalTokens ?? 0) * (COST_PER_MILLION / 1_000_000),
+        cost: s.provider === "chatgpt" ? (s.totalCostUSD ?? 0) : (s.totalTokens ?? 0) * (COST_PER_MILLION / 1_000_000),
         durationMin: s.durationMin ?? null,
         source: "session" as const,
       })),
@@ -192,6 +201,33 @@ export async function getAnalytics(
       tool: usage.tool,
       taskId: (usage as { taskId?: string | null }).taskId ?? null,
     })),
+    ...runTelemetry.map((run) => ({
+      ...(() => {
+        const provider = run.provider === "claude" || run.provider === "codex" || run.provider === "chatgpt" ? run.provider : "chatgpt";
+        const credit = estimateProviderCredits(provider, run.actualTokens ?? 0, run.model);
+        return {
+          credits: run.normalizedCostUsd ?? run.codexCredits ?? credit.credits,
+          creditBasis: run.provider === "codex" ? "input_equivalent" : credit.basis,
+          creditNote: run.provider === "codex"
+            ? "Local Codex run telemetry stores thread-meter tokens and Codex credits separately."
+            : "Local run telemetry normalized from bridge action result.",
+        };
+      })(),
+      date: run.createdAt.toISOString().slice(0, 10),
+      time: sessionTime(run.createdAt),
+      timestamp: run.createdAt.toISOString(),
+      provider: run.provider,
+      role: run.role,
+      model: run.model,
+      project: run.projectName || "local-run",
+      tasksCompleted: run.status === "succeeded" ? 1 : 0,
+      tokens: run.actualTokens ?? 0,
+      cost: run.normalizedCostUsd ?? run.codexCredits ?? 0,
+      durationMin: run.durationMs != null ? Math.round((run.durationMs / 60_000) * 1000) / 1000 : null,
+      source: "run" as const,
+      tool: run.source,
+      taskId: run.taskId,
+    })),
   ].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
   const filteredSessionRows = allSessionRows.filter((row) => {
     const providerMatches = !options?.sessionProvider || options.sessionProvider === "all" || row.provider === options.sessionProvider;
@@ -204,5 +240,5 @@ export async function getAnalytics(
   const sessionsPage = filteredSessionRows.slice((page - 1) * pageSize, page * pageSize);
   const sessionPagination = { page, pageSize, total: filteredSessionRows.length, totalPages };
 
-  return { totalTokens, totalCost, providerBreakdown, toolBreakdown, dailyUsage, sessions: sessionsPage, sessionPagination };
+  return { totalTokens, totalCost, meterTotals, providerBreakdown, toolBreakdown, dailyUsage, sessions: sessionsPage, sessionPagination };
 }

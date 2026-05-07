@@ -4,12 +4,14 @@ import { McpServerList } from "@/components/mcp/McpServerList";
 import { McpProfileViewer } from "@/components/mcp/McpProfileViewer";
 import { RegisterMcpServerForm } from "@/components/mcp/McpForms";
 import { McpRefreshButton } from "@/components/mcp/McpRefreshButton";
-import { getMcpServers, getMcpProfiles } from "@/lib/mcp";
+import { requireCurrentUser } from "@/lib/auth";
+import { getMcpProfiles, getMcpServersWithRuntime } from "@/lib/mcp";
 import type { McpServer } from "@/lib/mcp";
 
 export default async function McpPage() {
+  const user = await requireCurrentUser();
   const [servers, profiles] = await Promise.all([
-    getMcpServers(),
+    getMcpServersWithRuntime(user.workspaceId),
     getMcpProfiles(),
   ]);
 
@@ -31,6 +33,22 @@ export default async function McpPage() {
               </div>
             </div>
             <McpServerList servers={servers} />
+            <section className="rounded-xl border border-border bg-card p-5">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-accent">Figma Design Flow</p>
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                {[
+                  ["Analyze Figma", "Use figma-mcp-go or Figma HTTP MCP to inspect the linked file and selected frames."],
+                  ["Generate UI Brief", "Convert design signals into compact implementation guidance for the selected project/task."],
+                  ["Implement Design", "Queue a local Codex/Claude run with design-integrator skills and project code-index snippets."],
+                  ["Review Visual Diff", "Capture screenshots, compare layout regressions, and write review artifacts."],
+                ].map(([title, body]) => (
+                  <div key={title} className="rounded-lg border border-border bg-bg-base p-3">
+                    <p className="text-sm font-bold text-text">{title}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-text-muted">{body}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
           </div>
 
           <div className="col-span-12 lg:col-span-5 space-y-6 lg:sticky lg:top-8">

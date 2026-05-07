@@ -4,7 +4,25 @@ import { useState, useTransition, useRef } from "react";
 import { X, Search, Loader2 } from "lucide-react";
 import type { SearchResult } from "@/app/api/skills/search/route";
 
-type Skill = { id: string; name: string; slug: string; category: string; description: string; isRemote: boolean; sourcePath?: string | null };
+type Skill = {
+  id: string;
+  name: string;
+  slug: string;
+  category: string;
+  sourceType?: string | null;
+  sourcePriority?: number | null;
+  contentHash?: string | null;
+  importMode?: string | null;
+  trustedSourceSlug?: string | null;
+  compactGuidance?: string | null;
+  description: string;
+  providerCompatibility?: string[];
+  roleCompatibility?: string[];
+  tags?: string[];
+  isImported?: boolean;
+  isRemote: boolean;
+  sourcePath?: string | null;
+};
 type Role = {
   id: string;
   name: string;
@@ -224,8 +242,15 @@ export function AgentLibraryClient({ roles, skills, sourceSummary }: { roles: Ro
               <div className="grid gap-3 md:grid-cols-3">
                 <Detail label="Slug" value={selectedSkill.slug} />
                 <Detail label="Category" value={selectedSkill.category} />
-                <Detail label="Source" value={selectedSkill.isRemote ? "remote" : "local"} />
+                <Detail label="Source Type" value={selectedSkill.sourceType ?? (selectedSkill.isRemote ? "remote" : "local")} />
+                <Detail label="Priority" value={String(selectedSkill.sourcePriority ?? 50)} />
+                <Detail label="Import Mode" value={selectedSkill.importMode ?? "full"} />
+                <Detail label="Hash" value={selectedSkill.contentHash ?? "none"} />
+                <Detail label="Trusted Source" value={selectedSkill.trustedSourceSlug ?? "none"} />
+                <Detail label="Providers" value={(selectedSkill.providerCompatibility ?? []).join(", ") || "all"} />
                 {selectedSkill.sourcePath && <Detail label="Path" value={selectedSkill.sourcePath} wide />}
+                {selectedSkill.compactGuidance && <Detail label="Compact Guidance" value={selectedSkill.compactGuidance} wide />}
+                {(selectedSkill.tags?.length ?? 0) > 0 && <Detail label="Tags" value={(selectedSkill.tags ?? []).slice(0, 20).join(", ")} wide />}
               </div>
             )}
           </section>
@@ -355,8 +380,10 @@ export function AgentLibraryClient({ roles, skills, sourceSummary }: { roles: Ro
                   setSelectedRole(null);
                 }}
                 className="rounded-lg border border-border bg-bg-base px-2 py-1 text-left text-xs text-text-muted transition-colors hover:border-accent/40 hover:text-text"
+                title={`${skill.sourceType ?? skill.category} / priority ${skill.sourcePriority ?? 50}`}
               >
                 {skill.name}
+                <span className="ml-1 text-[9px] text-accent">{skill.sourcePriority ?? 50}</span>
               </button>
             ))}
           </div>

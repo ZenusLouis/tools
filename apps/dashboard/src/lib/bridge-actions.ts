@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { sanitizeJson, sanitizeLogLines } from "@/lib/sanitize";
+import { estimateProviderCredits } from "@/lib/token-accounting";
 
 export const BRIDGE_PAYLOAD_VERSION = 1;
 export const BRIDGE_RESULT_VERSION = 1;
@@ -130,12 +131,20 @@ export function telemetryFromActionResult(params: {
   const durationMs = params.startedAt && params.completedAt
     ? Math.max(0, params.completedAt.getTime() - params.startedAt.getTime())
     : null;
+  const provider = String(payload.provider ?? params.result.provider ?? "unknown");
+  const providerEstimate = provider === "claude" || provider === "codex" || provider === "chatgpt"
+    ? estimateProviderCredits(provider, actualTokens ?? 0, typeof payload.model === "string" ? payload.model : null)
+    : { credits: 0 };
+  const reportedCost = typeof params.result.totalCostUSD === "number" ? params.result.totalCostUSD : null;
+  const resultProviderTokens = typeof params.result.providerTokens === "number" ? params.result.providerTokens : null;
+  const resultCodexCredits = typeof params.result.codexCredits === "number" ? params.result.codexCredits : null;
+  const resultNormalizedCostUsd = typeof params.result.normalizedCostUsd === "number" ? params.result.normalizedCostUsd : null;
   return {
     workspaceId: params.workspaceId,
     actionId: params.actionId,
     taskId: typeof payload.taskId === "string" ? payload.taskId : null,
     projectName: typeof payload.projectName === "string" ? payload.projectName : null,
-    provider: String(payload.provider ?? params.result.provider ?? "unknown"),
+    provider,
     model: typeof payload.model === "string" ? payload.model : null,
     role: typeof payload.role === "string" ? payload.role : null,
     source: params.type === "run_task" ? "run_task" : params.type,
@@ -145,9 +154,11 @@ export function telemetryFromActionResult(params: {
     skillScores,
     estimatedTokens,
     actualTokens,
-    providerTokens: actualTokens,
-    codexCredits: typeof params.result.codexCredits === "number" ? params.result.codexCredits : null,
-    normalizedCostUsd: typeof params.result.totalCostUSD === "number" ? params.result.totalCostUSD : null,
+    providerTokens: resultProviderTokens ?? (provider === "codex" ? null : actualTokens),
+    codexCredits: provider === "codex"
+      ? (resultCodexCredits ?? providerEstimate.credits)
+      : null,
+    normalizedCostUsd: resultNormalizedCostUsd ?? reportedCost ?? providerEstimate.credits,
     status: params.status,
     failureReason: params.status === "succeeded" ? null : params.error ?? String(params.result.failureReason ?? ""),
     startedAt: params.startedAt,
@@ -156,6 +167,8 @@ export function telemetryFromActionResult(params: {
     metadata: sanitizeJson({
       actionType: params.type,
       omittedCount: typeof skillRouting.omittedCount === "number" ? skillRouting.omittedCount : null,
+      topCandidateCount: Array.isArray(skillRouting.topCandidates) ? skillRouting.topCandidates.length : 0,
+      retryEscalation: optimizer.retryEscalation ?? contextPlan.retryEscalation ?? null,
       routingTokens: params.result.routingTokens ?? objectValue(params.result.contextReport).routingTokens ?? 0,
     }),
   };

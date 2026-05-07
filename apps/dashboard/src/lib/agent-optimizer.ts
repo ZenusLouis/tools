@@ -9,8 +9,11 @@ export type SkillBrainRow = {
   slug: string;
   name: string;
   category: string;
+  sourceType?: string | null;
+  sourcePriority?: number | null;
   description: string;
   content: string | null;
+  compactGuidance?: string | null;
   providerCompatibility: string[];
   roleCompatibility: string[];
   tags: string[];
@@ -46,7 +49,7 @@ export type TaskOptimizerInput = {
   availableSkills: SkillBrainRow[];
   retryCount?: number;
   skillFeedback?: Record<string, { successes: number; failures: number }>;
-  previousFailure?: { error: string | null; logTail: string[] } | null;
+  previousFailure?: { error: string | null; logTail: string[]; exitCode?: number | null } | null;
 };
 
 const STOPWORDS = new Set([
@@ -77,6 +80,7 @@ function estimateTokens(text: string) {
 }
 
 function compactGuidance(skill: SkillBrainRow) {
+  if (skill.compactGuidance) return skill.compactGuidance.length > 700 ? `${skill.compactGuidance.slice(0, 700).trim()}...` : skill.compactGuidance;
   const raw = (skill.content ?? "")
     .replace(/^---[\s\S]*?---\s*/m, "")
     .split(/\r?\n/)
@@ -185,7 +189,7 @@ function chooseModel(input: TaskOptimizerInput, contextMode: ContextMode) {
   };
 }
 
-function scoreSkill(skill: SkillBrainRow, input: TaskOptimizerInput, tokens: Set<string>, domains: string[]) {
+function scoreSkill(skill: SkillBrainRow, input: TaskOptimizerInput, tokens: Set<string>, domains: string[], failureTokens: Set<string>) {
   let score = 0;
   const reasons: string[] = [];
   const slug = normalize(skill.slug);
@@ -208,6 +212,11 @@ function scoreSkill(skill: SkillBrainRow, input: TaskOptimizerInput, tokens: Set
   if (skill.category === "trusted-upstream" || skill.tags.includes("trusted-upstream")) {
     score += 10;
     reasons.push("trusted upstream");
+  }
+  if (typeof skill.sourcePriority === "number" && skill.sourcePriority > 50) {
+    const boost = Math.min(14, Math.max(0, Math.round((skill.sourcePriority - 50) / 5)));
+    score += boost;
+    if (boost > 0) reasons.push(`source priority ${skill.sourcePriority}`);
   }
   const priorityTag = skill.tags.find((tag) => tag.startsWith("priority:"));
   if (priorityTag) {
@@ -250,9 +259,17 @@ function scoreSkill(skill: SkillBrainRow, input: TaskOptimizerInput, tokens: Set
     score += 8;
     reasons.push("phase slug");
   }
-  if (/debug|review|qa|test|security/.test(slug) && (input.retryCount ?? 0) > 0) {
-    score += 16;
-    reasons.push("retry helper");
+  const retrying = (input.retryCount ?? 0) > 0 || !!input.previousFailure;
+  if (retrying && /debug|debugger|triage|review|qa|test|security|fix|diagnostic|ci|lint|build/.test(corpus)) {
+    score += 22;
+    reasons.push("retry/debug helper");
+  }
+  if (retrying && failureTokens.size > 0) {
+    const failureHits = Array.from(failureTokens).filter((token) => corpus.includes(token)).length;
+    if (failureHits > 0) {
+      score += Math.min(24, failureHits * 4);
+      reasons.push(`${failureHits} failure-context match${failureHits === 1 ? "" : "es"}`);
+    }
   }
   const feedback = input.skillFeedback?.[skill.slug];
   if (feedback?.successes) {
@@ -290,16 +307,25 @@ export function buildTaskOptimizerPlan(input: TaskOptimizerInput) {
     input.provider,
     input.roleSlug ?? "",
     input.roleType ?? "",
+    input.previousFailure?.error ?? "",
+    input.previousFailure?.logTail.join(" ") ?? "",
   ].join(" ");
   const tokens = new Set(tokenize(taskText));
+  const failureText = [
+    input.previousFailure?.error ?? "",
+    input.previousFailure?.logTail.join(" ") ?? "",
+  ].join(" ");
+  const failureTokens = new Set(tokenize(failureText));
   const domains = requirementDomains(input.task.reqIds);
   const ranked = input.availableSkills
     .map((skill) => {
-      const scored = scoreSkill(skill, input, tokens, domains);
+      const scored = scoreSkill(skill, input, tokens, domains, failureTokens);
       return {
         slug: skill.slug,
         name: skill.name,
         category: skill.category,
+        sourceType: skill.sourceType ?? null,
+        sourcePriority: skill.sourcePriority ?? null,
         score: scored.score,
         reasons: scored.reasons,
         guidance: compactGuidance(skill),
@@ -309,6 +335,13 @@ export function buildTaskOptimizerPlan(input: TaskOptimizerInput) {
     .filter((skill) => skill.score > 0 || input.roleSkillSlugs.includes(skill.slug))
     .sort((a, b) => b.score - a.score || a.slug.localeCompare(b.slug));
   const selected = ranked.slice(0, caps.skillLimit);
+  const retryHelper = ranked.find((skill) => /retry|debug|review|qa|test|security|failure|ci|lint|build/i.test(skill.reasons.join(" ") + " " + skill.slug + " " + skill.category));
+  const retryEscalated = !!input.previousFailure || (input.retryCount ?? 0) > 0;
+  if (retryEscalated && retryHelper && !selected.some((skill) => skill.slug === retryHelper.slug)) {
+    selected.splice(Math.max(0, caps.skillLimit - 1), 1, retryHelper);
+  }
+  const selectedSlugs = new Set(selected.map((skill) => skill.slug));
+  const omittedCount = Math.max(0, input.availableSkills.length - selected.length);
   const selectedText = selected.map((skill) => `${skill.slug}: ${skill.guidance}`).join("\n");
   const taskCoreTokens = estimateTokens(taskText);
   const estimatedPromptTokens = Math.min(
@@ -328,19 +361,46 @@ export function buildTaskOptimizerPlan(input: TaskOptimizerInput) {
       zeroTokenRouting: true,
       estimatedPromptTokens,
       promptBudgetTokens: caps.maxPromptTokens,
+      retryEscalation: retryEscalated
+        ? {
+            enabled: true,
+            retryCount: input.retryCount ?? 0,
+            previousFailureAttached: !!input.previousFailure,
+            helperSkill: retryHelper?.slug ?? null,
+            reason: retryHelper
+              ? `Retry context boosted ${retryHelper.slug} and included previous failure output.`
+              : "Retry context included previous failure output; no dedicated debugger skill matched.",
+          }
+        : { enabled: false, retryCount: input.retryCount ?? 0, previousFailureAttached: false, helperSkill: null, reason: "No retry escalation needed." },
     },
     skillRouting: {
       selected,
-      omittedCount: Math.max(0, input.availableSkills.length - selected.length),
+      topCandidates: ranked
+        .filter((skill) => !selectedSlugs.has(skill.slug))
+        .slice(0, 10)
+        .map((skill) => ({
+          slug: skill.slug,
+          name: skill.name,
+          category: skill.category,
+          sourceType: skill.sourceType,
+          sourcePriority: skill.sourcePriority,
+          score: skill.score,
+          reasons: skill.reasons,
+          sourcePath: skill.sourcePath,
+        })),
+      omittedCount,
       availableCount: input.availableSkills.length,
       candidateCount: ranked.length,
       tokenCost: "0 LLM tokens used for routing",
       scoring: {
+        version: 2,
         frameworkMatch: true,
         phaseRoleMatch: true,
         keywordMatch: true,
         requirementDomainMatch: true,
         retryFeedback: (input.retryCount ?? 0) > 0,
+        failureContextMatch: failureTokens.size > 0,
+        sourcePriority: true,
       },
     },
     contextPlan: {
@@ -359,6 +419,9 @@ export function buildTaskOptimizerPlan(input: TaskOptimizerInput) {
       omittedBlocks: input.availableSkills.length > selected.length
         ? [`${input.availableSkills.length - selected.length} unselected skill(s) kept in brain but omitted from prompt`]
         : [],
+      retryEscalation: retryEscalated
+        ? `Previous failure context attached; ${retryHelper ? `${retryHelper.slug} boosted as retry helper.` : "no dedicated retry helper matched."}`
+        : null,
     },
   };
 }

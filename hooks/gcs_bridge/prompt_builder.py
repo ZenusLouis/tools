@@ -140,6 +140,28 @@ def format_previous_failure(previous_failure: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def format_related_memory(payload: dict[str, Any]) -> str:
+    items = payload.get("relatedMemory")
+    if not isinstance(items, list) or not items:
+        return "No related memory snippets matched this task."
+    lines: list[str] = []
+    for item in items[:8]:
+        if not isinstance(item, dict):
+            continue
+        reasons = item.get("reasons") if isinstance(item.get("reasons"), list) else []
+        req_ids = item.get("reqIds") if isinstance(item.get("reqIds"), list) else []
+        lines.extend([
+            f"### {item.get('title') or item.get('kind') or 'memory'}",
+            f"- Kind: {item.get('kind') or 'unknown'}",
+            f"- Score: {item.get('score', 0)}",
+            f"- Why included: {', '.join(str(reason) for reason in reasons[:4]) or 'deterministic memory match'}",
+            f"- Requirement IDs: {', '.join(str(req_id) for req_id in req_ids[:8]) or 'none'}",
+            str(item.get("snippet") or "").strip(),
+            "",
+        ])
+    return "\n".join(lines).strip() or "No related memory snippets matched this task."
+
+
 def estimate_text_tokens(text: str) -> int:
     return max(1, round(len(text) / 4))
 
@@ -276,6 +298,9 @@ def build_task_run_prompt(
         "",
         "## Previous Failure Context",
         format_previous_failure(previous_failure),
+        "",
+        "## Related Memory Snippets",
+        format_related_memory(payload),
         "",
         "## Project Code Index",
         code_index or "No code-index.md found for this project yet. If structure is unclear, inspect the repository before editing.",

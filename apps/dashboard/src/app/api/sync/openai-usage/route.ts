@@ -192,11 +192,10 @@ export async function POST(req: NextRequest) {
     const apiKey = selectedApiKeyId
       ? await getApiKeyById(selectedApiKeyId, user.workspaceId)
       : await getApiKeyByService("openai_admin", user.workspaceId) ??
-        await getApiKeyByService("openai_usage", user.workspaceId) ??
-        await getApiKeyByService("openai", user.workspaceId);
+        await getApiKeyByService("openai_usage", user.workspaceId);
     if (!apiKey) {
       return NextResponse.json(
-        { error: selectedApiKeyId ? "Selected API key was not found in this workspace." : "No OpenAI Usage/Admin API key configured. Add service openai_admin in Settings." },
+        { error: selectedApiKeyId ? "Selected API key was not found in this workspace." : "No OpenAI Usage/Admin API key configured. Add the OpenAI Admin API Key in Settings." },
         { status: 400 },
       );
     }

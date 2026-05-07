@@ -33,6 +33,10 @@ type QueueAction = {
   artifactPath: string | null;
   exitCode: number | null;
   actualTokens: number | null;
+  providerTokens: number | null;
+  codexCredits: number | null;
+  normalizedCostUsd: number | null;
+  tokenMeter: string | null;
   contextReportPath: string | null;
   lastLogLine: string | null;
   logTail: string[];
@@ -56,6 +60,10 @@ type QueueActionDetail = {
   artifactPath: string | null;
   exitCode: number | null;
   actualTokens: number | null;
+  providerTokens: number | null;
+  codexCredits: number | null;
+  normalizedCostUsd: number | null;
+  tokenMeter: string | null;
   contextReportPath: string | null;
   contextReport: Record<string, unknown> | null;
   command: string | null;
@@ -73,10 +81,27 @@ type OptimizerInfo = {
   modelReason?: string;
   estimatedPromptTokens?: number;
   reason?: string;
+  retryEscalation?: {
+    enabled?: boolean;
+    retryCount?: number;
+    previousFailureAttached?: boolean;
+    helperSkill?: string | null;
+    reason?: string;
+  };
+};
+
+type SkillRouteItem = {
+  slug?: string;
+  name?: string;
+  score?: number;
+  reasons?: string[];
+  sourceType?: string | null;
+  sourcePriority?: number | null;
 };
 
 type SkillRoutingInfo = {
-  selected?: Array<{ slug?: string; score?: number; reasons?: string[] }>;
+  selected?: SkillRouteItem[];
+  topCandidates?: SkillRouteItem[];
   omittedCount?: number;
   tokenCost?: string;
 };
@@ -85,6 +110,8 @@ type ContextPlanInfo = {
   mode?: string;
   includedBlocks?: string[];
   omittedBlocks?: string[];
+  retryEscalation?: string | null;
+  relatedMemoryCount?: number;
 };
 
 type QueueFilter = "all" | "live" | "failed" | "done";
@@ -125,6 +152,25 @@ function StatusIcon({ status }: { status: string }) {
   if (status === "failed" || status === "cancelled" || status === "expired") return <XCircle size={12} />;
   if (status === "running") return <Loader2 size={12} className="animate-spin" />;
   return <Clock3 size={12} />;
+}
+
+function usageLabel(action: {
+  provider: string | null;
+  actualTokens: number | null;
+  providerTokens: number | null;
+  codexCredits: number | null;
+  normalizedCostUsd: number | null;
+  tokenMeter: string | null;
+}) {
+  if (typeof action.actualTokens !== "number") return null;
+  if (action.provider === "codex" || action.tokenMeter === "thread_meter") {
+    const cost = typeof action.normalizedCostUsd === "number" ? ` / $${action.normalizedCostUsd.toFixed(4)}` : "";
+    return `${action.actualTokens.toLocaleString()} thread tokens${cost}`;
+  }
+  if (action.tokenMeter === "provider_reported") {
+    return `${(action.providerTokens ?? action.actualTokens).toLocaleString()} provider tokens`;
+  }
+  return `${action.actualTokens.toLocaleString()} hook tokens`;
 }
 
 function timeLabel(value: string) {
@@ -471,7 +517,7 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
                     {action.deviceName && <span>{action.deviceName}</span>}
                     {action.optimizer && <span>{action.optimizer.mode ?? "auto"} / {action.optimizer.contextMode ?? action.contextPlan?.mode ?? "standard"}</span>}
                     {action.optimizer?.model && <span>{action.optimizer.model}</span>}
-                    {typeof action.actualTokens === "number" && <span>{action.actualTokens.toLocaleString()} tokens</span>}
+                    {usageLabel(action) && <span>{usageLabel(action)}</span>}
                     <span>{timeLabel(action.updatedAt)}</span>
                   </div>
                   {action.skillRouting?.selected?.length ? (
@@ -481,6 +527,11 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
                           {skill.slug}{typeof skill.score === "number" ? ` ${skill.score}` : ""}
                         </span>
                       ))}
+                      {action.optimizer?.retryEscalation?.enabled && (
+                        <span className="rounded border border-in-progress/30 bg-in-progress/10 px-1.5 py-0.5 text-[9px] text-in-progress">
+                          retry escalated
+                        </span>
+                      )}
                       {typeof action.skillRouting.omittedCount === "number" && (
                         <span className="rounded border border-border bg-card px-1.5 py-0.5 text-[9px] text-text-muted">
                           {action.skillRouting.omittedCount} omitted
@@ -667,7 +718,8 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
                   <span>Context: <b className="text-text">{detailAction.optimizer?.contextMode ?? detailAction.contextPlan?.mode ?? "--"}</b></span>
                   <span>Model: <b className="text-text">{detailAction.optimizer?.model ?? "--"}</b></span>
                   <span>Estimate: <b className="text-text">{detailAction.optimizer?.estimatedPromptTokens?.toLocaleString() ?? "--"}</b></span>
-                  <span>Actual: <b className="text-text">{detailAction.actualTokens?.toLocaleString() ?? "--"}</b></span>
+                  <span>Memory: <b className="text-text">{detailAction.contextPlan?.relatedMemoryCount ?? 0}</b></span>
+                  <span>Actual: <b className="text-text">{usageLabel(detailAction) ?? "--"}</b></span>
                 </div>
                 {detailAction.skillRouting?.selected?.length ? (
                   <div className="mb-3 rounded border border-border bg-card px-3 py-2">
@@ -688,11 +740,32 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
                     </div>
                     {detailAction.optimizer?.reason && <p className="mt-2 text-[11px] text-text-muted">{detailAction.optimizer.reason}</p>}
                     {detailAction.optimizer?.modelReason && <p className="mt-1 text-[11px] text-text-muted">{detailAction.optimizer.modelReason}</p>}
+                    {(detailAction.optimizer?.retryEscalation?.enabled || detailAction.contextPlan?.retryEscalation) && (
+                      <p className="mt-2 rounded border border-in-progress/30 bg-in-progress/10 px-2 py-1 text-[11px] text-in-progress">
+                        {detailAction.optimizer?.retryEscalation?.reason ?? detailAction.contextPlan?.retryEscalation}
+                        {detailAction.optimizer?.retryEscalation?.helperSkill ? ` Helper skill: ${detailAction.optimizer.retryEscalation.helperSkill}.` : ""}
+                      </p>
+                    )}
                     {contextReportObject(detailAction.contextReport, "previousFailure") && (
                       <p className="mt-2 rounded border border-in-progress/30 bg-in-progress/10 px-2 py-1 text-[11px] text-in-progress">
                         Retry context attached from previous failed run.
                       </p>
                     )}
+                    {detailAction.skillRouting.topCandidates?.length ? (
+                      <details className="mt-2 rounded border border-border bg-bg-base px-2 py-1">
+                        <summary className="cursor-pointer text-[10px] font-bold uppercase tracking-widest text-text-muted">
+                          Top omitted candidates
+                        </summary>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {detailAction.skillRouting.topCandidates.map((skill) => (
+                            <span key={skill.slug ?? skill.name} className="rounded border border-border bg-card px-2 py-1 font-mono text-[10px] text-text-muted" title={(skill.reasons ?? []).join(", ")}>
+                              {skill.slug ?? skill.name}{typeof skill.score === "number" ? ` (${skill.score})` : ""}
+                              {skill.sourceType ? ` · ${skill.sourceType}` : ""}
+                            </span>
+                          ))}
+                        </div>
+                      </details>
+                    ) : null}
                   </div>
                 ) : null}
                 {detailAction.artifactPath && (

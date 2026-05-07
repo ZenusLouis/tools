@@ -1,7 +1,7 @@
 import "server-only";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { estimateProviderCredits, TOKEN_METER_META } from "@/lib/token-accounting";
+import { addMeterUsage, emptyMeterTotals, estimateProviderCredits, TOKEN_METER_META, type MeterTotals } from "@/lib/token-accounting";
 
 
 export type DashboardRange = "today" | "week" | "month";
@@ -10,6 +10,7 @@ export type DashboardStats = {
   activeProjects: number;
   tasksCompleted: number;
   tokenCount: number;
+  meterTotals: MeterTotals;
   sessionCost: number;
   tokenBreakdown: Array<{
     provider: "claude" | "codex" | "chatgpt";
@@ -113,7 +114,10 @@ export async function getDashboardStats(workspaceId?: string, range: DashboardRa
         ? providerSessions.map((session) => estimateProviderCredits(provider, session.totalTokens ?? 0, session.model))
         : []),
     ];
-    const creditTotal = credits.reduce((sum, item) => sum + item.credits, 0);
+    const providerReportedCost = provider === "chatgpt"
+      ? providerSessions.reduce((sum, session) => sum + (session.totalCostUSD ?? 0), 0)
+      : 0;
+    const creditTotal = provider === "chatgpt" ? providerReportedCost : credits.reduce((sum, item) => sum + item.credits, 0);
     const firstCredit = credits.find((item) => item.credits > 0) ?? estimateProviderCredits(provider, 0);
     return {
       provider,
@@ -128,12 +132,16 @@ export async function getDashboardStats(workspaceId?: string, range: DashboardRa
       percent: 0,
       credits: creditTotal,
       creditBasis: firstCredit.basis,
-      creditNote: firstCredit.note,
+      creditNote: provider === "chatgpt" ? "Cost comes from OpenAI organization usage/cost sync when available." : firstCredit.note,
       ...TOKEN_METER_META[provider],
     };
   });
+  const meterTotals = tokenBreakdown.reduce(
+    (totals, item) => addMeterUsage(totals, item.meterKind, item.tokens, item.credits),
+    emptyMeterTotals(),
+  );
   const tokenCount = tokenBreakdown.reduce((sum, item) => sum + item.tokens, 0);
-  const sessionCost = tokenBreakdown.reduce((sum, item) => sum + item.credits, 0);
+  const sessionCost = meterTotals.estimatedCostUsd;
   const breakdownWithPercent = tokenBreakdown.map((item) => ({
     ...item,
     percent: tokenCount > 0 ? Math.round((item.tokens / tokenCount) * 100) : 0,
@@ -143,6 +151,7 @@ export async function getDashboardStats(workspaceId?: string, range: DashboardRa
     activeProjects: projectCount,
     tasksCompleted,
     tokenCount,
+    meterTotals,
     sessionCost,
     tokenBreakdown: breakdownWithPercent,
   };

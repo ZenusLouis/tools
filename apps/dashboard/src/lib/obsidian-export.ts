@@ -23,6 +23,20 @@ export async function exportObsidianVault(workspaceId: string) {
     orderBy: [{ projectName: "asc" }, { kind: "asc" }, { title: "asc" }],
     take: 2000,
   });
+  const edges = await db.memoryEdge.findMany({
+    where: { workspaceId },
+    include: {
+      fromNode: { select: { id: true, title: true, kind: true } },
+      toNode: { select: { id: true, title: true, kind: true } },
+    },
+    take: 5000,
+  });
+  const outgoing = new Map<string, typeof edges>();
+  const incoming = new Map<string, typeof edges>();
+  for (const edge of edges) {
+    outgoing.set(edge.fromNodeId, [...(outgoing.get(edge.fromNodeId) ?? []), edge]);
+    incoming.set(edge.toNodeId, [...(incoming.get(edge.toNodeId) ?? []), edge]);
+  }
 
   const vaultDir = resolvePath(".gcs", "obsidian");
   await fs.mkdir(vaultDir, { recursive: true });
@@ -32,6 +46,7 @@ export async function exportObsidianVault(workspaceId: string) {
     "",
     `Exported at: ${new Date().toISOString()}`,
     `Nodes: ${nodes.length}`,
+    `Edges: ${edges.length}`,
     "",
     "## Nodes",
   ];
@@ -60,6 +75,11 @@ export async function exportObsidianVault(workspaceId: string) {
       "",
       node.body,
       "",
+      "## Relations",
+      "",
+      ...(outgoing.get(node.id) ?? []).slice(0, 50).map((edge) => `- ${edge.relation} -> [[${edge.toNode.title}]] (${edge.toNode.kind})`),
+      ...(incoming.get(node.id) ?? []).slice(0, 50).map((edge) => `- ${edge.relation} <- [[${edge.fromNode.title}]] (${edge.fromNode.kind})`),
+      "",
       "## Backlinks",
       "",
       node.projectName ? `- [[${node.projectName}]]` : "- [[Workspace]]",
@@ -72,5 +92,5 @@ export async function exportObsidianVault(workspaceId: string) {
   }
 
   await fs.writeFile(path.join(vaultDir, "index.md"), `${indexLines.join("\n")}\n`, "utf-8");
-  return { vaultDir, nodes: nodes.length, files: written + 1 };
+  return { vaultDir, nodes: nodes.length, edges: edges.length, files: written + 1 };
 }

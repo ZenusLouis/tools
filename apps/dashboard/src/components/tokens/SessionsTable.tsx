@@ -78,6 +78,7 @@ export function SessionsTable({
             <option value="all">All sources</option>
             <option value="session">Sessions</option>
             <option value="tool">Tool usage</option>
+            <option value="run">Task runs</option>
           </select>
           <a href="/api/activity/export" className="flex items-center gap-1.5 rounded-lg border border-border bg-bg-base px-3 py-1.5 text-xs text-text-muted transition-colors hover:border-border/80 hover:text-text">
             <Download size={12} />
@@ -127,7 +128,7 @@ export function SessionsTable({
                   <td className="px-6 py-4">
                     <div className="flex flex-col">
                       <span className="text-sm font-semibold text-text">{session.project}</span>
-                      <span className="text-[10px] text-text-muted">{session.source === "tool" ? session.tool : "session"}</span>
+                      <span className="text-[10px] text-text-muted">{session.source === "tool" || session.source === "run" ? session.tool : "session"}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -161,7 +162,7 @@ export function SessionsTable({
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-accent">Session Detail</p>
                 <h4 className="mt-1 text-lg font-bold text-text">
-                  {selected.provider.toUpperCase()} / {selected.source === "tool" ? selected.tool ?? "tool usage" : selected.project}
+                  {selected.provider.toUpperCase()} / {selected.source === "tool" || selected.source === "run" ? selected.tool ?? "tracked usage" : selected.project}
                 </h4>
                 <p className="mt-1 text-sm text-text-muted">
                   {selected.date} {selected.time} / {selected.role ?? selected.model ?? "No role/model metadata"}
@@ -195,7 +196,7 @@ export function SessionsTable({
               </div>
               <div className="rounded-lg border border-border bg-bg-base p-3">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Source</p>
-                <p className="mt-2 text-sm font-semibold text-text">{selected.source === "tool" ? selected.tool ?? "tool" : "session"}</p>
+                <p className="mt-2 text-sm font-semibold text-text">{selected.source === "tool" || selected.source === "run" ? selected.tool ?? selected.source : "session"}</p>
               </div>
               <div className="rounded-lg border border-border bg-bg-base p-3">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Duration</p>

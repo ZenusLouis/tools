@@ -4,6 +4,7 @@ import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { normalizeBridgeResult, telemetryFromActionResult } from "@/lib/bridge-actions";
 import { bridgeTokenFromHeaders, verifyBridgeRequest } from "@/lib/bridge-auth";
+import { sanitizeText } from "@/lib/sanitize";
 
 const ResultSchema = z.object({
   id: z.string().min(1),
@@ -48,6 +49,7 @@ export async function POST(req: NextRequest) {
 
   const incomingResult = parsed.data.result ?? {};
   const completedAt = new Date();
+  const sanitizedError = parsed.data.error ? sanitizeText(parsed.data.error) : null;
   const nextResult = normalizeBridgeResult(action.result, incomingResult, parsed.data.status, {
     actionType: action.type,
     completedAt: completedAt.toISOString(),
@@ -59,7 +61,7 @@ export async function POST(req: NextRequest) {
       status: parsed.data.status,
       resultVersion: 1,
       result: nextResult,
-      error: parsed.data.error ?? null,
+      error: sanitizedError,
       deviceId,
       completedAt,
       heartbeatAt: completedAt,
@@ -87,7 +89,7 @@ export async function POST(req: NextRequest) {
       payload: action.payload,
       result: resultObject,
       status: parsed.data.status,
-      error: parsed.data.error ?? null,
+      error: sanitizedError,
       startedAt: action.claimedAt ?? action.createdAt,
       completedAt,
     });

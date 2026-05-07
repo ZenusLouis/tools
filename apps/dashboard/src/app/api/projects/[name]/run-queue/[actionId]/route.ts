@@ -13,6 +13,10 @@ function stringValue(value: unknown) {
   return typeof value === "string" ? value : null;
 }
 
+function numberValue(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ name: string; actionId: string }> },
@@ -66,8 +70,12 @@ export async function GET(
       contextPlan: payload.contextPlan ?? result.contextPlan ?? null,
       deviceName: action.device?.name ?? null,
       artifactPath: stringValue(result.artifactPath),
-      exitCode: typeof result.exitCode === "number" ? result.exitCode : null,
-      actualTokens: typeof result.actualTokens === "number" ? result.actualTokens : typeof result.tokens === "number" ? result.tokens : null,
+      exitCode: numberValue(result.exitCode),
+      actualTokens: numberValue(result.actualTokens) ?? numberValue(result.tokens),
+      providerTokens: numberValue(result.providerTokens),
+      codexCredits: numberValue(result.codexCredits),
+      normalizedCostUsd: numberValue(result.normalizedCostUsd) ?? numberValue(result.totalCostUSD),
+      tokenMeter: stringValue(result.tokenMeter),
       contextReportPath: stringValue(result.contextReportPath),
       contextReport: result.contextReport ?? null,
       command: log.find((line) => line.startsWith("CMD: "))?.slice(5) ?? null,

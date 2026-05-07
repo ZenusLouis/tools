@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { resolvePath } from "@/lib/fs/resolve";
+import { createHash } from "crypto";
 
 const ImportSchema = z.object({
   sourceName: z.string().regex(/^[a-z0-9-]+$/),
@@ -33,6 +34,23 @@ function githubRawUrl(repoUrl: string, filePath: string): string {
   const match = repoUrl.match(/^https?:\/\/github\.com\/([^/]+\/[^/]+)/);
   if (!match) throw new Error(`Cannot derive raw URL from: ${repoUrl}`);
   return `https://raw.githubusercontent.com/${match[1]}/HEAD/${filePath}`;
+}
+
+function contentHash(text: string) {
+  return createHash("sha256").update(text).digest("hex").slice(0, 16);
+}
+
+function compactSkillGuidance(text: string, fallback: string) {
+  const body = text
+    .replace(/^---[\s\S]*?---\s*/m, "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => /^[-*]\s+/.test(line) || /^#{2,4}\s+/.test(line) || /must|should|avoid|verify|check|use/i.test(line))
+    .slice(0, 10)
+    .join("\n");
+  const value = body || fallback;
+  return value.length > 900 ? `${value.slice(0, 900).trim()}...` : value;
 }
 
 async function readSkillText(sourceFile: string, repoUrl: string, filePath: string): Promise<string> {
@@ -80,6 +98,8 @@ export async function POST(req: NextRequest) {
   await fs.writeFile(targetFile, text, "utf-8");
 
   const sourcePath = path.relative(resolvePath(), targetFile).replace(/\\/g, "/");
+  const hash = contentHash(text);
+  const description = skill.description || `${parsed.data.name} imported skill`;
   const saved = await db.skillDefinition.upsert({
     where: { workspaceId_slug: { workspaceId: user.workspaceId, slug: parsed.data.name } },
     create: {
@@ -87,24 +107,51 @@ export async function POST(req: NextRequest) {
       name: parsed.data.name,
       slug: parsed.data.name,
       category: "imported",
+      sourceType: "generic-imported",
+      sourcePriority: 50,
+      contentHash: hash,
+      importMode: "full",
+      trustedSourceSlug: null,
       sourcePath,
-      description: skill.description || `${parsed.data.name} imported skill`,
+      content: text,
+      compactGuidance: compactSkillGuidance(text, description),
+      description,
       providerCompatibility: ["claude", "codex", "chatgpt"],
       roleCompatibility: ["ba", "dev", "reviewer", "qa", "design", "researcher"],
-      tags: ["imported", parsed.data.sourceName, `source:${source.url}`],
+      tags: ["imported", parsed.data.sourceName, `source:${source.url}`, `hash:${hash}`, "source-type:generic-imported"],
+      metadata: { sourceName: parsed.data.sourceName, sourceUrl: source.url, sourcePath: safeSourcePath },
       isImported: true,
       isRemote: false,
     },
     update: {
       category: "imported",
+      sourceType: "generic-imported",
+      sourcePriority: 50,
+      contentHash: hash,
+      importMode: "full",
+      trustedSourceSlug: null,
       sourcePath,
-      description: skill.description || `${parsed.data.name} imported skill`,
+      content: text,
+      compactGuidance: compactSkillGuidance(text, description),
+      description,
       providerCompatibility: ["claude", "codex", "chatgpt"],
-      tags: ["imported", parsed.data.sourceName, `source:${source.url}`],
+      tags: ["imported", parsed.data.sourceName, `source:${source.url}`, `hash:${hash}`, "source-type:generic-imported"],
+      metadata: { sourceName: parsed.data.sourceName, sourceUrl: source.url, sourcePath: safeSourcePath },
       isImported: true,
       isRemote: false,
     },
   });
+  await db.auditLog.create({
+    data: {
+      workspaceId: user.workspaceId,
+      userId: user.id,
+      actorType: "user",
+      event: "skill_imported",
+      targetType: "SkillDefinition",
+      targetId: saved.id,
+      metadata: { name: saved.name, sourceName: parsed.data.sourceName, sourcePath: safeSourcePath, contentHash: hash },
+    },
+  }).catch(() => null);
 
   return NextResponse.json({ skill: saved });
 }

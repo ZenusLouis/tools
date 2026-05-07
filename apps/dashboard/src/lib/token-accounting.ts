@@ -1,5 +1,12 @@
 export type TokenMeterKind = "provider_reported" | "thread_meter" | "hook_estimate";
 
+export type MeterTotals = {
+  providerReportedTokens: number;
+  hookEstimateTokens: number;
+  threadMeterTokens: number;
+  estimatedCostUsd: number;
+};
+
 export type TokenCreditEstimate = {
   credits: number;
   basis: "exact_split" | "input_equivalent" | "not_applicable";
@@ -52,6 +59,34 @@ export const TOKEN_METER_META = {
     meterDescription: "ChatGPT/OpenAI usage comes from OpenAI usage sync when configured, so it is closest to provider-reported billing usage.",
   },
 } as const;
+
+export function emptyMeterTotals(): MeterTotals {
+  return {
+    providerReportedTokens: 0,
+    hookEstimateTokens: 0,
+    threadMeterTokens: 0,
+    estimatedCostUsd: 0,
+  };
+}
+
+export function addMeterUsage(totals: MeterTotals, kind: TokenMeterKind, tokens: number, costUsd = 0): MeterTotals {
+  return {
+    providerReportedTokens: totals.providerReportedTokens + (kind === "provider_reported" ? tokens : 0),
+    hookEstimateTokens: totals.hookEstimateTokens + (kind === "hook_estimate" ? tokens : 0),
+    threadMeterTokens: totals.threadMeterTokens + (kind === "thread_meter" ? tokens : 0),
+    estimatedCostUsd: totals.estimatedCostUsd + costUsd,
+  };
+}
+
+export function primaryMeterValue(totals: MeterTotals): { label: string; value: number; unit: string } {
+  if (totals.providerReportedTokens > 0) {
+    return { label: "Provider-reported tokens", value: totals.providerReportedTokens, unit: "tokens" };
+  }
+  if (totals.threadMeterTokens > 0) {
+    return { label: "Codex thread meter", value: totals.threadMeterTokens, unit: "thread tokens" };
+  }
+  return { label: "Claude hook estimate", value: totals.hookEstimateTokens, unit: "tokens" };
+}
 
 function normalizeModel(model?: string | null) {
   return (model ?? "").toLowerCase().replace(/^openai\//, "");

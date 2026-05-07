@@ -13,6 +13,16 @@ export async function POST() {
     includeMcp: false,
     includeProjects: false,
   });
+  await db.auditLog.create({
+    data: {
+      workspaceId: user.workspaceId,
+      userId: user.id,
+      actorType: "user",
+      event: "skill_brain_refreshed",
+      targetType: "SkillDefinition",
+      metadata: { skills: result.skills, roles: result.roles },
+    },
+  }).catch(() => null);
   return NextResponse.json({
     ok: true,
     skills: result.skills,

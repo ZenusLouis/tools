@@ -12,11 +12,21 @@ function fmt(n: number) {
   return n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n);
 }
 
+function smoothCurvePath(pts: { x: number; y: number }[]): string {
+  if (pts.length < 2) return pts.length === 1 ? `M${pts[0].x},${pts[0].y}` : "";
+  let d = `M${pts[0].x},${pts[0].y}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const dx = (pts[i + 1].x - pts[i].x) * 0.4;
+    d += ` C${pts[i].x + dx},${pts[i].y} ${pts[i + 1].x - dx},${pts[i + 1].y} ${pts[i + 1].x},${pts[i + 1].y}`;
+  }
+  return d;
+}
+
 // SVG line chart for hourly view
 function LineChart({ data }: { data: { label: string; tokens: number }[] }) {
   const W = 600;
   const H = 140;
-  const PAD = { t: 20, r: 10, b: 28, l: 42 };
+  const PAD = { t: 16, r: 10, b: 28, l: 42 };
   const iW = W - PAD.l - PAD.r;
   const iH = H - PAD.t - PAD.b;
 
@@ -28,56 +38,44 @@ function LineChart({ data }: { data: { label: string; tokens: number }[] }) {
     label: d.label,
   }));
 
-  const polyline = pts.map((p) => `${p.x},${p.y}`).join(" ");
-  const area = [
-    `M${pts[0].x},${PAD.t + iH}`,
-    ...pts.map((p) => `L${p.x},${p.y}`),
-    `L${pts[pts.length - 1].x},${PAD.t + iH}`,
-    "Z",
-  ].join(" ");
+  const linePath = smoothCurvePath(pts);
+  const areaPath = pts.length > 0
+    ? `M${pts[0].x},${PAD.t + iH} ${linePath.slice(1)} L${pts[pts.length - 1].x},${PAD.t + iH} Z`
+    : "";
 
-  // Y-axis ticks
   const yTicks = [0, 0.5, 1].map((f) => ({
     y: PAD.t + iH - f * iH,
     label: fmt(Math.round(f * max)),
   }));
 
-  // Show every Nth label to avoid crowding (aim for ~8 labels max)
   const step = Math.max(1, Math.ceil(data.length / 8));
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 140 }}>
       <defs>
         <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#6366f1" stopOpacity="0.25" />
-          <stop offset="100%" stopColor="#6366f1" stopOpacity="0.02" />
+          <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.18" />
+          <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.01" />
         </linearGradient>
       </defs>
 
-      {/* Grid lines */}
+      {/* Dashed grid lines */}
       {yTicks.map((t) => (
         <g key={t.y}>
-          <line x1={PAD.l} x2={W - PAD.r} y1={t.y} y2={t.y} stroke="#ffffff08" strokeWidth="1" />
-          <text x={PAD.l - 6} y={t.y + 4} textAnchor="end" fontSize="9" fill="#6b7280">{t.label}</text>
+          <line x1={PAD.l} x2={W - PAD.r} y1={t.y} y2={t.y} stroke="currentColor" strokeOpacity="0.1" strokeWidth="1" strokeDasharray="4 4" />
+          <text x={PAD.l - 6} y={t.y + 4} textAnchor="end" fontSize="9" fill="#9ca3af">{t.label}</text>
         </g>
       ))}
 
       {/* Area fill */}
-      <path d={area} fill="url(#areaGrad)" />
+      <path d={areaPath} fill="url(#areaGrad)" />
 
-      {/* Line */}
-      <polyline points={polyline} fill="none" stroke="#6366f1" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+      {/* Smooth line */}
+      <path d={linePath} fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
 
-      {/* Dots + X labels */}
-      {pts.map((p, i) => (
-        <g key={i}>
-          {p.tokens > 0 && (
-            <circle cx={p.x} cy={p.y} r="3" fill="#6366f1" stroke="#080d1b" strokeWidth="1.5" />
-          )}
-          {i % step === 0 && (
-            <text x={p.x} y={H - 4} textAnchor="middle" fontSize="9" fill="#6b7280">{p.label}</text>
-          )}
-        </g>
+      {/* X labels only */}
+      {pts.map((p, i) => i % step === 0 && (
+        <text key={i} x={p.x} y={H - 4} textAnchor="middle" fontSize="9" fill="#9ca3af">{p.label}</text>
       ))}
     </svg>
   );
