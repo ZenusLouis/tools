@@ -161,6 +161,12 @@ export function RunTaskButton({ taskId, disabled }: { taskId: string; disabled?:
   }, [actionId, status?.status, taskId]);
 
   useEffect(() => {
+    if (status?.status === "succeeded") {
+      router.refresh();
+    }
+  }, [status?.status, router]);
+
+  useEffect(() => {
     if (provider === "auto") return;
     const providerKey = provider === "claude" ? "claude" : "codex";
     fetch(`/api/models?provider=${providerKey}`, { cache: "no-store" })

@@ -149,6 +149,32 @@
               "status": "pending"
             }
           ]
+        },
+        {
+          "name": "Seat Hold & Cinema Booking",
+          "tasks": [
+            {
+              "id": "omnibooking-M1-F2-T1",
+              "name": "Showtime seat map display, seat selection, and temporary hold with Redis lock",
+              "summary": "Display live seat map with AVAILABLE/HELD/SOLD/BLOCKED status; create temporary seat hold with TTL using Redis distributed lock and DB unique constraint to prevent duplicates.",
+              "details": "Seat map statuses: AVAILABLE, HELD, SOLD, BLOCKED. Sold/blocked/held-by-other seats are disabled. Default TTL 5 minutes (configurable). Hold stores customer, showtime, seats, expiry. Prevent duplicates using Redis SET NX lock per showtimeSeatId + DB unique constraint. Limit one active hold per user/showtime. Hold response: holdId, expiresAt, selected seats. Page 10.",
+              "acceptanceCriteria": [
+                "Seat map accurately reflects current status on load",
+                "Parallel requests for same seat result in exactly one success",
+                "No duplicate active hold for same customer and showtime",
+                "Hold response includes holdId and expiresAt",
+                "Customer cannot proceed without at least one available seat selected"
+              ],
+              "steps": [
+                "Create seat_holds and seat_hold_items tables with unique constraint on (showtime_id, customer_id, status=ACTIVE)",
+                "Add unique index on showtime_seats for concurrent hold protection",
+                "Implement Redis SETNX lock per showtimeSeatId before DB insert",
+                "Write POST /cinema/holds endpoint returning HoldResponseDto",
+                "Angular seat-map component disabling unavailable seats"
+              ],
+              "status": "pending"
+            }
+          ]
         }
       ]
     }
