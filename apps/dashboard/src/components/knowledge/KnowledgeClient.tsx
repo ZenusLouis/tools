@@ -83,9 +83,21 @@ export function KnowledgeClient({ lessons, frameworks, projectDecisions, project
     setMemoryStatus(null);
     try {
       const res = await fetch("/api/memory/export-obsidian", { method: "POST" });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? "Export failed");
-      setMemoryStatus(`Exported ${Number(body.result?.files ?? 0).toLocaleString()} Obsidian files (${Number(body.result?.edges ?? 0).toLocaleString()} edges) to ${body.result?.vaultDir ?? ".gcs/obsidian"}.`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Export failed");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const date = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `obsidian-vault-${date}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setMemoryStatus("Download started.");
     } catch (error) {
       setMemoryStatus(error instanceof Error ? error.message : String(error));
     } finally {

@@ -1,8 +1,5 @@
 import "server-only";
-import fs from "fs/promises";
-import path from "path";
 import { db } from "@/lib/db";
-import { resolvePath } from "@/lib/fs/resolve";
 
 function slug(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "memory";
@@ -17,7 +14,11 @@ function frontmatter(data: Record<string, unknown>) {
   return `---\n${lines.join("\n")}\n---`;
 }
 
-export async function exportObsidianVault(workspaceId: string) {
+export async function buildObsidianFiles(workspaceId: string): Promise<{
+  files: Map<string, string>;
+  nodeCount: number;
+  edgeCount: number;
+}> {
   const nodes = await db.memoryNode.findMany({
     where: { workspaceId },
     orderBy: [{ projectName: "asc" }, { kind: "asc" }, { title: "asc" }],
@@ -38,9 +39,7 @@ export async function exportObsidianVault(workspaceId: string) {
     incoming.set(edge.toNodeId, [...(incoming.get(edge.toNodeId) ?? []), edge]);
   }
 
-  const vaultDir = resolvePath(".gcs", "obsidian");
-  await fs.mkdir(vaultDir, { recursive: true });
-
+  const files = new Map<string, string>();
   const indexLines = [
     "# GCS Memory Vault",
     "",
@@ -51,21 +50,11 @@ export async function exportObsidianVault(workspaceId: string) {
     "## Nodes",
   ];
 
-  let written = 0;
   for (const node of nodes) {
     const project = node.projectName ? slug(node.projectName) : "workspace";
     const fileName = `${project}__${slug(node.kind)}__${slug(node.title)}__${node.id.slice(0, 8)}.md`;
-    const rel = fileName;
     const content = [
-      frontmatter({
-        id: node.id,
-        key: node.key,
-        kind: node.kind,
-        project: node.projectName,
-        tags: node.tags,
-        reqIds: node.reqIds,
-        sourcePath: node.sourcePath,
-      }),
+      frontmatter({ id: node.id, key: node.key, kind: node.kind, project: node.projectName, tags: node.tags, reqIds: node.reqIds, sourcePath: node.sourcePath }),
       "",
       `# ${node.title}`,
       "",
@@ -84,13 +73,11 @@ export async function exportObsidianVault(workspaceId: string) {
       "",
       node.projectName ? `- [[${node.projectName}]]` : "- [[Workspace]]",
       ...node.reqIds.map((id) => `- [[${id}]]`),
-      "",
     ].filter((line) => line !== "").join("\n");
-    await fs.writeFile(path.join(vaultDir, fileName), content, "utf-8");
-    indexLines.push(`- [[${rel.replace(/\.md$/, "")}]] - ${node.kind} - ${node.title}`);
-    written++;
+    files.set(fileName, content);
+    indexLines.push(`- [[${fileName.replace(/\.md$/, "")}]] - ${node.kind} - ${node.title}`);
   }
 
-  await fs.writeFile(path.join(vaultDir, "index.md"), `${indexLines.join("\n")}\n`, "utf-8");
-  return { vaultDir, nodes: nodes.length, edges: edges.length, files: written + 1 };
+  files.set("index.md", `${indexLines.join("\n")}\n`);
+  return { files, nodeCount: nodes.length, edgeCount: edges.length };
 }
