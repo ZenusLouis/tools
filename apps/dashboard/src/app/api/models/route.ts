@@ -5,6 +5,12 @@ import { getApiKeyByService } from "@/lib/api-keys";
 type Provider = "claude" | "codex" | "chatgpt";
 const PROVIDERS: Provider[] = ["claude", "codex", "chatgpt"];
 
+// Fallback models for local CLI providers (no API key needed)
+const LOCAL_MODELS: Record<string, string[]> = {
+  claude: ["claude-sonnet-4-6", "claude-opus-4-7", "claude-haiku-4-5-20251001"],
+  codex: ["gpt-5.2-codex", "gpt-5.1-codex", "gpt-5.1-codex-max", "gpt-5-codex"],
+};
+
 async function fetchOpenAIModels(apiKey: string, provider: Provider) {
   const res = await fetch("https://api.openai.com/v1/models", {
     headers: { Authorization: `Bearer ${apiKey}` },
@@ -48,9 +54,11 @@ export async function GET(req: NextRequest) {
     live = [];
   }
 
+  const fallback = LOCAL_MODELS[provider] ?? [];
+  const models = live.length > 0 ? [...new Set([...live, ...fallback])] : fallback;
   return NextResponse.json({
     provider,
-    source: live.length > 0 ? "live" : "none",
-    models: live,
+    source: live.length > 0 ? "live" : "local",
+    models,
   });
 }

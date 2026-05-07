@@ -382,17 +382,29 @@ export function RunTaskButton({ taskId, disabled }: { taskId: string; disabled?:
           >
             {PROVIDER_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
-          {models.length > 0 && (
-            <select
-              value={model}
-              onChange={(event) => setModel(event.target.value)}
-              disabled={running}
-              className="rounded-xl border border-border bg-bg-base px-3 py-2 text-xs font-bold text-text outline-none transition-colors hover:bg-card-hover disabled:cursor-not-allowed disabled:opacity-50"
-              title="Model override"
-            >
-              <option value="">Auto model</option>
-              {models.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
+          {provider !== "auto" && (
+            models.length > 0 ? (
+              <select
+                value={model}
+                onChange={(event) => setModel(event.target.value)}
+                disabled={running}
+                className="rounded-xl border border-border bg-bg-base px-3 py-2 text-xs font-bold text-text outline-none transition-colors hover:bg-card-hover disabled:cursor-not-allowed disabled:opacity-50"
+                title="Model override"
+              >
+                <option value="">Auto model</option>
+                {models.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={model}
+                onChange={(event) => setModel(event.target.value)}
+                disabled={running}
+                placeholder="Auto model"
+                className="w-36 rounded-xl border border-border bg-bg-base px-3 py-2 text-xs font-bold text-text outline-none transition-colors hover:bg-card-hover disabled:cursor-not-allowed disabled:opacity-50 placeholder:text-text-muted placeholder:font-normal"
+                title="Model override"
+              />
+            )
           )}
           <select
             value={optimizerMode}
