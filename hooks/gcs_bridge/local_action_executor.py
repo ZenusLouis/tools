@@ -972,6 +972,148 @@ def execute_generate_code_index(action: dict[str, Any]) -> dict[str, Any]:
     return {"fileCount": file_count, "path": str(out_path)}
 
 
+MCP_DESIGN_ACTIONS = {
+    "mcp_design_inspection": {
+        "title": "Figma Design Inspection",
+        "artifact": "figma-inspection.md",
+        "report": "figma-context-report.json",
+        "status": "inspection_recorded",
+        "focus": "Analyze Figma frames/components and extract layout, spacing, typography, states, and interaction details.",
+    },
+    "mcp_ui_brief": {
+        "title": "Figma UI Implementation Brief",
+        "artifact": "figma-ui-brief.md",
+        "report": "figma-ui-brief-report.json",
+        "status": "brief_ready",
+        "focus": "Generate a compact UI implementation brief from the Figma link, project stack, and existing code-index.",
+    },
+    "mcp_design_implementation": {
+        "title": "Figma Design Implementation Handoff",
+        "artifact": "figma-implementation-handoff.md",
+        "report": "figma-implementation-report.json",
+        "status": "implementation_handoff_ready",
+        "focus": "Queue design-integrator/dev-implementer work to apply the Figma UI brief to the local project.",
+    },
+    "mcp_visual_review": {
+        "title": "Figma Visual Diff Review",
+        "artifact": "figma-visual-review.md",
+        "report": "figma-visual-review-report.json",
+        "status": "visual_review_ready",
+        "focus": "Review implemented screens against the Figma reference and capture visual diff notes.",
+    },
+}
+
+
+def execute_mcp_design_action(action: dict[str, Any]) -> dict[str, Any]:
+    payload = action.get("payload") if isinstance(action.get("payload"), dict) else {}
+    action_id = str(action.get("id") or "")
+    action_type = str(action.get("type") or payload.get("designAction") or "mcp_design_inspection")
+    action_config = MCP_DESIGN_ACTIONS.get(action_type, MCP_DESIGN_ACTIONS["mcp_design_inspection"])
+    project_name = str(payload.get("projectName") or "")
+    project_path = str(payload.get("projectPath") or "")
+    figma_url = str(payload.get("figmaUrl") or "")
+    mcp_profile = str(payload.get("mcpProfile") or "none")
+    mcp_server = payload.get("mcpServer") if isinstance(payload.get("mcpServer"), dict) else {}
+    if not project_name or not project_path:
+        raise ValueError(f"{action_type} requires projectName and projectPath")
+    if not figma_url:
+        raise ValueError(f"{action_type} requires figmaUrl")
+
+    cwd = Path(project_path).expanduser()
+    if not cwd.exists():
+        raise ValueError(f"projectPath not accessible: {project_path}")
+
+    server_name = str(mcp_server.get("name") or "figma-mcp-go")
+    server_type = str(mcp_server.get("type") or "unknown")
+    command = str(mcp_server.get("command") or "")
+    args = mcp_server.get("args") if isinstance(mcp_server.get("args"), list) else []
+    url = str(mcp_server.get("url") or "")
+    if command:
+        command_display = " ".join([command, *[str(arg) for arg in args]]).strip()
+    elif url:
+        command_display = f"{server_type} {url}"
+    else:
+        command_display = "mcp server not registered"
+
+    post_action_progress(action_id, [
+        f"Starting {action_config['title']} for {project_name}.",
+        f"Figma URL: {figma_url}",
+        f"MCP server: {server_name} ({server_type})",
+        f"MCP profile: {mcp_profile}",
+        f"CWD: {cwd}",
+        f"CMD: {command_display}",
+    ])
+
+    report = {
+        "projectName": project_name,
+        "projectPath": project_path,
+        "figmaUrl": figma_url,
+        "mcpProfile": mcp_profile,
+        "mcpServer": mcp_server or None,
+        "actionType": action_type,
+        "flow": [
+            "Analyze Figma",
+            "Generate UI brief",
+            "Implement design",
+            "Review visual diff",
+        ],
+        "status": action_config["status"],
+        "focus": action_config["focus"],
+        "routingTokens": 0,
+        "notes": [
+            "The local bridge recorded this design-flow request as a project artifact.",
+            "A design-integrator/dev-implementer agent can consume this artifact together with the project code-index.",
+            "If the MCP server is offline, keep this artifact as the fallback design brief.",
+        ],
+    }
+
+    context_path = safe_local_target(project_path, f".gcs/design/{action_config['report']}")
+    context_path.parent.mkdir(parents=True, exist_ok=True)
+    context_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    brief = [
+        f"# {action_config['title']}: {project_name}",
+        "",
+        f"- Figma URL: {figma_url}",
+        f"- MCP Profile: {mcp_profile}",
+        f"- MCP Server: {server_name} ({server_type})",
+        f"- Runtime Command: `{command_display}`",
+        f"- Action Type: `{action_type}`",
+        "",
+        "## Current Action",
+        action_config["focus"],
+        "",
+        "## Full Flow",
+        "1. Analyze Figma frames/components and extract layout, spacing, typography, states, and interaction details.",
+        "2. Generate a compact UI implementation brief for the project/task.",
+        "3. Run a design-integrator implementation agent with this brief plus relevant code-index snippets.",
+        "4. Capture screenshots and write a visual review artifact.",
+        "",
+        "## Fallback",
+        "If MCP tooling is unavailable, use the linked Figma URL and this artifact as the handoff record. Do not block unrelated task execution.",
+    ]
+    artifact_path = safe_local_target(project_path, f".gcs/design/{action_config['artifact']}")
+    artifact_path.parent.mkdir(parents=True, exist_ok=True)
+    artifact_path.write_text("\n".join(brief), encoding="utf-8")
+
+    post_action_progress(action_id, [
+        f"Design context report written: .gcs/design/{action_config['report']}",
+        f"Design artifact written: .gcs/design/{action_config['artifact']}",
+        "Done.",
+    ])
+    return {
+        "artifactPath": str(artifact_path),
+        "contextReportPath": str(context_path),
+        "contextReport": report,
+        "provider": "mcp",
+        "phase": "design",
+        "role": "design-integrator",
+        "tokenMeter": "none",
+        "actualTokens": 0,
+        "routingTokens": 0,
+    }
+
+
 def execute_file_action(action: dict[str, Any]) -> dict[str, Any]:
     action_type = str(action.get("type") or "")
     payload = action.get("payload") if isinstance(action.get("payload"), dict) else {}
@@ -984,6 +1126,12 @@ def execute_file_action(action: dict[str, Any]) -> dict[str, Any]:
 
     if action_type == "generate_code_index":
         return execute_generate_code_index(action)
+
+    if action_type == "mcp_design_inspection":
+        return execute_mcp_design_action(action)
+
+    if action_type in {"mcp_ui_brief", "mcp_design_implementation", "mcp_visual_review"}:
+        return execute_mcp_design_action(action)
 
     if action_type != "sync_project_metadata":
         raise ValueError(f"unsupported file action type: {action_type}")

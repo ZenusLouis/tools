@@ -3,6 +3,8 @@ import { requireCurrentUser } from "@/lib/auth";
 import { expireStaleBridgeActions } from "@/lib/bridge-actions";
 import { db } from "@/lib/db";
 
+const QUEUE_ACTION_TYPES = ["run_task", "mcp_design_inspection", "mcp_ui_brief", "mcp_design_implementation", "mcp_visual_review"];
+
 function objectValue(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -33,9 +35,10 @@ export async function GET(
   if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
 
   const action = await db.bridgeFileAction.findFirst({
-    where: { id: actionId, workspaceId: user.workspaceId, type: "run_task" },
+    where: { id: actionId, workspaceId: user.workspaceId, type: { in: QUEUE_ACTION_TYPES } },
     select: {
       id: true,
+      type: true,
       status: true,
       error: true,
       payload: true,
@@ -43,7 +46,6 @@ export async function GET(
       createdAt: true,
       updatedAt: true,
       completedAt: true,
-      device: { select: { name: true } },
     },
   });
   if (!action) return NextResponse.json({ error: "Run action not found" }, { status: 404 });
@@ -59,6 +61,7 @@ export async function GET(
   return NextResponse.json({
     action: {
       id: action.id,
+      actionType: action.type,
       status: action.status,
       error: action.error,
       taskId: stringValue(payload.taskId),
@@ -68,7 +71,7 @@ export async function GET(
       optimizer: payload.optimizer ?? result.optimizer ?? null,
       skillRouting: payload.skillRouting ?? result.skillRouting ?? null,
       contextPlan: payload.contextPlan ?? result.contextPlan ?? null,
-      deviceName: action.device?.name ?? null,
+      deviceName: null,
       artifactPath: stringValue(result.artifactPath),
       exitCode: numberValue(result.exitCode),
       actualTokens: numberValue(result.actualTokens) ?? numberValue(result.tokens),

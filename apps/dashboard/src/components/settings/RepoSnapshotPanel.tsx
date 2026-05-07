@@ -27,14 +27,40 @@ type ImportResult = {
   roles: number;
 };
 
+type SnapshotImportSummary = {
+  projects: number;
+  modules: number;
+  features: number;
+  tasks: number;
+  roles: number;
+  skills: number;
+  memories: number;
+  skippedLocalPaths: number;
+};
+
 function totalImported(result: ImportResult) {
   return Object.values(result).reduce((sum, value) => sum + value, 0);
+}
+
+function summarizeSnapshotImport(summary: SnapshotImportSummary) {
+  const total = summary.projects
+    + summary.modules
+    + summary.features
+    + summary.tasks
+    + summary.roles
+    + summary.skills
+    + summary.memories;
+  const skipped = summary.skippedLocalPaths > 0
+    ? ` Skipped ${summary.skippedLocalPaths.toLocaleString()} machine-specific local path(s).`
+    : "";
+  return `Imported ${total.toLocaleString()} snapshot records into DB.${skipped}`;
 }
 
 export function RepoSnapshotPanel() {
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [loadingSnapshots, setLoadingSnapshots] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [importingSnapshot, setImportingSnapshot] = useState(false);
   const [includeLogs, setIncludeLogs] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -86,6 +112,30 @@ export function RepoSnapshotPanel() {
     }
   }
 
+  async function importSnapshotFile(file: File | null) {
+    if (!file) return;
+    setImportingSnapshot(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const text = await file.text();
+      const snapshot = JSON.parse(text) as unknown;
+      const res = await fetch("/api/import/snapshot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ snapshot }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? "Snapshot import failed");
+      setMessage(summarizeSnapshotImport(body.summary as SnapshotImportSummary));
+      await loadSnapshots();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setImportingSnapshot(false);
+    }
+  }
+
   return (
     <section className="rounded-xl border border-border bg-card p-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -109,6 +159,20 @@ export function RepoSnapshotPanel() {
             {importing ? <RefreshCw size={14} className="animate-spin" /> : <UploadCloud size={14} />}
             Import repo JSON
           </button>
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-bg-base px-3 py-2 text-xs font-bold text-text transition-colors hover:border-accent/50 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
+            {importingSnapshot ? <RefreshCw size={14} className="animate-spin" /> : <UploadCloud size={14} />}
+            Import snapshot
+            <input
+              type="file"
+              accept="application/json,.json"
+              disabled={importingSnapshot}
+              onChange={(event) => {
+                void importSnapshotFile(event.target.files?.[0] ?? null);
+                event.currentTarget.value = "";
+              }}
+              className="sr-only"
+            />
+          </label>
           <a
             href="/api/export/workspace"
             className="inline-flex items-center gap-2 rounded-lg bg-accent px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-accent-hover"

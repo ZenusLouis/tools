@@ -44,6 +44,17 @@
 - Updated Obsidian export so generated notes include relation sections from memory edges, plus export metadata now reports edge count.
 - Replaced the Obsidian Logic lab concept screen with a real runtime console: node/edge/kind metrics, project-filtered memory search, recent memory cards, graph refresh, and Obsidian vault export actions.
 - Started Phase 9 MCP Tool Plane runtime visibility: MCP servers now carry runtime hints, local stdio servers show bridge-required/configured status, server details show available tool hints, last audited call/error, and MCP Monitor includes the Figma design flow stages.
+- Extended Phase 9 from concept UI to a real queued action: project pages with a Figma link now expose "Analyze Figma", which creates a versioned `mcp_design_inspection` bridge action with audit/session records.
+- Added local bridge handling for `mcp_design_inspection`; it records the Figma URL, MCP profile/server/command, writes `.gcs/design/figma-context-report.json`, and writes `.gcs/design/figma-inspection.md` as the handoff artifact for design-integrator agents.
+- Updated project run queue APIs/UI to include non-task project actions, display Figma design inspection runs, keep logs/detail visible, and allow dashboard-side cancel for queued/running project actions.
+- Hardened legacy `/api/bridge/prompt-context`: it now requires bridge authentication, uses compact skill guidance instead of raw skill content, retrieves only related memory snippets with 0 LLM tokens, slices code-index into keyword-matched snippets, sanitizes output, and audits prompt-context builds.
+- Updated Run Queue provider handling for MCP/design actions: MCP can be filtered separately, design actions no longer display misleading token usage, and only task-backed failed runs are bulk-retried.
+- Improved Obsidian vault export layout: notes now export under `.gcs/obsidian/`, relation links use stable file stems, and the vault includes project and requirement index pages so backlinks resolve cleanly.
+- Completed the DB snapshot import path for Phase 1: `/api/import/snapshot` imports hashed workspace/project snapshots into DB, replaces imported project backlogs, imports role/skill/memory metadata, and skips machine-specific local paths.
+- Expanded workspace snapshot export with Skill Brain v2 metadata (`sourceType`, priority, hashes, trusted source, compact guidance, metadata) and role artifacts (`rulesMarkdown`, `generatedPaths`) so DB snapshots round-trip the runtime brain instead of only shallow labels.
+- Added a Settings UI file import for DB snapshots alongside repo JSON import/export, with explicit reporting for skipped local device paths to keep multi-machine project paths account/device scoped.
+- Expanded Phase 9 Figma tool-plane actions from a single inspection queue to the full design flow: Analyze, UI Brief, Implement handoff, and Visual Review. Each queues a versioned bridge action, appears in Run Queue with a distinct label, and writes a dedicated `.gcs/design/*` artifact/report locally.
+- Added MCP Monitor action telemetry: recent MCP/Figma bridge actions now appear on `/mcp`, and bridge result ingestion writes `mcp_action_completed` / `mcp_action_failed` audit records tied back to the MCP server for accurate last-call/last-error display.
 
 ## Verification
 
@@ -58,9 +69,16 @@
 - `npm run build` passed after Memory Graph edge sync, search API, Knowledge UI, and Obsidian export updates.
 - `npm run build` passed after replacing `/labs/obsidian-logic` with the runtime Memory Graph console.
 - `npm run build` passed after MCP runtime status/tool hint and Figma design flow UI updates.
+- `python -m py_compile hooks/gcs_bridge/local_action_executor.py` passed after adding MCP design inspection bridge handling.
+- `npm run lint`, `npx tsc --noEmit`, and `npm run build` passed after wiring the Figma design inspection queue/action UI.
+- `npm run lint`, `npx tsc --noEmit`, and `npm run build` passed after hardening `/api/bridge/prompt-context`.
+- `npm run lint`, `npx tsc --noEmit`, `python -m py_compile hooks/gcs_bridge/local_action_executor.py`, and `npm run build` passed after MCP queue filter and Obsidian export improvements.
+- `npm run lint`, `npx tsc --noEmit`, `python -m py_compile` over `hooks/gcs_bridge_daemon.py` and `hooks/gcs_bridge/*.py`, and `npm run build` passed after snapshot import/export UI and metadata round-trip updates.
+- `npm run lint`, `npx tsc --noEmit`, `python -m py_compile` over the bridge entrypoint/modules, and `npm run build` passed after expanding the Figma MCP design-flow actions.
+- `npm run lint`, `npx tsc --noEmit`, `python -m py_compile` over the bridge entrypoint/modules, and `npm run build` passed after adding MCP action telemetry to the monitor and bridge result path.
 
 ## Gaps
 
 - Spring Boot extraction remains a later phase.
-- MCP online tool-call telemetry is not implemented yet.
+- MCP online tool-call telemetry is partially represented by queued design-inspection/audit events; direct MCP tool invocation is still staged behind the local bridge/tool-plane contract.
 - Full Spring Boot extraction remains staged for a later phase; local execution is still Python bridge runtime by design.

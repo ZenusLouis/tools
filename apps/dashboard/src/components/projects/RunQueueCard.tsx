@@ -19,6 +19,7 @@ import {
 
 type QueueAction = {
   id: string;
+  actionType: string | null;
   status: string;
   error: string | null;
   taskId: string | null;
@@ -47,6 +48,7 @@ type QueueAction = {
 
 type QueueActionDetail = {
   id: string;
+  actionType: string | null;
   status: string;
   error: string | null;
   taskId: string | null;
@@ -115,8 +117,8 @@ type ContextPlanInfo = {
 };
 
 type QueueFilter = "all" | "live" | "failed" | "done";
-type ProviderFilter = "all" | "claude" | "codex";
-type PhaseFilter = "all" | "analysis" | "implementation" | "review";
+type ProviderFilter = "all" | "claude" | "codex" | "mcp";
+type PhaseFilter = "all" | "analysis" | "implementation" | "review" | "design";
 type QueueCounts = Record<QueueFilter, number>;
 
 const FILTERS: Array<{ value: QueueFilter; label: string }> = [
@@ -130,6 +132,7 @@ const PROVIDERS: Array<{ value: ProviderFilter; label: string }> = [
   { value: "all", label: "All agents" },
   { value: "claude", label: "Claude" },
   { value: "codex", label: "Codex" },
+  { value: "mcp", label: "MCP" },
 ];
 
 const PHASES: Array<{ value: PhaseFilter; label: string }> = [
@@ -137,7 +140,15 @@ const PHASES: Array<{ value: PhaseFilter; label: string }> = [
   { value: "analysis", label: "Brief" },
   { value: "implementation", label: "Build" },
   { value: "review", label: "Review" },
+  { value: "design", label: "Design" },
 ];
+
+const ACTION_LABELS: Record<string, string> = {
+  mcp_design_inspection: "figma design inspection",
+  mcp_ui_brief: "figma UI brief",
+  mcp_design_implementation: "figma implementation handoff",
+  mcp_visual_review: "figma visual diff review",
+};
 
 function statusClass(status: string) {
   if (status === "succeeded") return "border-done/30 bg-done/10 text-done";
@@ -163,6 +174,7 @@ function usageLabel(action: {
   tokenMeter: string | null;
 }) {
   if (typeof action.actualTokens !== "number") return null;
+  if (action.tokenMeter === "none" || action.provider === "mcp") return null;
   if (action.provider === "codex" || action.tokenMeter === "thread_meter") {
     const cost = typeof action.normalizedCostUsd === "number" ? ` / $${action.normalizedCostUsd.toFixed(4)}` : "";
     return `${action.actualTokens.toLocaleString()} thread tokens${cost}`;
@@ -216,7 +228,7 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
     [actions],
   );
   const liveActions = useMemo(
-    () => actions.filter((action) => action.taskId && (action.status === "pending" || action.status === "claimed" || action.status === "running")),
+    () => actions.filter((action) => action.status === "pending" || action.status === "claimed" || action.status === "running"),
     [actions],
   );
   const retryableActions = useMemo(
@@ -285,14 +297,15 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
     };
   }, [hasLiveAction, loadQueue]);
 
-  async function cancelTaskRun(action: QueueAction) {
-    if (!action.taskId) return;
+  async function cancelRunAction(action: QueueAction) {
     setBusyActionId(action.id);
     setError(null);
     try {
-      const res = await fetch(`/api/tasks/${encodeURIComponent(action.taskId)}/run/cancel`, { method: "POST" });
+      const res = action.taskId
+        ? await fetch(`/api/tasks/${encodeURIComponent(action.taskId)}/run/cancel`, { method: "POST" })
+        : await fetch(`/api/projects/${encodeURIComponent(projectName)}/run-queue/${encodeURIComponent(action.id)}/cancel`, { method: "POST" });
       const body = await res.json().catch(() => ({})) as { error?: string };
-      if (!res.ok) setError(body.error ?? "Failed to cancel task run.");
+      if (!res.ok) setError(body.error ?? "Failed to cancel run.");
       await loadQueue();
     } finally {
       setBusyActionId(null);
@@ -327,7 +340,7 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
     setError(null);
     try {
       for (const action of liveActions) {
-        await cancelTaskRun(action);
+        await cancelRunAction(action);
       }
       await loadQueue();
     } finally {
@@ -483,7 +496,7 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
         <div className="rounded-lg border border-dashed border-border bg-bg-base p-4 text-center">
           <Activity size={18} className="mx-auto mb-2 text-text-muted" />
           <p className="text-xs font-medium text-text">No task runs yet</p>
-          <p className="mt-1 text-[11px] text-text-muted">Queued local Claude/Codex task runs will appear here.</p>
+          <p className="mt-1 text-[11px] text-text-muted">Queued local agent and MCP project actions will appear here.</p>
         </div>
       )}
 
@@ -503,7 +516,9 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
                         {action.taskId}
                       </Link>
                     ) : (
-                      <span className="font-mono text-xs text-text-muted">unknown task</span>
+                      <span className="font-mono text-xs font-bold text-accent">
+                        {ACTION_LABELS[action.actionType ?? ""] ?? "project action"}
+                      </span>
                     )}
                   </div>
                   {action.taskName && (
@@ -560,10 +575,10 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
                       Full
                     </button>
                   )}
-                  {action.taskId && (action.status === "pending" || action.status === "claimed" || action.status === "running") && (
+                  {(action.status === "pending" || action.status === "claimed" || action.status === "running") && (
                     <button
                       type="button"
-                      onClick={() => void cancelTaskRun(action)}
+                      onClick={() => void cancelRunAction(action)}
                       disabled={busyActionId === action.id}
                       className="inline-flex items-center gap-1 rounded border border-blocked/30 px-2 py-1 text-[10px] font-bold text-blocked hover:bg-blocked/10 disabled:opacity-50"
                     >
@@ -662,7 +677,7 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
               <div className="min-w-0">
                 <h3 className="text-sm font-bold text-text">Run Log Detail</h3>
                 <p className="mt-1 truncate font-mono text-[11px] text-text-muted">
-                  {detailAction?.taskId ?? "loading"} {detailAction?.provider ? `- ${detailAction.provider}` : ""} {detailAction?.phase ? `- ${detailAction.phase}` : ""}
+                  {detailAction?.taskId ?? ACTION_LABELS[detailAction?.actionType ?? ""] ?? detailAction?.actionType ?? "loading"} {detailAction?.provider ? `- ${detailAction.provider}` : ""} {detailAction?.phase ? `- ${detailAction.phase}` : ""}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">

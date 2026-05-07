@@ -81,6 +81,72 @@
                 "Build Angular movie list with filter bar and status chips"
               ],
               "status": "pending"
+            },
+            {
+              "id": "omnibooking-M1-F0-T2",
+              "name": "Cinema branches, screening rooms, and seat layout generator",
+              "summary": "Manage cinema branches and rooms; generate seat layout from row/column config; restrict layout changes after future sold tickets exist.",
+              "details": "Branch: code, name, address, city, contact, opening/closing time, status. Room: roomCode, roomName, type, capacity, status, belongs to active branch. Seat layout generator accepts row labels, column count, seat type mapping, blocked/aisle positions. Individual seat edits allowed (type, blocked, position) while safe. Layout change blocked if any future showtime has active hold or sold ticket — return dependency error. Seat preview shows rows, columns, VIP/standard/blocked legend. Page 8-9.",
+              "acceptanceCriteria": [
+                "Generated seat count matches layout configuration input",
+                "Seat map preview updates immediately after config change",
+                "Layout change with active hold/sold ticket returns dependency error",
+                "Room must belong to active branch",
+                "Inactive branch cannot create new showtimes"
+              ],
+              "steps": [
+                "Create cinema_branches and screening_rooms tables",
+                "Create seats table with rowLabel, colNumber, seatType, isBlocked, showtimeSeatId FK",
+                "Implement SeatLayoutGeneratorService from row/col/type config",
+                "Add layout-change guard: check future showtime active holds and sold tickets",
+                "Build Angular SeatBuilderComponent with visual grid preview"
+              ],
+              "status": "pending"
+            }
+          ]
+        },
+        {
+          "name": "Showtime Scheduling",
+          "tasks": [
+            {
+              "id": "omnibooking-M1-F1-T1",
+              "name": "Showtime creation with end-time calculation and room-overlap prevention",
+              "summary": "Create showtimes generating showtime seats from room layout; compute end time as start + duration + cleaning buffer; reject if room schedule overlaps including buffer.",
+              "details": "Required: movie, branch, room, start time, price config, sale window. End time = start + durationMinutes + cleaningBufferMinutes (configurable). Overlap check includes active showtimes AND cleaning buffer. Creating a showtime copies room seats into showtime_seats table. UI previews end time before save. Page 9.",
+              "acceptanceCriteria": [
+                "Creating showtime generates showtime_seats from room seats",
+                "UI previews calculated end time before save",
+                "Overlapping showtime (including cleaning buffer) cannot be saved",
+                "Showtime form filters rooms belonging to selected branch"
+              ],
+              "steps": [
+                "Create showtimes and showtime_seats tables",
+                "Implement end-time calculator using configurable cleaning buffer",
+                "Add overlap query: SELECT 1 FROM showtimes WHERE room_id=? AND status NOT IN ('CANCELLED') AND NOT (endTime <= newStart OR startTime >= newEnd)",
+                "On showtime create, bulk-insert showtime_seats from room seats",
+                "Build Angular showtime form with real-time end-time preview"
+              ],
+              "status": "pending"
+            },
+            {
+              "id": "omnibooking-M1-F1-T2",
+              "name": "Bulk showtime creation, cancellation, and update restrictions",
+              "summary": "Generate repeated showtime schedules by date range/weekdays/time slots; cancel with booking impact evaluation; restrict core field edits after paid tickets.",
+              "details": "Bulk create: date range, weekday selection, time slots — validate each generated slot for overlap and report invalid rows with reason. Cancellation: if paid tickets exist, those bookings become refund candidates. After paid tickets, movie/room/time fields are locked; update requires cancel+recreate flow. Showtime statuses: SCHEDULED, SELLING, SOLD_OUT, CANCELLED, COMPLETED. Page 9.",
+              "acceptanceCriteria": [
+                "Bulk generation reports each invalid slot with reason instead of silently skipping",
+                "Cancelled showtime no longer sellable; tickets cannot check in",
+                "Movie/room/time fields disabled in UI after paid tickets; backend enforces same restriction",
+                "Showtime status reflects sale window, seat availability, and time progression"
+              ],
+              "steps": [
+                "Implement BulkShowtimeGeneratorService iterating date range × weekdays × slots",
+                "Collect validation errors per slot and return partial-success response",
+                "Add cancellation flow: set status CANCELLED, mark tickets CANCELLED, flag bookings for refund",
+                "Add update guard: if paid tickets exist, reject changes to movie/room/startTime",
+                "Angular calendar view grouping showtimes by date with status color coding"
+              ],
+              "status": "pending"
             }
           ]
         }

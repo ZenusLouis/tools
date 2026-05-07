@@ -15,6 +15,13 @@ const ResultSchema = z.object({
 });
 
 const HOOK_SECRET = process.env.HOOK_SECRET;
+const MCP_ACTION_TYPES = new Set(["mcp_design_inspection", "mcp_ui_brief", "mcp_design_implementation", "mcp_visual_review"]);
+
+function objectValue(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
 
 export async function POST(req: NextRequest) {
   let ctx = await verifyBridgeRequest(bridgeTokenFromHeaders(req.headers));
@@ -81,6 +88,30 @@ export async function POST(req: NextRequest) {
   }).catch(() => null);
 
   const resultObject = nextResult as Record<string, unknown>;
+
+  if (MCP_ACTION_TYPES.has(action.type)) {
+    const payload = objectValue(action.payload);
+    const mcpServer = objectValue(payload.mcpServer);
+    await db.auditLog.create({
+      data: {
+        workspaceId: ctx.workspaceId,
+        actionId: action.id,
+        actorType: "bridge",
+        event: parsed.data.status === "succeeded" ? "mcp_action_completed" : "mcp_action_failed",
+        targetType: "McpServer",
+        targetId: typeof mcpServer.name === "string" ? mcpServer.name : null,
+        metadata: {
+          type: action.type,
+          projectName: typeof payload.projectName === "string" ? payload.projectName : null,
+          server: typeof mcpServer.name === "string" ? mcpServer.name : null,
+          status: parsed.data.status,
+          artifactPath: typeof resultObject.artifactPath === "string" ? resultObject.artifactPath : null,
+          error: sanitizedError,
+        },
+      },
+    }).catch(() => null);
+  }
+
   if (action.type === "run_task") {
     const telemetry = telemetryFromActionResult({
       workspaceId: ctx.workspaceId,

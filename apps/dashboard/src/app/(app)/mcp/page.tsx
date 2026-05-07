@@ -2,17 +2,19 @@ import { TopBar } from "@/components/layout/TopBar";
 import { PageShell } from "@/components/layout/PageShell";
 import { McpServerList } from "@/components/mcp/McpServerList";
 import { McpProfileViewer } from "@/components/mcp/McpProfileViewer";
+import { McpActionTimeline } from "@/components/mcp/McpActionTimeline";
 import { RegisterMcpServerForm } from "@/components/mcp/McpForms";
 import { McpRefreshButton } from "@/components/mcp/McpRefreshButton";
 import { requireCurrentUser } from "@/lib/auth";
-import { getMcpProfiles, getMcpServersWithRuntime } from "@/lib/mcp";
+import { getMcpProfiles, getMcpServersWithRuntime, getRecentMcpActions } from "@/lib/mcp";
 import type { McpServer } from "@/lib/mcp";
 
 export default async function McpPage() {
   const user = await requireCurrentUser();
-  const [servers, profiles] = await Promise.all([
+  const [servers, profiles, actions] = await Promise.all([
     getMcpServersWithRuntime(user.workspaceId),
     getMcpProfiles(),
+    getRecentMcpActions(user.workspaceId),
   ]);
 
   const serverMap: Record<string, McpServer> = Object.fromEntries(
@@ -33,6 +35,7 @@ export default async function McpPage() {
               </div>
             </div>
             <McpServerList servers={servers} />
+            <McpActionTimeline actions={actions} />
             <section className="rounded-xl border border-border bg-card p-5">
               <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-accent">Figma Design Flow</p>
               <div className="mt-4 grid gap-3 md:grid-cols-2">

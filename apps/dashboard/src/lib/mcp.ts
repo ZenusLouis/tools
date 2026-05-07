@@ -28,6 +28,19 @@ export type McpRuntimeStatus = {
   requiresBridge: boolean;
 };
 
+export type McpActionRow = {
+  id: string;
+  actionType: string;
+  status: string;
+  projectName: string | null;
+  server: string | null;
+  artifactPath: string | null;
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+};
+
 const TOOL_HINTS: Record<string, string[]> = {
   figma: ["inspect_file", "read_nodes", "export_assets", "design_tokens"],
   "figma-mcp-go": ["inspect_selection", "read_document", "write_annotations", "export_components"],
@@ -119,6 +132,51 @@ export async function getMcpProfiles(): Promise<McpProfile[]> {
     servers: r.servers,
     use_when: r.useWhen,
   }));
+}
+
+function objectValue(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+const MCP_ACTION_TYPES = ["mcp_design_inspection", "mcp_ui_brief", "mcp_design_implementation", "mcp_visual_review"];
+
+export async function getRecentMcpActions(workspaceId: string): Promise<McpActionRow[]> {
+  const actions = await db.bridgeFileAction.findMany({
+    where: { workspaceId, type: { in: MCP_ACTION_TYPES } },
+    orderBy: { updatedAt: "desc" },
+    take: 12,
+    select: {
+      id: true,
+      type: true,
+      status: true,
+      payload: true,
+      result: true,
+      error: true,
+      createdAt: true,
+      updatedAt: true,
+      completedAt: true,
+    },
+  });
+
+  return actions.map((action) => {
+    const payload = objectValue(action.payload);
+    const result = objectValue(action.result);
+    const mcpServer = objectValue(payload.mcpServer);
+    return {
+      id: action.id,
+      actionType: action.type,
+      status: action.status,
+      projectName: typeof payload.projectName === "string" ? payload.projectName : null,
+      server: typeof mcpServer.name === "string" ? mcpServer.name : null,
+      artifactPath: typeof result.artifactPath === "string" ? result.artifactPath : null,
+      error: action.error ?? (typeof result.error === "string" ? result.error : null),
+      createdAt: action.createdAt.toISOString(),
+      updatedAt: action.updatedAt.toISOString(),
+      completedAt: action.completedAt?.toISOString() ?? null,
+    };
+  });
 }
 
 export function buildMcpAddCommand(server: McpServer): string {

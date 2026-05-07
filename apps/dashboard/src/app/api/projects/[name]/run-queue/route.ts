@@ -3,6 +3,8 @@ import { requireCurrentUser } from "@/lib/auth";
 import { expireStaleBridgeActions } from "@/lib/bridge-actions";
 import { db } from "@/lib/db";
 
+const QUEUE_ACTION_TYPES = ["run_task", "mcp_design_inspection", "mcp_ui_brief", "mcp_design_implementation", "mcp_visual_review"];
+
 function objectValue(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -41,12 +43,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ name: st
     status === "failed" ? ["failed", "cancelled", "expired"] :
     status === "done" ? ["succeeded"] :
     null;
-  const providerFilter = provider === "claude" || provider === "codex" ? provider : null;
-  const phaseFilter = phase === "analysis" || phase === "implementation" || phase === "review" ? phase : null;
+  const providerFilter = provider === "claude" || provider === "codex" || provider === "mcp" ? provider : null;
+  const phaseFilter = phase === "analysis" || phase === "implementation" || phase === "review" || phase === "design" ? phase : null;
 
   const baseWhere = {
     workspaceId: user.workspaceId,
-    type: "run_task",
+    type: { in: QUEUE_ACTION_TYPES },
     AND: [
       { payload: { path: ["projectName"], equals: project.name } },
       ...(providerFilter ? [{ payload: { path: ["provider"], equals: providerFilter } }] : []),
@@ -71,6 +73,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ name: st
       take: pageSize,
       select: {
         id: true,
+        type: true,
         status: true,
         error: true,
         payload: true,
@@ -78,7 +81,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ name: st
         createdAt: true,
         updatedAt: true,
         completedAt: true,
-        device: { select: { name: true } },
       },
     }),
   ]);
@@ -117,6 +119,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ name: st
       const taskId = stringValue(payload.taskId);
       return {
         id: action.id,
+        actionType: action.type,
         status: action.status,
         error: action.error,
         taskId,
@@ -127,7 +130,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ name: st
         optimizer: payload.optimizer ?? result.optimizer ?? null,
         skillRouting: payload.skillRouting ?? result.skillRouting ?? null,
         contextPlan: payload.contextPlan ?? result.contextPlan ?? null,
-        deviceName: action.device?.name ?? null,
+        deviceName: null,
         artifactPath: stringValue(result.artifactPath),
         exitCode: numberValue(result.exitCode),
         actualTokens: numberValue(result.actualTokens) ?? numberValue(result.tokens),

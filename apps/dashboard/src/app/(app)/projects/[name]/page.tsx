@@ -14,6 +14,7 @@ import { ResetTasksButton } from "@/components/projects/ResetTasksButton";
 import { RunProjectTaskButton } from "@/components/projects/RunProjectTaskButton";
 import { RunProjectBatchButton } from "@/components/projects/RunProjectBatchButton";
 import { RunQueueCard } from "@/components/projects/RunQueueCard";
+import { FigmaDesignButton } from "@/components/projects/FigmaDesignButton";
 import { getProjectDetail } from "@/lib/projects";
 import { getRecentActivity, timeAgo } from "@/lib/activity";
 import { requireCurrentUser } from "@/lib/auth";
@@ -247,10 +248,11 @@ export default async function ProjectOverviewPage({
                     <Link href={`/projects/${encodedName}/settings`} className="text-accent hover:underline">Add in settings</Link>
                   </p>
                 ) : (
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="flex flex-wrap gap-2">
                     {project.links.figma && <LinkChip href={project.links.figma} icon={<Palette size={16} />} label="Figma" />}
                     {project.links.github && <LinkChip href={project.links.github} icon={<GitBranch size={16} />} label="GitHub" />}
                     {project.links.linear && <LinkChip href={project.links.linear} icon={<LayoutGrid size={16} />} label="Linear" />}
+                    {project.links.figma && <FigmaDesignButton projectName={project.name} />}
                   </div>
                 )}
               </section>
