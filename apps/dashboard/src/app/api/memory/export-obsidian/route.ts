@@ -102,7 +102,7 @@ export async function POST() {
     }).catch(() => null);
 
     const date = new Date().toISOString().slice(0, 10);
-    return new Response(zip, {
+    return new Response(new Uint8Array(zip), {
       headers: {
         "Content-Type": "application/zip",
         "Content-Disposition": `attachment; filename="obsidian-vault-${date}.zip"`,
