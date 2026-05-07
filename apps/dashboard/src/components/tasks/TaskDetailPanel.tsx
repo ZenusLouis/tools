@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useCallback, useRef } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, CheckCircle, Clock, ExternalLink, GitCommit, Lock, Share2, X } from "lucide-react";
@@ -27,6 +27,25 @@ export function TaskDetailPanel({ task, projectName, completedIds, onClose }: Pr
   const [isPending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<string | null>(null);
   const [commitOpen, setCommitOpen] = useState(false);
+  const [panelWidth, setPanelWidth] = useState(420);
+  const dragging = useRef(false);
+
+  const startResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    dragging.current = true;
+    const onMove = (ev: MouseEvent) => {
+      if (!dragging.current) return;
+      const newWidth = window.innerWidth - ev.clientX;
+      setPanelWidth(Math.min(Math.max(newWidth, 320), 860));
+    };
+    const onUp = () => {
+      dragging.current = false;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, []);
 
   function handleMark(status: "completed" | "blocked") {
     if (!task) return;
@@ -47,7 +66,9 @@ export function TaskDetailPanel({ task, projectName, completedIds, onClose }: Pr
       {task && (
         <>
           <motion.div className="fixed inset-0 z-40 bg-black/50" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }} onClick={onClose} />
-          <motion.div className="fixed right-0 top-0 z-50 flex h-full w-[420px] max-w-[100vw] flex-col border-l border-border bg-card shadow-2xl" initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ duration: 0.22, ease: "easeOut" }}>
+          <motion.div className="fixed right-0 top-0 z-50 flex h-full flex-col border-l border-border bg-card shadow-2xl" style={{ width: panelWidth, maxWidth: "100vw" }} initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ duration: 0.22, ease: "easeOut" }}>
+            {/* Resize handle */}
+            <div onMouseDown={startResize} className="absolute left-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-accent/40 transition-colors z-10" />
             <div className="border-b border-border px-5 py-4">
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2">
