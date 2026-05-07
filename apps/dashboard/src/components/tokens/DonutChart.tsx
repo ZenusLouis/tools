@@ -40,7 +40,12 @@ export function DonutChart({ breakdown }: Props) {
     );
   }
 
-  const data = breakdown.map((b) => ({ name: b.tool, value: b.tokens, percent: b.percent }));
+  const significant = breakdown.filter((b) => b.percent >= 1);
+  const otherTokens = breakdown.filter((b) => b.percent < 1).reduce((s, b) => s + b.tokens, 0);
+  const data = [
+    ...significant.map((b) => ({ name: b.tool, value: b.tokens, percent: b.percent })),
+    ...(otherTokens > 0 ? [{ name: "Other", value: otherTokens, percent: 0 }] : []),
+  ];
 
   return (
     <div className="rounded-xl border bg-card p-5 flex flex-col gap-3">
@@ -53,7 +58,9 @@ export function DonutChart({ breakdown }: Props) {
             cy="50%"
             innerRadius={60}
             outerRadius={95}
-            paddingAngle={2}
+            paddingAngle={0}
+            startAngle={90}
+            endAngle={-270}
             dataKey="value"
           >
             {data.map((entry, idx) => (
