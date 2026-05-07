@@ -340,10 +340,11 @@ export function RunTaskButton({ taskId, disabled }: { taskId: string; disabled?:
   const failed = status?.status === "failed";
   const cancelled = status?.status === "cancelled";
   const cmd = status?.log.find((line) => line.startsWith("CMD: "))?.slice(5);
-  const displayOptimizer = status?.optimizer ?? preview?.optimizer ?? null;
-  const displaySkillRouting = status?.skillRouting ?? preview?.skillRouting ?? null;
-  const displayContextPlan = status?.contextPlan ?? preview?.contextPlan ?? null;
-  const displayProvider = status?.optimizer?.provider ?? preview?.provider ?? provider;
+  const showingLiveRun = running || done || failed || cancelled;
+  const displayOptimizer = showingLiveRun ? (status?.optimizer ?? null) : (preview?.optimizer ?? null);
+  const displaySkillRouting = showingLiveRun ? (status?.skillRouting ?? null) : (preview?.skillRouting ?? null);
+  const displayContextPlan = showingLiveRun ? (status?.contextPlan ?? null) : (preview?.contextPlan ?? null);
+  const displayProvider = showingLiveRun ? (status?.optimizer?.provider ?? provider) : (preview?.provider ?? provider);
   const displayUsage = statusUsageLabel(status, displayProvider);
 
   return (
