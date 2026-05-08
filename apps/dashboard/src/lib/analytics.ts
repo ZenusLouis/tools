@@ -114,10 +114,27 @@ export async function getAnalytics(
   );
   const totalCost = meterTotals.estimatedCostUsd;
 
-  // Tool breakdown
+  // Tool breakdown — normalize variant tool names + include Claude session tokens
+  const TOOL_ALIASES: Record<string, string> = {
+    "codex-thread": "CodexIDE",
+    "codex_thread": "CodexIDE",
+    "CodexThread": "CodexIDE",
+  };
   const toolMap = new Map<string, number>();
   for (const t of toolUsage) {
-    toolMap.set(t.tool, (toolMap.get(t.tool) ?? 0) + t.tokens);
+    const canonical = TOOL_ALIASES[t.tool] ?? t.tool;
+    toolMap.set(canonical, (toolMap.get(canonical) ?? 0) + t.tokens);
+  }
+  // Add Claude session tokens (these are in Session table, not ToolUsage)
+  // Use the delta above what hook events already captured to avoid double-counting
+  const claudeSessionTotal = sessions
+    .filter((s) => s.provider === "claude")
+    .reduce((sum, s) => sum + (s.totalTokens ?? 0), 0);
+  const claudeToolTotal = [...toolMap.entries()]
+    .filter(([tool]) => !["CodexIDE"].includes(tool))
+    .reduce((sum, [, tokens]) => sum + tokens, 0);
+  if (claudeSessionTotal > claudeToolTotal) {
+    toolMap.set("Claude (session)", claudeSessionTotal - claudeToolTotal);
   }
   const totalToolTokens = [...toolMap.values()].reduce((a, b) => a + b, 0) || 1;
   const toolBreakdown: ToolBreakdown[] = [...toolMap.entries()]

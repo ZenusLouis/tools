@@ -30,10 +30,14 @@ function LineChart({ data }: { data: { label: string; tokens: number }[] }) {
   const iW = W - PAD.l - PAD.r;
   const iH = H - PAD.t - PAD.b;
 
-  const max = Math.max(...data.map((d) => d.tokens), 1);
+  const rawMax = Math.max(...data.map((d) => d.tokens), 1);
+  // Cap outliers at 3× the 90th-percentile to prevent one huge spike flattening everything else
+  const sorted = [...data.map((d) => d.tokens)].sort((a, b) => a - b);
+  const p90 = sorted[Math.floor(sorted.length * 0.9)] ?? rawMax;
+  const max = Math.max(p90 * 3, 1);
   const pts = data.map((d, i) => ({
     x: PAD.l + (i / Math.max(data.length - 1, 1)) * iW,
-    y: PAD.t + iH - (d.tokens / max) * iH,
+    y: PAD.t + iH - (Math.min(d.tokens, max) / max) * iH,
     tokens: d.tokens,
     label: d.label,
   }));

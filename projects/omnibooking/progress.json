@@ -235,6 +235,51 @@
               "status": "pending"
             }
           ]
+        },
+        {
+          "name": "Combos, Promotions & Cinema Reports",
+          "tasks": [
+            {
+              "id": "omnibooking-M1-F3-T1",
+              "name": "Cinema combo and promotion management with server-side discount calculation",
+              "summary": "Manage combos (name, price, image, status, availability period) and promotions (fixed/percentage, min amount, usage limit, movie/branch scope); calculate discounts server-side only.",
+              "details": "Inactive combos hidden from new booking. Promotions support fixed and percentage discount, minimum order amount, per-user and total usage limits, scoped to specific movies or branches. Client discount preview is informational; backend recalculates and rejects manipulated values. Invalid coupon returns reason. Page 12.",
+              "acceptanceCriteria": [
+                "Inactive combo cannot be added to new booking",
+                "Invalid or expired coupon returns specific reason",
+                "Manipulated client discount value is ignored; server total is authoritative",
+                "Promotion usage limit enforced atomically"
+              ],
+              "steps": [
+                "Create combos and promotions tables with scope and limit columns",
+                "Implement PromotionService.calculateDiscount() called inside PricingEngine",
+                "Add usage limit check with SELECT FOR UPDATE to prevent over-redemption",
+                "Expose /cinema/combos and /cinema/promotions CRUD endpoints",
+                "Angular promo code input field with server-side validation feedback"
+              ],
+              "status": "pending"
+            },
+            {
+              "id": "omnibooking-M1-F3-T2",
+              "name": "Cinema dashboard metrics and booking/ticket report export",
+              "summary": "Dashboard showing tickets sold, revenue by movie/branch/date, occupancy rate, and checked-in count; export booking and ticket data filtered by date range and permissions.",
+              "details": "Dashboard filters by date range. Metrics: tickets sold, revenue by movie/branch/date, occupancy %, checked-in count. Export respects active filters and user permissions (branch-scoped managers cannot see other branches). Page 12.",
+              "acceptanceCriteria": [
+                "Dashboard metrics update when date range filter changes",
+                "Export file contains only records matching active filters",
+                "Branch-scoped manager export excludes other branches",
+                "Occupancy calculated as sold seats / total seats per showtime"
+              ],
+              "steps": [
+                "Write aggregation queries for dashboard metrics using indexed date range scans",
+                "Implement /cinema/reports/dashboard and /cinema/reports/export endpoints",
+                "Apply permission scope filter in report service (branch restriction)",
+                "Generate CSV/Excel export using Apache POI or streaming CSV",
+                "Build Angular dashboard with chart components and filter bar"
+              ],
+              "status": "pending"
+            }
+          ]
         }
       ]
     }
