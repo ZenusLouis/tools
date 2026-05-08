@@ -1,4 +1,4 @@
-import { Bot, Cpu, MessageSquare } from "lucide-react";
+import { Bot, Cpu, MessageSquare, Sparkles } from "lucide-react";
 import type { ProviderBreakdown } from "@/lib/analytics";
 import { formatCompactNumber, formatCredits, formatCurrency } from "@/lib/format";
 
@@ -6,6 +6,7 @@ const PROVIDER_META = {
   claude: { label: "Claude", icon: Bot, color: "bg-done", text: "text-done" },
   codex: { label: "Codex", icon: Cpu, color: "bg-accent", text: "text-accent" },
   chatgpt: { label: "ChatGPT", icon: MessageSquare, color: "bg-in-progress", text: "text-in-progress" },
+  gemini: { label: "Gemini", icon: Sparkles, color: "bg-done", text: "text-done" },
 } satisfies Record<ProviderBreakdown["provider"], { label: string; icon: typeof Bot; color: string; text: string }>;
 
 export function ProviderTokenBreakdown({ breakdown }: { breakdown: ProviderBreakdown[] }) {

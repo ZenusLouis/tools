@@ -13,7 +13,7 @@ export type DashboardStats = {
   meterTotals: MeterTotals;
   sessionCost: number;
   tokenBreakdown: Array<{
-    provider: "claude" | "codex" | "chatgpt";
+    provider: "claude" | "codex" | "chatgpt" | "gemini";
     tokens: number;
     sessionTokens: number;
     toolTokens: number;
@@ -100,7 +100,7 @@ export async function getDashboardStats(workspaceId?: string, range: DashboardRa
     if (!transcript) return sum;
     return sum + (tokenTotalFromModelUsage(transcript.modelUsage) || tokenTotalFromUsage(transcript.usage));
   }, 0);
-  const providers = ["claude", "codex", "chatgpt"] as const;
+  const providers = ["claude", "codex", "chatgpt", "gemini"] as const;
   const tokenBreakdown = providers.map((provider) => {
     const providerSessions = sessions.filter((session) => session.provider === provider);
     const providerTools = toolUsage.filter((usage) => usage.provider === provider);

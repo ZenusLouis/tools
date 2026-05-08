@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireCurrentUser } from "@/lib/auth";
 import { getApiKeyByService } from "@/lib/api-keys";
 
-type Provider = "claude" | "codex" | "chatgpt";
-const PROVIDERS: Provider[] = ["claude", "codex", "chatgpt"];
+type Provider = "claude" | "codex" | "chatgpt" | "gemini";
+const PROVIDERS: Provider[] = ["claude", "codex", "chatgpt", "gemini"];
 
 // Fallback models for local CLI providers (no API key needed)
 const LOCAL_MODELS: Record<string, string[]> = {
   claude: ["claude-sonnet-4-6", "claude-opus-4-7", "claude-haiku-4-5-20251001"],
   codex: ["gpt-5.2-codex", "gpt-5.1-codex", "gpt-5.1-codex-max", "gpt-5-codex"],
+  gemini: ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-thinking-exp", "gemini-exp-1206"],
 };
 
 async function fetchOpenAIModels(apiKey: string, provider: Provider) {
@@ -46,6 +47,8 @@ export async function GET(req: NextRequest) {
     if (provider === "claude") {
       const key = await getApiKeyByService("anthropic", user.workspaceId);
       if (key) live = await fetchAnthropicModels(key);
+    } else if (provider === "gemini") {
+      live = [];
     } else {
       const key = await getApiKeyByService("openai", user.workspaceId);
       if (key) live = await fetchOpenAIModels(key, provider);
