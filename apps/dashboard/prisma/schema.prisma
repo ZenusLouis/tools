@@ -104,6 +104,7 @@ enum AgentProvider {
   claude
   codex
   chatgpt
+  gemini
 }
 
 enum ExecutionMode {
