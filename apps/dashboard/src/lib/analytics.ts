@@ -5,7 +5,7 @@ import { addMeterUsage, emptyMeterTotals, estimateProviderCredits, TOKEN_METER_M
 export type DateRange = "today" | "week" | "month" | "year";
 export type ToolBreakdown = { tool: string; tokens: number; percent: number };
 export type ProviderBreakdown = {
-  provider: "claude" | "codex" | "chatgpt";
+  provider: "claude" | "codex" | "chatgpt" | "gemini";
   tokens: number;
   sessionTokens: number;
   toolTokens: number;
@@ -75,7 +75,7 @@ export async function getAnalytics(
     db.runTelemetry.findMany({ where: { createdAt: { gte: since }, ...(workspaceId ? { workspaceId } : {}) }, orderBy: { createdAt: "desc" }, take: 5000 }),
   ]);
 
-  const providers = ["claude", "codex", "chatgpt"] as const;
+  const providers = ["claude", "codex", "chatgpt", "gemini"] as const;
   const rawProviderBreakdown = providers.map((provider) => {
     const providerSessions = sessions.filter((session) => session.provider === provider);
     const providerTools = toolUsage.filter((usage) => usage.provider === provider);
@@ -220,7 +220,7 @@ export async function getAnalytics(
     })),
     ...runTelemetry.map((run) => ({
       ...(() => {
-        const provider = run.provider === "claude" || run.provider === "codex" || run.provider === "chatgpt" ? run.provider : "chatgpt";
+        const provider = run.provider === "claude" || run.provider === "codex" || run.provider === "chatgpt" || run.provider === "gemini" ? run.provider : "chatgpt";
         const credit = estimateProviderCredits(provider, run.actualTokens ?? 0, run.model);
         return {
           credits: run.normalizedCostUsd ?? run.codexCredits ?? credit.credits,

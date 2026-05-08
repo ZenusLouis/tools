@@ -282,6 +282,36 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Hotel Booking",
+      "features": [
+        {
+          "name": "Property, Room Types & Physical Room Master",
+          "tasks": [
+            {
+              "id": "omnibooking-M2-F0-T1",
+              "name": "Hotel property CRUD with fee policy and room type management",
+              "summary": "Create/update hotel properties with default fee policy (tax, service fee, cancellation policy, check-in/out times); manage room types with occupancy, pricing, amenities, and status.",
+              "details": "Property required fields: code, name, address, city, contact, check-in/out time, status. Property activatable only when mandatory data exists. Default tax rate, service fee rate, cancellation policy, check-in/out times configurable per property used as defaults for bookings/invoices. Room type: occupancy, base price, bed type, amenities, images, status. Inactive room type hidden from availability search. Page 13.",
+              "acceptanceCriteria": [
+                "Property cannot be activated without all mandatory fields",
+                "Booking uses property fee config unless explicitly overridden",
+                "Inactive room type absent from availability search results",
+                "Room type occupancy violation returns validation error"
+              ],
+              "steps": [
+                "Create hotel_properties and room_types tables",
+                "Add property fee_policy JSONB column for tax/service/cancellation defaults",
+                "Implement activation guard checking mandatory field completeness",
+                "Expose CRUD endpoints /hotel/properties and /hotel/room-types",
+                "Angular property form with fee policy section"
+              ],
+              "status": "pending"
+            }
+          ]
+        }
+      ]
     }
   ]
 }

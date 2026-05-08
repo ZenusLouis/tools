@@ -21,6 +21,13 @@
       "commandsPath": ".agents/providers/chatgpt/commands",
       "skillsPath": "skills",
       "learningPath": ".agents/providers/chatgpt/learning"
+    },
+    "gemini": {
+      "runtime": "local",
+      "rolesPath": ".claude/roles",
+      "commandsPath": ".claude/commands",
+      "skillsPath": "skills",
+      "learningPath": "agents/learning"
     }
   },
   "shared": {

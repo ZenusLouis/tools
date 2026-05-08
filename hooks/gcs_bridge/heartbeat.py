@@ -38,6 +38,7 @@ def send_heartbeat(
             "name": device_name,
             "claudeAvailable": command_available("claude"),
             "codexAvailable": command_available("codex"),
+            "geminiAvailable": command_available("gemini"),
             "projectPaths": project_paths_provider(),
             "metadata": {
                 "cwd": os.getcwd(),
@@ -45,6 +46,7 @@ def send_heartbeat(
                 "startedAt": datetime.now().isoformat(),
                 "claudePath": command_path("claude"),
                 "codexPath": command_path("codex"),
+                "geminiPath": command_path("gemini"),
             },
         },
     )

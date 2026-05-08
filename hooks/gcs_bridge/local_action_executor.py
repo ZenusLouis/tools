@@ -90,6 +90,14 @@ def _estimate_local_cost_usd(provider: str, model: str | None, tokens: int) -> f
         else:
             rate = 3.0
         return round((tokens / 1_000_000) * rate, 8)
+    if provider == "gemini":
+        if "pro" in normalized_model:
+            rate = 3.5
+        elif "flash" in normalized_model:
+            rate = 0.35
+        else:
+            rate = 1.0
+        return round((tokens / 1_000_000) * rate, 8)
     return 0.0
 
 
@@ -605,6 +613,22 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
         except Exception as exc:
             proc.kill()
             raise ValueError(f"Failed to attach task prompt to Codex stdin: {exc}") from exc
+    elif provider == "gemini":
+        binary = command_path("gemini")
+        if not binary:
+            raise ValueError("gemini executable not found in PATH")
+        cmd = [
+            binary, "-p", prompt,
+            "--output-format", "stream-json",
+            "--approval-mode", "yolo",
+        ]
+        if os.environ.get("GCS_MAX_TURNS"):
+            cmd.extend(["--max-turns", os.environ["GCS_MAX_TURNS"]])
+        if model:
+            cmd.extend(["--model", model])
+        display_cmd = f"{' '.join(quote_cmd_arg(part) for part in cmd)}"
+        post_action_progress(action_id, [f"CWD: {cwd}", f"CMD: {display_cmd}"])
+        proc = subprocess.Popen(cmd, cwd=str(cwd), env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
     else:
         raise ValueError(f"unsupported run_task provider: {provider}")
 

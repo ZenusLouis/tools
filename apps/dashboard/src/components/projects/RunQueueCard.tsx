@@ -117,7 +117,7 @@ type ContextPlanInfo = {
 };
 
 type QueueFilter = "all" | "live" | "failed" | "done";
-type ProviderFilter = "all" | "claude" | "codex" | "mcp";
+type ProviderFilter = "all" | "claude" | "codex" | "gemini" | "mcp";
 type PhaseFilter = "all" | "analysis" | "implementation" | "review" | "design";
 type QueueCounts = Record<QueueFilter, number>;
 
@@ -132,6 +132,7 @@ const PROVIDERS: Array<{ value: ProviderFilter; label: string }> = [
   { value: "all", label: "All agents" },
   { value: "claude", label: "Claude" },
   { value: "codex", label: "Codex" },
+  { value: "gemini", label: "Gemini" },
   { value: "mcp", label: "MCP" },
 ];
 
@@ -320,7 +321,7 @@ export function RunQueueCard({ projectName }: { projectName: string }) {
       const phase = action.phase === "analysis" || action.phase === "review" || action.phase === "implementation"
         ? action.phase
         : "implementation";
-      const provider = action.provider === "claude" || action.provider === "codex" ? action.provider : undefined;
+      const provider = action.provider === "claude" || action.provider === "codex" || action.provider === "gemini" ? action.provider : undefined;
       const res = await fetch(`/api/tasks/${encodeURIComponent(action.taskId)}/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

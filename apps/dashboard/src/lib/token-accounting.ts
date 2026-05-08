@@ -58,6 +58,11 @@ export const TOKEN_METER_META = {
     meterLabel: "provider reported",
     meterDescription: "ChatGPT/OpenAI usage comes from OpenAI usage sync when configured, so it is closest to provider-reported billing usage.",
   },
+  gemini: {
+    meterKind: "provider_reported" as const,
+    meterLabel: "provider reported",
+    meterDescription: "Gemini usage is reported directly by the gemini CLI stream-json output, including token counts and sometimes cost.",
+  },
 } as const;
 
 export function emptyMeterTotals(): MeterTotals {
@@ -164,9 +169,17 @@ export function estimateCodexCredits(
   };
 }
 
-export function estimateProviderCredits(provider: "claude" | "codex" | "chatgpt", tokens: number, model?: string | null): TokenCreditEstimate {
+export function estimateProviderCredits(provider: "claude" | "codex" | "chatgpt" | "gemini", tokens: number, model?: string | null): TokenCreditEstimate {
   if (provider === "codex") return estimateCodexCredits(tokens, model);
   if (provider === "claude") return estimateClaudeCredits(tokens, model);
+  if (provider === "gemini") {
+    const rate = (model || "").toLowerCase().includes("pro") ? 3.5 : 0.35;
+    return {
+        credits: (tokens / 1_000_000) * rate,
+        basis: "input_equivalent",
+        note: "Gemini credits estimated from local token count using Google AI rate card (Flash/Pro blend).",
+    };
+  }
   return {
     credits: 0,
     basis: "not_applicable",

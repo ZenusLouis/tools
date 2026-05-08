@@ -103,6 +103,7 @@ const PROVIDER_OPTIONS = [
   { value: "auto", label: "Auto provider" },
   { value: "claude", label: "Claude local" },
   { value: "codex", label: "Codex local" },
+  { value: "gemini", label: "Gemini local" },
 ] as const;
 
 const OPTIMIZER_OPTIONS = [
@@ -168,7 +169,7 @@ export function RunTaskButton({ taskId, disabled }: { taskId: string; disabled?:
 
   useEffect(() => {
     if (provider === "auto") return;
-    const providerKey = provider === "claude" ? "claude" : "codex";
+    const providerKey = provider === "claude" ? "claude" : provider === "gemini" ? "gemini" : "codex";
     fetch(`/api/models?provider=${providerKey}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((body: { models?: string[] }) => {
