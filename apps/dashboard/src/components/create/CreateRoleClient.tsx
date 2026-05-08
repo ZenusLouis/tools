@@ -10,7 +10,7 @@ type Role = {
   name: string;
   slug: string;
   description: string;
-  provider: "claude" | "codex" | "chatgpt";
+  provider: "claude" | "codex" | "chatgpt" | "gemini";
   defaultModel?: string | null;
   phase: string;
   executionModeDefault: "local" | "dashboard";
@@ -21,6 +21,7 @@ const MODEL_OPTIONS: Record<Role["provider"], string[]> = {
   claude: ["", "claude-sonnet-4-6", "claude-haiku-4-5-20251001", "claude-opus-4-1-20250805"],
   codex: ["", "gpt-5.2-codex", "gpt-5.1-codex", "gpt-5.1-codex-max", "gpt-5-codex"],
   chatgpt: ["", "gpt-5.2", "gpt-5.2-pro", "gpt-5.1", "gpt-5", "gpt-4.1", "gpt-4o-mini"],
+  gemini: ["", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-thinking-exp", "gemini-exp-1206"],
 };
 
 function modelOptionsFor(provider: Role["provider"], liveModels: string[] = []) {
@@ -329,7 +330,7 @@ export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; s
           <Select
             name="provider"
             label="Provider"
-            options={["claude", "codex", "chatgpt"]}
+            options={["claude", "codex", "chatgpt", "gemini"]}
             defaultValue={editingRole?.provider}
             onChange={(value) => {
               const nextProvider = value as Role["provider"];

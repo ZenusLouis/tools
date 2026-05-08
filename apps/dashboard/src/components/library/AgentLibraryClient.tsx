@@ -27,7 +27,7 @@ type Role = {
   id: string;
   name: string;
   description: string;
-  provider: "claude" | "codex" | "chatgpt";
+  provider: "claude" | "codex" | "chatgpt" | "gemini";
   phase: string;
   executionModeDefault: "local" | "dashboard";
   skills: Skill[];

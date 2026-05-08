@@ -7,7 +7,7 @@ import { primaryMeterValue, type MeterTotals } from "@/lib/token-accounting";
 
 
 type ProviderBreakdown = {
-  provider: "claude" | "codex" | "chatgpt";
+  provider: "claude" | "codex" | "chatgpt" | "gemini";
   tokens: number;
   sessionTokens: number;
   toolTokens: number;
@@ -24,6 +24,7 @@ const PROVIDER_UI: Record<ProviderBreakdown["provider"], { label: string; color:
   claude: { label: "Claude", color: "text-orange-300", bar: "bg-orange-400" },
   codex: { label: "Codex", color: "text-sky-300", bar: "bg-sky-400" },
   chatgpt: { label: "ChatGPT", color: "text-emerald-300", bar: "bg-emerald-400" },
+  gemini: { label: "Gemini", color: "text-purple-300", bar: "bg-purple-400" },
 };
 
 function displayValue(item: ProviderBreakdown) {

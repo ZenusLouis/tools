@@ -12,7 +12,7 @@ type AnalyzeResult = {
   source?: string;
   pending?: boolean;
   actionId?: string;
-  provider?: "claude" | "codex" | "chatgpt";
+  provider?: "claude" | "codex" | "chatgpt" | "gemini";
   runnerLabel?: string;
 };
 

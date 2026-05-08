@@ -14,7 +14,7 @@ type ProjectWithLatestPath = {
   bridgePaths: { deviceId: string; path: string }[];
 };
 
-type AnalysisProvider = "claude" | "codex" | "chatgpt";
+type AnalysisProvider = "claude" | "codex" | "chatgpt" | "gemini";
 
 type AiTask = {
   name: string;
@@ -311,6 +311,7 @@ function providerCredential(provider: string, credentialService: string) {
 function providerLabel(provider: string) {
   if (provider === "chatgpt") return "ChatGPT";
   if (provider === "codex") return "Codex";
+  if (provider === "gemini") return "Gemini";
   return "Claude";
 }
 
@@ -368,7 +369,11 @@ export async function analyzeProjectForWorkspace(
 
   async function queueLocalBridgeAnalysis() {
     const bridgeDevice = await db.bridgeDevice.findFirst({
-      where: { workspaceId, claudeAvailable: true, lastSeenAt: { gte: new Date(Date.now() - 5 * 60_000) } },
+      where: {
+        workspaceId,
+        OR: [{ claudeAvailable: true }, { geminiAvailable: true }],
+        lastSeenAt: { gte: new Date(Date.now() - 5 * 60_000) },
+      },
       select: { id: true },
     });
     if (!bridgeDevice) return null;

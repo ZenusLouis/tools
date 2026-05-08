@@ -151,7 +151,8 @@ function credentialFor(provider: string) {
 }
 
 function modeFor(provider: string) {
-  return provider === "chatgpt" ? "dashboard" : "local";
+  if (provider === "chatgpt") return "dashboard";
+  return "local";
 }
 
 function roleTypeFor(slug: string, phase: string) {
@@ -343,7 +344,7 @@ type SessionEntry = {
   tool?: string;
   tokens?: number;
   ts?: string;
-  provider?: "claude" | "codex" | "chatgpt";
+  provider?: "claude" | "codex" | "chatgpt" | "gemini";
   role?: string;
   model?: string;
 };
@@ -417,7 +418,7 @@ type SeedSkill = {
 type RoleFile = {
   slug: string;
   name: string;
-  provider: "claude" | "codex" | "chatgpt";
+  provider: "claude" | "codex" | "chatgpt" | "gemini";
   phase: "analysis" | "implementation" | "review" | "research" | "design" | "custom";
   defaultCommand?: string;
   description?: string;
@@ -612,7 +613,7 @@ async function syncSkillsAndRoles(db: Db, workspaceId: string, root: string, res
         description: skill.description,
         content: skill.content,
         compactGuidance: skill.compactGuidance,
-        providerCompatibility: ["claude", "codex", "chatgpt"],
+        providerCompatibility: ["claude", "codex", "chatgpt", "gemini"],
         roleCompatibility: skill.roleCompatibility,
         tags: skill.tags,
         metadata: {
@@ -635,7 +636,7 @@ async function syncSkillsAndRoles(db: Db, workspaceId: string, root: string, res
         description: skill.description,
         content: skill.content,
         compactGuidance: skill.compactGuidance,
-        providerCompatibility: ["claude", "codex", "chatgpt"],
+        providerCompatibility: ["claude", "codex", "chatgpt", "gemini"],
         roleCompatibility: skill.roleCompatibility,
         tags: skill.tags,
         metadata: {
