@@ -125,6 +125,53 @@ export async function POST(req: NextRequest) {
       completedAt,
     });
     await db.runTelemetry.create({ data: telemetry }).catch(() => null);
+
+    // On success: upsert a MemoryNode so future tasks get project conventions injected
+    if (parsed.data.status === "succeeded") {
+      const payload = objectValue(action.payload);
+      const projectName = typeof payload.projectName === "string" ? payload.projectName : null;
+      const taskId = typeof payload.taskId === "string" ? payload.taskId : null;
+      const taskObj = objectValue(payload.task);
+      const taskName = typeof taskObj.name === "string" ? taskObj.name : taskId ?? "";
+      const reqIds = Array.isArray(taskObj.reqIds) ? taskObj.reqIds.filter((r): r is string => typeof r === "string") : [];
+      const outputText = typeof resultObject.outputText === "string" ? resultObject.outputText : "";
+      const artifactPath = typeof resultObject.artifactPath === "string" ? resultObject.artifactPath : null;
+      const filesChanged = Array.isArray(resultObject.filesChanged) ? resultObject.filesChanged.filter((f): f is string => typeof f === "string") : [];
+
+      if (projectName && taskId && (outputText || artifactPath)) {
+        const body = [
+          outputText ? outputText.slice(0, 1200) : "",
+          filesChanged.length ? `Files changed: ${filesChanged.slice(0, 10).join(", ")}` : "",
+          artifactPath ? `Artifact: ${artifactPath}` : "",
+        ].filter(Boolean).join("\n\n");
+
+        await db.memoryNode.upsert({
+          where: {
+            workspaceId_key: {
+              workspaceId: ctx.workspaceId,
+              key: `task-run:${taskId}`,
+            },
+          },
+          create: {
+            workspaceId: ctx.workspaceId,
+            key: `task-run:${taskId}`,
+            kind: "task-implementation",
+            title: taskName,
+            body,
+            projectName,
+            reqIds,
+            tags: ["task-run", payload.phase as string ?? "implementation"],
+            sourcePath: artifactPath,
+          },
+          update: {
+            body,
+            tags: ["task-run", payload.phase as string ?? "implementation"],
+            sourcePath: artifactPath,
+            updatedAt: new Date(),
+          },
+        }).catch(() => null);
+      }
+    }
   }
 
   if (parsed.data.status === "succeeded" && action.type === "sync_project_metadata" && deviceId) {

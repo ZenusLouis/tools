@@ -173,6 +173,25 @@
                 "Angular seat-map component disabling unavailable seats"
               ],
               "status": "pending"
+            },
+            {
+              "id": "omnibooking-M1-F2-T2",
+              "name": "Hold expiry cleanup and near-real-time seat map refresh",
+              "summary": "Scheduled job expires held seats and makes them available; WebSocket or polling pushes seat status updates to active seat-map viewers.",
+              "details": "Expired holds: set hold status EXPIRED, mark showtime_seats back to AVAILABLE. Scheduler runs every minute (configurable). WebSocket preferred for real-time push; polling acceptable fallback. Creating a new hold auto-cancels expired previous hold for same user/showtime. Page 10-11.",
+              "acceptanceCriteria": [
+                "Expired hold returns HOLD_EXPIRED error on checkout attempt",
+                "Seat map refreshes to show newly available seats within acceptable latency",
+                "Another user releasing seats updates map visible to concurrent viewers"
+              ],
+              "steps": [
+                "Spring @Scheduled job: UPDATE seat_holds SET status=EXPIRED WHERE expires_at < NOW()",
+                "Update showtime_seats status back to AVAILABLE on expiry",
+                "Implement WebSocket topic /topic/showtimes/{showtimeId}/seats broadcasting status delta",
+                "Angular seat-map subscribes to WebSocket; fallback to 30s polling if WS unavailable",
+                "Add HOLD_EXPIRED guard in booking creation service"
+              ],
+              "status": "pending"
             }
           ]
         }
