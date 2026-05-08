@@ -65,8 +65,18 @@ export function McpActionTimeline({ actions }: { actions: McpActionRow[] }) {
                   <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-text-muted">
                     {action.projectName && <span className="font-mono text-accent">{action.projectName}</span>}
                     {action.server && <span>{action.server}</span>}
+                    {action.executionMode && (
+                      <span className={action.executionMode === "artifact_fallback" ? "text-in-progress" : "text-done"}>
+                        {action.executionMode === "artifact_fallback" ? "artifact fallback" : "tool call"}
+                      </span>
+                    )}
                     <span>{timeLabel(action.updatedAt)}</span>
                   </div>
+                  {action.fallbackReason && (
+                    <p className="mt-2 rounded border border-in-progress/20 bg-in-progress/5 px-2 py-1 text-[11px] text-in-progress">
+                      {action.fallbackReason}
+                    </p>
+                  )}
                   {action.artifactPath && (
                     <p className="mt-2 truncate font-mono text-[10px] text-text-muted" title={action.artifactPath}>
                       {action.artifactPath}

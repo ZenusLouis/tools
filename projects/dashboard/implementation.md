@@ -55,6 +55,15 @@
 - Added a Settings UI file import for DB snapshots alongside repo JSON import/export, with explicit reporting for skipped local device paths to keep multi-machine project paths account/device scoped.
 - Expanded Phase 9 Figma tool-plane actions from a single inspection queue to the full design flow: Analyze, UI Brief, Implement handoff, and Visual Review. Each queues a versioned bridge action, appears in Run Queue with a distinct label, and writes a dedicated `.gcs/design/*` artifact/report locally.
 - Added MCP Monitor action telemetry: recent MCP/Figma bridge actions now appear on `/mcp`, and bridge result ingestion writes `mcp_action_completed` / `mcp_action_failed` audit records tied back to the MCP server for accurate last-call/last-error display.
+- Added MCP execution-mode reporting: design actions now record whether they were a real `tool_call` or an `artifact_fallback`, include the fallback reason in `.gcs/design/*` reports, and show that mode in the MCP Monitor action timeline.
+- Started Phase 10 Spring Boot extraction with a staged `apps/core-api` service instead of moving orchestration all at once.
+- Added Spring Boot contract-only endpoints: `/api/core/health` and `/api/core/contract`, exposing Bridge Action Protocol v1 action types, lifecycle states, required payload fields, and telemetry contract fields.
+- Added dashboard-side Core API feature flag helpers and `/api/core-runtime`, so the Next.js console can detect the Spring runtime without depending on it yet.
+- Added a Settings card for Core API Runtime status so operators can see whether the staged Spring service is disabled, offline, or online without checking logs manually.
+- Added a Docker Compose `core-api` profile and `GCS_CORE_API_ENABLED` / `GCS_CORE_API_URL` env examples for opt-in local contract testing.
+- Added an in-memory Spring Bridge Action Protocol v1 lifecycle slice for contract testing: enqueue, pending, claim, lease, status, result, and cancel endpoints under `/api/core/bridge/file-actions`.
+- Added Spring lifecycle tests covering pending claim, claim token lease transition, terminal result persistence, and pending cancellation.
+- Added a dashboard-authenticated Core Runtime smoke route and Settings button that exercises the Spring lifecycle end-to-end: enqueue, claim, lease, result, and status readback.
 
 ## Verification
 
@@ -76,9 +85,14 @@
 - `npm run lint`, `npx tsc --noEmit`, `python -m py_compile` over `hooks/gcs_bridge_daemon.py` and `hooks/gcs_bridge/*.py`, and `npm run build` passed after snapshot import/export UI and metadata round-trip updates.
 - `npm run lint`, `npx tsc --noEmit`, `python -m py_compile` over the bridge entrypoint/modules, and `npm run build` passed after expanding the Figma MCP design-flow actions.
 - `npm run lint`, `npx tsc --noEmit`, `python -m py_compile` over the bridge entrypoint/modules, and `npm run build` passed after adding MCP action telemetry to the monitor and bridge result path.
+- `npm run lint`, `npx tsc --noEmit`, `python -m py_compile` over the bridge entrypoint/modules, and `npm run build` passed after adding MCP tool-call vs artifact-fallback reporting.
+- `mvn test` passed for the new Spring Boot `apps/core-api` contract baseline.
+- `npm run lint`, `npx tsc --noEmit`, and `npm run build` passed after wiring the Core API feature flag/status endpoint and Settings status card into the dashboard.
+- `mvn test`, `npm run lint`, `npx tsc --noEmit`, and `npm run build` passed after adding the in-memory Spring bridge action lifecycle slice.
+- `mvn test`, `npm run lint`, `npx tsc --noEmit`, and `npm run build` passed after adding the dashboard Core Runtime lifecycle smoke test.
 
 ## Gaps
 
-- Spring Boot extraction remains a later phase.
+- Spring Boot extraction has a contract-only baseline; moving bridge lifecycle, telemetry, router, memory, and audit APIs into Spring remains staged behind feature flags.
 - MCP online tool-call telemetry is partially represented by queued design-inspection/audit events; direct MCP tool invocation is still staged behind the local bridge/tool-plane contract.
 - Full Spring Boot extraction remains staged for a later phase; local execution is still Python bridge runtime by design.

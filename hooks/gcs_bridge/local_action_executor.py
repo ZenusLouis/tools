@@ -1035,11 +1035,16 @@ def execute_mcp_design_action(action: dict[str, Any]) -> dict[str, Any]:
     else:
         command_display = "mcp server not registered"
 
+    execution_mode = "tool_call" if command or url else "artifact_fallback"
+    fallback_reason = "" if execution_mode == "tool_call" else "No MCP server command or URL is registered; wrote handoff artifacts only."
+
     post_action_progress(action_id, [
         f"Starting {action_config['title']} for {project_name}.",
         f"Figma URL: {figma_url}",
         f"MCP server: {server_name} ({server_type})",
         f"MCP profile: {mcp_profile}",
+        f"Execution mode: {execution_mode}",
+        *([f"Fallback: {fallback_reason}"] if fallback_reason else []),
         f"CWD: {cwd}",
         f"CMD: {command_display}",
     ])
@@ -1051,6 +1056,8 @@ def execute_mcp_design_action(action: dict[str, Any]) -> dict[str, Any]:
         "mcpProfile": mcp_profile,
         "mcpServer": mcp_server or None,
         "actionType": action_type,
+        "executionMode": execution_mode,
+        "fallbackReason": fallback_reason or None,
         "flow": [
             "Analyze Figma",
             "Generate UI brief",
@@ -1079,6 +1086,7 @@ def execute_mcp_design_action(action: dict[str, Any]) -> dict[str, Any]:
         f"- MCP Server: {server_name} ({server_type})",
         f"- Runtime Command: `{command_display}`",
         f"- Action Type: `{action_type}`",
+        f"- Execution Mode: `{execution_mode}`",
         "",
         "## Current Action",
         action_config["focus"],
@@ -1092,6 +1100,8 @@ def execute_mcp_design_action(action: dict[str, Any]) -> dict[str, Any]:
         "## Fallback",
         "If MCP tooling is unavailable, use the linked Figma URL and this artifact as the handoff record. Do not block unrelated task execution.",
     ]
+    if fallback_reason:
+        brief.extend(["", "Fallback reason:", fallback_reason])
     artifact_path = safe_local_target(project_path, f".gcs/design/{action_config['artifact']}")
     artifact_path.parent.mkdir(parents=True, exist_ok=True)
     artifact_path.write_text("\n".join(brief), encoding="utf-8")

@@ -34,6 +34,8 @@ export type McpActionRow = {
   status: string;
   projectName: string | null;
   server: string | null;
+  executionMode: string | null;
+  fallbackReason: string | null;
   artifactPath: string | null;
   error: string | null;
   createdAt: string;
@@ -163,6 +165,7 @@ export async function getRecentMcpActions(workspaceId: string): Promise<McpActio
   return actions.map((action) => {
     const payload = objectValue(action.payload);
     const result = objectValue(action.result);
+    const contextReport = objectValue(result.contextReport);
     const mcpServer = objectValue(payload.mcpServer);
     return {
       id: action.id,
@@ -170,6 +173,8 @@ export async function getRecentMcpActions(workspaceId: string): Promise<McpActio
       status: action.status,
       projectName: typeof payload.projectName === "string" ? payload.projectName : null,
       server: typeof mcpServer.name === "string" ? mcpServer.name : null,
+      executionMode: typeof contextReport.executionMode === "string" ? contextReport.executionMode : null,
+      fallbackReason: typeof contextReport.fallbackReason === "string" ? contextReport.fallbackReason : null,
       artifactPath: typeof result.artifactPath === "string" ? result.artifactPath : null,
       error: action.error ?? (typeof result.error === "string" ? result.error : null),
       createdAt: action.createdAt.toISOString(),

@@ -27,6 +27,18 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  core-api:
+    profiles: ["core-api"]
+    build:
+      context: ../..
+      dockerfile: apps/core-api/Dockerfile
+    ports:
+      - "4000:4000"
+    environment:
+      PORT: 4000
+      GCS_CORE_RUNTIME_MODE: contract-only
+    restart: unless-stopped
+
   postgres:
     image: postgres:17-alpine
     environment:

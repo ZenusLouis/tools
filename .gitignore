@@ -8,6 +8,9 @@ apps/dashboard/out/
 # Prisma generated client
 apps/dashboard/node_modules/.prisma/
 
+# Maven build output
+apps/core-api/target/
+
 # MCP config (contains API keys)
 .mcp.json
 
