@@ -192,6 +192,47 @@
                 "Add HOLD_EXPIRED guard in booking creation service"
               ],
               "status": "pending"
+            },
+            {
+              "id": "omnibooking-M1-F2-T3",
+              "name": "Cinema booking creation, server-side pricing, and payment recording",
+              "summary": "Create cinema booking from active hold with server-authoritative total (tickets + combos - promotion + fees); record payment success/failure; issue one ticket per seat with signed QR payload.",
+              "details": "Booking requires active non-expired hold. Total calculated server-side: sum ticket prices + combos - promotion discount + fees. On payment SUCCESS: booking → PAID, showtime_seats → SOLD, hold → CONVERTED, tickets ISSUED. On payment FAILURE: status FAILED with reason; booking stays PENDING until expiry. Each ticket: unique code, QR payload = ticketCode + HMAC signature. Page 11.",
+              "acceptanceCriteria": [
+                "Booking cannot be created from expired or released hold",
+                "Server-calculated total is source of truth; client total ignored",
+                "Payment success triggers PAID booking, SOLD seats, ISSUED tickets atomically",
+                "Ticket count equals booked seat count",
+                "QR payload verifiable by signature"
+              ],
+              "steps": [
+                "Create bookings, booking_items, payments, tickets tables",
+                "Implement PricingEngine: sum seat prices by type + combos - PromotionService discount + fees",
+                "Wrap payment success in @Transactional: update booking, seats, hold, insert tickets",
+                "Generate ticketCode (UUID) and HMAC-SHA256 signature in TicketService",
+                "Write POST /cinema/bookings and POST /cinema/payments endpoints"
+              ],
+              "status": "pending"
+            },
+            {
+              "id": "omnibooking-M1-F2-T4",
+              "name": "QR-based ticket check-in with duplicate and window guards",
+              "summary": "Staff scans QR code to check in ISSUED tickets within the valid window; duplicate scan and out-of-window attempts return descriptive errors without success.",
+              "details": "Verify QR payload signature before acting. Only ISSUED tickets within check-in window can transition to CHECKED_IN. Store staff ID, timestamp, gate on check-in. Already-checked-in ticket returns previous check-in info, not success. Out-of-window returns CHECKIN_WINDOW_CLOSED. REFUNDED/CANCELLED/INVALID tickets cannot check in. Page 11-12.",
+              "acceptanceCriteria": [
+                "Valid ISSUED ticket within window transitions to CHECKED_IN",
+                "Second scan displays warning with previous check-in details, not success",
+                "Out-of-window scan returns CHECKIN_WINDOW_CLOSED",
+                "Tampered QR payload rejected by signature verification"
+              ],
+              "steps": [
+                "Implement QRVerificationService validating HMAC signature",
+                "Add check-in window validation (showtime startTime - buffer to startTime + movie duration)",
+                "Update ticket status to CHECKED_IN, persist staffId, checkedInAt, gate",
+                "Return structured error for duplicate, window, and status violations",
+                "Build Angular staff check-in screen with QR scanner integration"
+              ],
+              "status": "pending"
             }
           ]
         }

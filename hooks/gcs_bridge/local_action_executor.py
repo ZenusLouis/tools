@@ -26,6 +26,7 @@ from gcs_bridge.command_utils import command_path
 from gcs_bridge.prompt_builder import (
     apply_prompt_budget,
     build_task_run_prompt,
+    build_task_run_prompt_parts,
     dict_value,
     estimate_text_tokens,
     string_list,
@@ -548,24 +549,40 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
         binary = command_path("claude")
         if not binary:
             raise ValueError("claude executable not found in PATH")
+
+        # Build split prompt for cache_control — cached block (project + code-index)
+        # is placed first so Anthropic caches it across task runs within 5 min TTL.
+        cached_block, dynamic_block = build_task_run_prompt_parts(
+            payload, project_name, project_path, task_id, provider, role, phase, model, ROOT
+        )
+        json_input = json.dumps({
+            "messages": [{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": cached_block, "cache_control": {"type": "ephemeral"}},
+                    {"type": "text", "text": dynamic_block},
+                ],
+            }]
+        }, ensure_ascii=False)
+
         cmd = [
             binary, "-p",
-            "--input-format", "text",
+            "--input-format", "json",
             "--output-format", "stream-json",
             "--verbose",
             "--dangerously-skip-permissions",
-            "--allowedTools", "Bash,Glob,Grep,Read,Write,Edit,Notebook,Sticker,Agent",
+            "--allowedTools", "Bash,Glob,Grep,Read,Write,Edit",
         ]
         if os.environ.get("GCS_MAX_TURNS"):
             cmd.extend(["--max-turns", os.environ["GCS_MAX_TURNS"]])
         if model:
             cmd.extend(["--model", model])
-        display_cmd = f"type {quote_cmd_arg(str(prompt_path))} | {' '.join(quote_cmd_arg(part) for part in cmd)}"
-        post_action_progress(action_id, [f"CWD: {cwd}", f"CMD: {display_cmd}"])
+        display_cmd = f"echo '<json>' | {' '.join(quote_cmd_arg(part) for part in cmd)}"
+        post_action_progress(action_id, [f"CWD: {cwd}", f"CMD: {display_cmd}", "Prompt caching: enabled (cached_block + dynamic_block)"])
         proc = subprocess.Popen(cmd, cwd=str(cwd), env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
         try:
             assert proc.stdin is not None
-            proc.stdin.write(prompt)
+            proc.stdin.write(json_input)
             proc.stdin.close()
         except Exception as exc:
             proc.kill()

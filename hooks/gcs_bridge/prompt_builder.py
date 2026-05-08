@@ -244,13 +244,11 @@ def build_task_run_prompt(
     acceptance_block = "\n".join(f"- {item}" for item in acceptance) or "- No explicit acceptance criteria were provided."
     deps_block = "\n".join(f"- {item}" for item in deps) or "- None"
 
-    return "\n".join([
+    # Cache block: stable per-project content (project info + code-index)
+    # This block is placed first and marked with cache_control so Anthropic
+    # caches it across task runs on the same project within the 5-min TTL.
+    cached_block = "\n".join([
         f"You are running as {provider} local agent for GCS.",
-        "",
-        "## Execution Mode",
-        phase_instruction,
-        "Follow the Suggested Steps in order. Announce each step before working on it, then summarize the result of that step.",
-        "Preserve unrelated user changes. Do not broaden scope beyond this task.",
         "",
         "## Token Budget Rules — MANDATORY",
         "- Read AT MOST 3 files before you start writing code. The code-index and conventions tell you patterns — trust them.",
@@ -262,21 +260,26 @@ def build_task_run_prompt(
         f"- Name: {project_name}",
         f"- Path: {project_path}",
         "",
+        "## Project Code Index",
+        code_index or "No code-index.md found for this project yet. If structure is unclear, inspect the repository before editing.",
+        "",
+        "## Selected Skill Guidance",
+        format_skill_guidance(skill_routing),
+    ])
+
+    # Dynamic block: task-specific content (changes every task run, not cached)
+    dynamic_block = "\n".join([
+        "## Execution Mode",
+        phase_instruction,
+        "Follow the Suggested Steps in order. Announce each step before working on it, then summarize the result of that step.",
+        "Preserve unrelated user changes. Do not broaden scope beyond this task.",
+        "",
         "## Agent",
         f"- Provider: {provider}",
         f"- Role: {role}",
         f"- Model: {model or 'provider default'}",
         f"- Optimizer: {optimizer.get('mode') or 'auto_aggressive'} / {optimizer.get('contextMode') or context_plan.get('mode') or 'standard'}",
-        f"- Routing token cost: {skill_routing.get('tokenCost') or '0 LLM tokens used for routing'}",
-        f"- Estimated prompt tokens: {optimizer.get('estimatedPromptTokens') or 'unknown'}",
         f"- Selected skills: {', '.join(str(skill.get('slug')) for skill in selected_skill_dicts if skill.get('slug')) or 'none'}",
-        f"- Omitted skills: {skill_routing.get('omittedCount') if 'omittedCount' in skill_routing else 'unknown'}",
-        "",
-        "## Optimizer Reason",
-        str(optimizer.get("reason") or "Deterministic routing selected the compact context plan before the model was called."),
-        "",
-        "## Selected Skill Guidance",
-        format_skill_guidance(skill_routing),
         "",
         "## Task",
         f"- ID: {task_id}",
@@ -302,14 +305,11 @@ def build_task_run_prompt(
         "## Dependencies",
         deps_block,
         "",
-        "## Previous Failure Context",
-        format_previous_failure(previous_failure),
-        "",
         "## Related Memory Snippets",
         format_related_memory(payload),
         "",
-        "## Project Code Index",
-        code_index or "No code-index.md found for this project yet. If structure is unclear, inspect the repository before editing.",
+        "## Previous Failure Context",
+        format_previous_failure(previous_failure),
         "",
         "## Risk Notes",
         str(task.get("risk") or "None"),
@@ -320,3 +320,101 @@ def build_task_run_prompt(
         "- List verification commands and results.",
         "- If blocked, explain the blocker clearly and do not claim completion.",
     ])
+
+    return f"{cached_block}\n\n{dynamic_block}"
+
+
+def build_task_run_prompt_parts(
+    payload: dict[str, Any],
+    project_name: str,
+    project_path: str,
+    task_id: str,
+    provider: str,
+    role: str,
+    phase: str,
+    model: str,
+    hub_root: Path,
+) -> tuple[str, str]:
+    """Same as build_task_run_prompt but returns (cached_block, dynamic_block) for JSON caching."""
+    task = payload.get("task") if isinstance(payload.get("task"), dict) else {}
+    req_ids = string_list(task.get("reqIds"))
+    acceptance = string_list(task.get("acceptanceCriteria"))
+    steps = string_list(task.get("steps"))
+    deps = string_list(task.get("deps"))
+    optimizer = dict_value(payload.get("optimizer"))
+    skill_routing = dict_value(payload.get("skillRouting"))
+    context_plan = dict_value(payload.get("contextPlan"))
+    selected_skills = skill_routing.get("selected") if isinstance(skill_routing.get("selected"), list) else []
+    selected_skill_dicts = [item for item in selected_skills if isinstance(item, dict)]
+    code_index_max = int(context_plan.get("codeIndexMaxChars") or 7000)
+    code_index = filter_code_index(load_project_code_index(project_name, project_path, hub_root), task, selected_skill_dicts, code_index_max)
+    phase_instruction = {
+        "analysis": "Prepare a concise implementation brief. Do not modify source files unless required to create planning artifacts.",
+        "review": "Review the implementation against the task scope and acceptance criteria. Prefer findings, risks, and verification gaps.",
+        "implementation": "Implement the scoped task in the local project. Modify files as needed and verify the change.",
+    }.get(phase, "Implement the scoped task in the local project.")
+    step_block = "\n".join(f"{i + 1}. {s}" for i, s in enumerate(steps)) or "- No explicit steps provided."
+    acceptance_block = "\n".join(f"- {a}" for a in acceptance) or "- No explicit acceptance criteria."
+    deps_block = "\n".join(f"- {d}" for d in deps) or "- None"
+    previous_failure = dict_value(payload.get("previousFailure"))
+
+    cached = "\n".join([
+        f"You are running as {provider} local agent for GCS.",
+        "",
+        "## Token Budget Rules — MANDATORY",
+        "- Read AT MOST 3 files before you start writing code. The code-index and conventions tell you patterns — trust them.",
+        "- Do NOT read files to 'understand the codebase' unless a step explicitly requires it.",
+        "- Do NOT run find/glob/bash to discover project structure — the code-index has everything.",
+        "- Write code directly using the patterns shown in conventions. Only read a file if you need its exact content.",
+        "",
+        "## Project",
+        f"- Name: {project_name}",
+        f"- Path: {project_path}",
+        "",
+        "## Project Code Index",
+        code_index or "No code-index.md found. Inspect repository if structure is unclear.",
+        "",
+        "## Selected Skill Guidance",
+        format_skill_guidance(skill_routing),
+    ])
+
+    dynamic = "\n".join([
+        "## Execution Mode",
+        phase_instruction,
+        "Follow the Suggested Steps in order. Preserve unrelated changes. Do not broaden scope.",
+        "",
+        f"## Task: {task_id}",
+        f"- Name: {task.get('name') or ''}",
+        f"- Module: {task.get('moduleName') or ''}",
+        f"- Feature: {task.get('featureName') or ''}",
+        f"- Req IDs: {', '.join(req_ids) if req_ids else 'none'}",
+        "",
+        "## Summary",
+        str(task.get("summary") or ""),
+        "",
+        "## Details",
+        str(task.get("details") or ""),
+        "",
+        "## Acceptance Criteria",
+        acceptance_block,
+        "",
+        "## Suggested Steps",
+        step_block,
+        "",
+        "## Dependencies",
+        deps_block,
+        "",
+        "## Related Memory Snippets",
+        format_related_memory(payload),
+        "",
+        "## Previous Failure Context",
+        format_previous_failure(previous_failure),
+        "",
+        "## Risk Notes",
+        str(task.get("risk") or "None"),
+        "",
+        "## Required Final Response",
+        "- State what changed. List changed files. List verification commands and results.",
+        "- If blocked, explain the blocker clearly and do not claim completion.",
+    ])
+    return cached, dynamic
