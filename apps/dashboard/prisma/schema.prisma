@@ -188,6 +188,8 @@ model BridgeDevice {
   deviceKey      String
   claudeAvailable Boolean @default(false)
   codexAvailable  Boolean @default(false)
+  geminiAvailable Boolean @default(false)
+  reportedModels  Json     @default("{}")
   lastSeenAt     DateTime?
   metadata       Json     @default("{}")
   workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)

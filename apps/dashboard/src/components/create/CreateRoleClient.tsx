@@ -21,7 +21,20 @@ const MODEL_OPTIONS: Record<Role["provider"], string[]> = {
   claude: ["", "claude-sonnet-4-6", "claude-haiku-4-5-20251001", "claude-opus-4-1-20250805"],
   codex: ["", "gpt-5.2-codex", "gpt-5.1-codex", "gpt-5.1-codex-max", "gpt-5-codex"],
   chatgpt: ["", "gpt-5.2", "gpt-5.2-pro", "gpt-5.1", "gpt-5", "gpt-4.1", "gpt-4o-mini"],
-  gemini: ["", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-thinking-exp", "gemini-exp-1206"],
+  gemini: [
+    "",
+    "gemini-1.5-flash",
+    "gemini-1.5-pro",
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite-preview-02-05",
+    "gemini-2.0-pro-exp-02-05",
+    "gemini-2.0-flash-thinking-exp-01-21",
+    "gemini-exp-1206",
+    "gemini-1.5-pro-latest",
+    "gemini-1.5-flash-latest",
+    "gemini-1.5-flash-8b",
+    "gemini-1.0-pro"
+  ],
 };
 
 function modelOptionsFor(provider: Role["provider"], liveModels: string[] = []) {
@@ -341,7 +354,7 @@ export function CreateRoleClient({ roles, skills, profiles }: { roles: Role[]; s
           />
           <Select name="phase" label="Phase" options={["analysis", "implementation", "review", "research", "design", "custom"]} defaultValue={editingRole?.phase} />
           <Select name="executionModeDefault" label="Execution mode" options={["local", "dashboard"]} defaultValue={editingRole?.executionModeDefault} />
-          <Select name="credentialService" label="Credential" options={["none", "openai", "anthropic"]} />
+          <Select name="credentialService" label="Credential" options={["none", "openai", "anthropic", "google"]} />
           <Select name="roleType" label="Role type" options={["ba", "dev", "reviewer", "qa", "design", "researcher", "custom"]} />
           <Select name="mcpProfile" label="MCP profile" options={["", ...profiles]} />
         </div>
