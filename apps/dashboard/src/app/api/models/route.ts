@@ -108,6 +108,7 @@ export async function GET(req: NextRequest) {
     // Ignore db errors
   }
 
+  const fallback = LOCAL_MODELS[provider] ?? [];
   const models = [...new Set([...live, ...reported, ...fallback])];
   return NextResponse.json({
     provider,

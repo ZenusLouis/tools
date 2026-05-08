@@ -16,6 +16,17 @@ import os
 def get_gemini_models() -> list[str]:
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
+        try:
+            # Try to read from Gemini CLI settings
+            settings_path = os.path.expanduser("~/.gemini/settings.json")
+            if os.path.exists(settings_path):
+                with open(settings_path, "r", encoding="utf-8") as f:
+                    settings = json.load(f)
+                    api_key = settings.get("apiKey") or settings.get("api_key")
+        except Exception:
+            pass
+            
+    if not api_key:
         return []
     try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
