@@ -83,8 +83,6 @@ export async function GET(req: NextRequest) {
     live = [];
   }
 
-  const fallback = LOCAL_MODELS[provider] ?? [];
-  
   // Also fetch models reported by local bridge devices
   let reported: string[] = [];
   try {

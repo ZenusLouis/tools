@@ -558,24 +558,16 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
         if not binary:
             raise ValueError("claude executable not found in PATH")
 
-        # Build split prompt for cache_control — cached block (project + code-index)
-        # is placed first so Anthropic caches it across task runs within 5 min TTL.
+        # Build prompt — cached_block (project context) + dynamic_block (task specifics).
+        # Claude CLI does not support --input-format json; send as plain text via stdin.
         cached_block, dynamic_block = build_task_run_prompt_parts(
             payload, project_name, project_path, task_id, provider, role, phase, model, ROOT
         )
-        json_input = json.dumps({
-            "messages": [{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": cached_block, "cache_control": {"type": "ephemeral"}},
-                    {"type": "text", "text": dynamic_block},
-                ],
-            }]
-        }, ensure_ascii=False)
+        json_input = cached_block + "\n\n" + dynamic_block
 
         cmd = [
             binary, "-p",
-            "--input-format", "json",
+            "--input-format", "text",
             "--output-format", "stream-json",
             "--verbose",
             "--dangerously-skip-permissions",
@@ -585,8 +577,8 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
             cmd.extend(["--max-turns", os.environ["GCS_MAX_TURNS"]])
         if model:
             cmd.extend(["--model", model])
-        display_cmd = f"echo '<json>' | {' '.join(quote_cmd_arg(part) for part in cmd)}"
-        post_action_progress(action_id, [f"CWD: {cwd}", f"CMD: {display_cmd}", "Prompt caching: enabled (cached_block + dynamic_block)"])
+        display_cmd = f"echo '<prompt>' | {' '.join(quote_cmd_arg(part) for part in cmd)}"
+        post_action_progress(action_id, [f"CWD: {cwd}", f"CMD: {display_cmd}"])
         proc = subprocess.Popen(cmd, cwd=str(cwd), env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
         try:
             assert proc.stdin is not None
