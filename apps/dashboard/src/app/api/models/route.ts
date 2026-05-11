@@ -86,17 +86,17 @@ export async function GET(req: NextRequest) {
   // Also fetch models reported by local bridge devices
   let reported: string[] = [];
   try {
+    const providerFilter =
+      provider === "claude" ? { claudeAvailable: true } :
+      provider === "codex"  ? { codexAvailable: true } :
+      provider === "gemini" ? { geminiAvailable: true } :
+      {};
     const devices = await db.bridgeDevice.findMany({
       where: {
         workspaceId: user.workspaceId,
-        lastSeenAt: { gte: new Date(Date.now() - 5 * 60_000) }, // Active in last 5 mins
-        OR: [
-          { providerCompatibility: { has: provider } }, // If we add this later
-          { claudeAvailable: provider === "claude" ? true : undefined },
-          { codexAvailable: provider === "codex" ? true : undefined },
-          { geminiAvailable: provider === "gemini" ? true : undefined },
-        ].filter(v => Object.values(v)[0] !== undefined) as any,
-      }
+        lastSeenAt: { gte: new Date(Date.now() - 5 * 60_000) },
+        ...providerFilter,
+      },
     });
     for (const d of devices) {
       const models = (d.reportedModels as any)?.[provider] as string[];

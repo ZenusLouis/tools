@@ -308,6 +308,120 @@
                 "Angular property form with fee policy section"
               ],
               "status": "pending"
+            },
+            {
+              "id": "omnibooking-M2-F0-T2",
+              "name": "Physical room management with status and maintenance block by date range",
+              "summary": "Manage individual physical rooms per property; status OUT_OF_SERVICE and MAINTENANCE exclude room from availability; date-range maintenance blocks further restrict booking.",
+              "details": "Room: roomNo unique per property, belongs to property and room type. Status OUT_OF_SERVICE and MAINTENANCE exclude from availability queries. Maintenance block: stores room, startDate, endDate, reason. Availability excludes overlapping block dates. Page 13.",
+              "acceptanceCriteria": [
+                "OUT_OF_SERVICE and MAINTENANCE rooms absent from availability",
+                "Maintenance block for date range excludes room during those dates only",
+                "roomNo unique constraint per property enforced"
+              ],
+              "steps": [
+                "Create hotel_rooms and room_maintenance_blocks tables",
+                "Add status enum: AVAILABLE, OUT_OF_SERVICE, MAINTENANCE",
+                "Availability query JOINs room_maintenance_blocks excluding date-overlapping rooms",
+                "Expose /hotel/rooms and /hotel/rooms/:id/maintenance-blocks endpoints",
+                "Angular room list with status badge and block calendar"
+              ],
+              "status": "pending"
+            }
+          ]
+        },
+        {
+          "name": "Availability Search & Rate Plans",
+          "tasks": [
+            {
+              "id": "omnibooking-M2-F1-T1",
+              "name": "Rate plan CRUD with duplicate-overlap prevention and availability search",
+              "summary": "Managers create rate plans per room type with date range, nightly price, refundable flag, breakfast option, and cancellation deadline; search returns room types with available quantity and estimated total using [checkIn, checkOut) logic.",
+              "details": "Rate plan fields: room type, date range, price per night, refundable flag, breakfast option, cancellation deadline, priority. Same room type/date/priority cannot have multiple active rates — return validation error. Availability search: required checkInDate, checkOutDate, guest count; optional property/city/room type filter. Excludes: OUT_OF_SERVICE, MAINTENANCE rooms, overlapping maintenance blocks, overlapping confirmed/active bookings and holds. Back-to-back bookings allowed (checkOut of one = checkIn of next). Cancelled/refunded/no-show do not block. Page 14.",
+              "acceptanceCriteria": [
+                "Overlapping rate plan with same room type/date/priority returns validation error",
+                "Availability search returns room types with quantity available and estimated nightly total",
+                "Back-to-back bookings (adjacent dates) are allowed",
+                "Cancelled/refunded bookings do not reduce available count"
+              ],
+              "steps": [
+                "Create hotel_rate_plans table with unique constraint on (room_type_id, date_range, priority) where status=ACTIVE",
+                "Implement RatePlanService.getApplicableRate() for a room type on given date",
+                "Write availability query: left-join bookings excluding CANCELLED/REFUNDED/NO_SHOW statuses, apply [checkIn, checkOut) interval logic",
+                "Expose GET /hotel/availability?checkIn=&checkOut=&guests=&propertyId=",
+                "Angular availability search form with date picker and results grid"
+              ],
+              "status": "pending"
+            }
+          ]
+        },
+        {
+          "name": "Hotel Room Hold & Booking",
+          "tasks": [
+            {
+              "id": "omnibooking-M2-F2-T1",
+              "name": "Room hold with concurrent conflict prevention and pay-now/pay-at-hotel modes",
+              "summary": "Create temporary room hold validating full availability (bookings, holds, status, maintenance, rate plan); prevent overlapping holds via transaction lock; support pay-now and pay-at-hotel confirmation modes.",
+              "details": "Hold fields: customer, date range, physical room, expiry. Full availability re-check at hold creation inside a transaction with SELECT FOR UPDATE. Expired hold cannot convert to booking. Pay-now: confirms after payment success. Pay-at-hotel: may confirm with UNPAID status if property allows. Hold response: holdId, expiresAt, room/roomType, price summary. Booking includes primary guest (required) + additional guests (optional). Page 15.",
+              "acceptanceCriteria": [
+                "Concurrent hold attempts for same room and overlapping dates: exactly one succeeds",
+                "Unavailable room returns ROOM_NOT_AVAILABLE",
+                "Expired hold returns HOLD_EXPIRED on booking creation attempt",
+                "Pay-at-hotel booking can reach CONFIRMED with UNPAID payment status"
+              ],
+              "steps": [
+                "Create hotel_holds, hotel_bookings, hotel_guests tables",
+                "Implement hold creation with SELECT FOR UPDATE on overlapping hold/booking rows",
+                "Add date-range unique constraint logic in HoldService",
+                "Implement pay-now and pay-at-hotel confirmation paths in HotelBookingService",
+                "Expose POST /hotel/holds and POST /hotel/bookings endpoints"
+              ],
+              "status": "pending"
+            },
+            {
+              "id": "omnibooking-M2-F2-T2",
+              "name": "Hotel cancellation policy engine and no-show handling",
+              "summary": "Apply rate/property cancellation policy on booking cancellation (refund, penalty, or no charge); no-show releases room and records audit.",
+              "details": "Cancellation shows financial impact before user confirms. Policy evaluates deadline relative to check-in date: before deadline → full refund; after deadline → penalty or no refund. No-show: releases physical room (status → AVAILABLE/DIRTY based on policy), records no-show audit entry. Page 15.",
+              "acceptanceCriteria": [
+                "Cancellation screen shows refund/penalty amount before confirmation",
+                "Before-deadline cancellation creates refund per policy",
+                "After-deadline cancellation applies penalty or no refund per policy",
+                "No-show releases room and writes audit record"
+              ],
+              "steps": [
+                "Implement CancellationPolicyEngine reading rate plan cancellation_deadline and property defaults",
+                "Return financial impact DTO from GET /hotel/bookings/:id/cancellation-preview",
+                "On POST /hotel/bookings/:id/cancel: apply policy, create refund request if applicable, update booking status",
+                "Implement no-show job: flag bookings as NO_SHOW after check-in deadline passes, release room",
+                "Angular cancellation confirmation dialog showing impact breakdown"
+              ],
+              "status": "pending"
+            }
+          ]
+        },
+        {
+          "name": "Check-in/Check-out & Hotel Reports",
+          "tasks": [
+            {
+              "id": "omnibooking-M2-F3-T1",
+              "name": "Hotel check-in with room assignment and check-in log recording",
+              "summary": "Receptionist checks in CONFIRMED booking within allowed window; assigns physical room if booking is room-type level; records staff, time, guest verification flag, remarks.",
+              "details": "Only CONFIRMED bookings can check in. Date/time must be within allowed window unless override permission held. If booking is room-type-level, receptionist selects available physical room from filtered list. Booking status → CHECKED_IN, room status → OCCUPIED. Check-in log records staffId, checkedInAt, guestVerified flag, remarks. Page 15-16.",
+              "acceptanceCriteria": [
+                "CONFIRMED booking transitions to CHECKED_IN after successful check-in",
+                "Check-in without room assignment returns validation error",
+                "Booking detail shows full check-in history log",
+                "Early/late check-in blocked without override permission"
+              ],
+              "steps": [
+                "Create hotel_checkin_logs table",
+                "Add check-in window validation using property check-in time configuration",
+                "Implement room assignment selector in CheckInService for room-type bookings",
+                "Update booking status to CHECKED_IN, room to OCCUPIED atomically",
+                "Angular check-in form with available room selector and remarks field"
+              ],
+              "status": "pending"
             }
           ]
         }
