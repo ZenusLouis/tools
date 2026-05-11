@@ -523,6 +523,49 @@
                 "Route config: lazy-load domain modules, guard each with required permission"
               ],
               "status": "pending"
+            },
+            {
+              "id": "omnibooking-M4-F0-T2",
+              "name": "Server-side paginated tables, inline form validation, status chips, and audit timeline",
+              "summary": "Reusable Angular components: server-side paginated/sortable/filterable table with URL-persisted state; form with inline and submit-summary validation; status chips; confirmation dialogs; audit timeline on detail screens.",
+              "details": "Table: pagination, sort, and filters persisted in URL query params. Forms: required, format, range, cross-field errors visible inline; submit shows error summary. Status chips: text + color, no color-only reliance. Confirmation dialog for destructive/bulk actions with reason field where required. Audit timeline: create/update/status/payment/check-in events. Loading (skeleton), empty, and error states for all async data. Page 19.",
+              "acceptanceCriteria": [
+                "Table state (page, sort, filters) survives browser reload",
+                "Form submit shows summary of all validation errors before API call",
+                "Status chip readable without relying solely on color",
+                "Operational detail screens include audit event timeline"
+              ],
+              "steps": [
+                "Build DataTableComponent wrapping Angular Material table with server-side datasource",
+                "Implement URL sync service persisting pagination/sort/filter to query params",
+                "Build FormValidationSummaryComponent showing all control errors on submit",
+                "Create StatusChipComponent with text+color input",
+                "Build AuditTimelineComponent consuming GET /admin/audit?entityType=&entityId="
+              ],
+              "status": "pending"
+            }
+          ]
+        },
+        {
+          "name": "Domain-specific Admin Screens",
+          "tasks": [
+            {
+              "id": "omnibooking-M4-F1-T1",
+              "name": "User management and role-permission matrix screens",
+              "summary": "User management screen: search/create/update/deactivate/reset/assign roles. Role-permission matrix screen: create roles, assign permission groups via tree transfer component.",
+              "details": "User management: recent activity, role assignment via permission-tree/transfer UI. Role matrix: grouped by domain/resource/action. Corresponds to CORE-UI-003 (User Management) and CORE-UI-004 (Role Permission Matrix) screens. Reuses PermissionTreeComponent from RBAC feature. Page 20.",
+              "acceptanceCriteria": [
+                "Admin can assign roles to user from permission tree without typing codes",
+                "User deactivation from this screen immediately blocks login",
+                "Role screen shows all permissions grouped by domain/resource/action"
+              ],
+              "steps": [
+                "Build UserManagementComponent with DataTable, search, and role assignment dialog",
+                "Build RolePermissionMatrixComponent with transfer list using PermissionTreeComponent",
+                "Wire to /admin/users and /admin/roles CRUD endpoints",
+                "Add confirm dialog for deactivation and role unassignment actions"
+              ],
+              "status": "pending"
             }
           ]
         }

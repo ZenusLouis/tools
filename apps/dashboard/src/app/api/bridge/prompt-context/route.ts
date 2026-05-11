@@ -110,6 +110,14 @@ export async function POST(req: NextRequest) {
         },
       },
     });
+
+    // Load linked design tasks (done only)
+    const designTasks = task.designRefs?.length
+      ? await db.designTask.findMany({
+          where: { id: { in: task.designRefs }, status: "done" },
+          select: { id: true, screenName: true, provider: true, outputUrl: true, figmaNodeId: true, figmaFileKey: true },
+        })
+      : [];
     if (!task) return NextResponse.json({ error: "Task not found" }, { status: 404 });
 
     const project = task.feature?.module?.project;
@@ -242,7 +250,20 @@ ${acceptance.map((item) => `- ${item}`).join("\n")}
 
 ## Suggested Steps
 ${steps.map((step, index) => `${index + 1}. ${step}`).join("\n")}
+${designTasks.length > 0 ? `
+## Design References
+The following screens have been designed for this task. Read the design before implementing UI.
 
+${designTasks.map((d) => {
+  const lines = [`### ${d.screenName}`];
+  if (d.provider === "figma" && d.figmaFileKey && d.figmaNodeId) {
+    lines.push(`- Figma: https://www.figma.com/design/${d.figmaFileKey}?node-id=${d.figmaNodeId}`);
+    lines.push(`  → Use figma-mcp-go MCP tool to read this design`);
+  } else if (d.outputUrl) {
+    lines.push(`- Stitch: ${d.outputUrl}`);
+  }
+  return lines.join("\n");
+}).join("\n\n")}` : ""}
 ## General Rules of Engagement
 - Work inside the current local project folder.
 - Preserve unrelated user changes.

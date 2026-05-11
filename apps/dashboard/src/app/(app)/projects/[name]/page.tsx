@@ -50,6 +50,9 @@ export default async function ProjectOverviewPage({
             <Link href={`/projects/${encodedName}/detail`} className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs text-text-muted hover:text-text hover:bg-card-hover transition-colors">
               <PanelRightOpen size={13} /> Detail
             </Link>
+            <Link href={`/projects/${encodedName}/design`} className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs text-text-muted hover:text-text hover:bg-card-hover transition-colors">
+              <Palette size={13} /> Design
+            </Link>
             <Link href={`/projects/${encodedName}/settings`} className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs text-text-muted hover:text-text hover:bg-card-hover transition-colors">
               <Settings size={13} /> Settings
             </Link>

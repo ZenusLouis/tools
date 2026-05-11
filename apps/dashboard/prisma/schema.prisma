@@ -71,6 +71,7 @@ model Task {
   analysisBriefPath String?
   implementationLogPath String?
   reviewPath String?
+  designRefs  String[]   @default([])
   workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
   baRole    AgentRole? @relation("TaskBaRole", fields: [baRoleId], references: [id], onDelete: SetNull)
   devRole   AgentRole? @relation("TaskDevRole", fields: [devRoleId], references: [id], onDelete: SetNull)
@@ -163,6 +164,7 @@ model Workspace {
   importJobs ImportJob[]
   memoryNodes MemoryNode[]
   memoryEdges MemoryEdge[]
+  designTasks DesignTask[]
   auditLogs AuditLog[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -613,6 +615,33 @@ model MemoryEdge {
   @@index([fromNodeId])
   @@index([toNodeId])
   @@index([relation])
+}
+
+model DesignTask {
+  id              String   @id @default(cuid())
+  workspaceId     String
+  projectName     String
+  screenName      String
+  screenDesc      String   @db.Text
+  userFlow        String?  @db.Text
+  reqIds          String[] @default([])
+  provider        String   @default("stitch")
+  prompt          String   @db.Text
+  status          String   @default("pending")
+  figmaNodeId     String?
+  figmaFileKey    String?
+  stitchScreenId  String?
+  stitchProjectId String?
+  outputUrl       String?
+  linkedTaskIds   String[] @default([])
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([workspaceId, projectName, screenName])
+  @@index([workspaceId])
+  @@index([projectName])
+  @@index([status])
 }
 
 model AuditLog {
