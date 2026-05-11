@@ -422,6 +422,107 @@
                 "Angular check-in form with available room selector and remarks field"
               ],
               "status": "pending"
+            },
+            {
+              "id": "omnibooking-M2-F3-T2",
+              "name": "Hotel check-out with housekeeping task creation and operational reports",
+              "summary": "Receptionist checks out CHECKED_IN booking; room status set to DIRTY; housekeeping task created automatically; hotel dashboard and operational report exports.",
+              "details": "Only CHECKED_IN bookings can check out. On checkout: booking → CHECKED_OUT, room → DIRTY, create housekeeping task row. Housekeeping board shows pending tasks. Dashboard metrics: occupancy rate, available rooms, arrivals, departures, revenue. Reports filterable by property, room type, date range, booking status, payment status. Separate no-show/cancelled/refunded/confirmed/checked-in-out metrics. Page 16-17.",
+              "acceptanceCriteria": [
+                "Checkout transitions booking to CHECKED_OUT and room to DIRTY",
+                "Housekeeping task row created immediately on checkout",
+                "Housekeeping board displays pending DIRTY room tasks",
+                "Report export matches active filters and user permission scope"
+              ],
+              "steps": [
+                "Create housekeeping_tasks table with roomId, createdAt, status, assignedTo",
+                "Implement checkout: @Transactional update booking, room, insert housekeeping task",
+                "Write dashboard aggregation queries for occupancy, arrivals, departures, revenue",
+                "Expose GET /hotel/reports/dashboard and GET /hotel/reports/export with filter params",
+                "Angular housekeeping board component and hotel dashboard with metric cards"
+              ],
+              "status": "pending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cross-domain Payment & State",
+      "features": [
+        {
+          "name": "Payment Entity & Domain Finalization",
+          "tasks": [
+            {
+              "id": "omnibooking-M3-F0-T1",
+              "name": "Cross-domain payment entity with domain reference and finalization trigger",
+              "summary": "Build shared payments table with domainCode, referenceType, referenceId linking cinema bookings and hotel bookings; payment success triggers domain-specific finalization atomically.",
+              "details": "Payment fields: domainCode (CINEMA/HOTEL), referenceType, referenceId, amount, currency, method, status, paidAt, expiredAt, failureReason. On CINEMA payment success: booking PAID + seats SOLD + tickets ISSUED. On HOTEL payment success: booking CONFIRMED or invoice PAID. Finalization must be transactional or compensating. Page 17.",
+              "acceptanceCriteria": [
+                "Cinema and hotel use same payments table with domain reference",
+                "Payment success triggers correct domain state change atomically",
+                "No PAID booking exists without corresponding sold seats/tickets (cinema) or confirmed state (hotel)",
+                "User can retry payment while booking is still within expiry window"
+              ],
+              "steps": [
+                "Create payments table with domain_code, reference_type, reference_id columns",
+                "Implement PaymentFinalizationService dispatching by domainCode to CinemaFinalizationService / HotelFinalizationService",
+                "Wrap finalization in @Transactional with rollback on domain state update failure",
+                "Add idempotency key on payment to prevent double-finalization",
+                "Write integration test: cinema payment success → booking PAID + seat SOLD + ticket ISSUED"
+              ],
+              "status": "pending"
+            },
+            {
+              "id": "omnibooking-M3-F0-T2",
+              "name": "Payment expiry enforcement, refund lifecycle, and stale-update conflict handling",
+              "summary": "Enforce payment expiry (late success rejected without override); manage refund as a separate lifecycle (REQUESTED → APPROVED/REJECTED → COMPLETED); handle concurrent stale-update conflicts with optimistic locking.",
+              "details": "Expired payment cannot be marked success without controlled override. Refund statuses: REQUESTED, APPROVED, REJECTED, COMPLETED. Refunded resource cannot be fulfilled (no re-check-in, no re-ticket). Booking resources protected from double-booking via DB constraints and Redis locks. Backend is source of truth; client previews are informational; final hold/checkout recalculates. Stale update returns 409 for caller to retry. Page 18.",
+              "acceptanceCriteria": [
+                "Payment beyond expiry window returns rejection without override",
+                "Refund lifecycle follows REQUESTED → APPROVED → COMPLETED flow",
+                "Refunded cinema tickets cannot be checked in",
+                "Concurrent same-resource booking attempt: exactly one succeeds",
+                "Stale update (optimistic lock version mismatch) returns 409"
+              ],
+              "steps": [
+                "Add expiredAt check in payment finalization service; log and reject expired success",
+                "Create refund_requests table with status enum; expose approval workflow endpoints",
+                "Add optimistic locking (@Version) to bookings, hotel_bookings, seat_hold entities",
+                "Return 409 on OptimisticLockException with retry-safe message",
+                "Guard ticket check-in and hotel check-in against REFUNDED booking status"
+              ],
+              "status": "pending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Global UI & Operations",
+      "features": [
+        {
+          "name": "Admin Shell Layout & Common UI Patterns",
+          "tasks": [
+            {
+              "id": "omnibooking-M4-F0-T1",
+              "name": "Admin shell with permission-filtered sidebar and consistent layout",
+              "summary": "Build Angular admin shell: left sidebar filtered by permission codes, top header with breadcrumb, content area, notification bell; every screen shows current location and available actions.",
+              "details": "Sidebar items rendered from permissionList returned by /auth/me; items absent when permission missing. Login screen: centered form, redirect to first permitted dashboard. Admin dashboard: domain cards visible by permission. Reload/back navigation preserves context. Page 19.",
+              "acceptanceCriteria": [
+                "Sidebar shows only items user has permission codes for",
+                "Login redirects to first permitted dashboard after success",
+                "Browser back/reload preserves filter and page state",
+                "Every admin screen shows breadcrumb with current location"
+              ],
+              "steps": [
+                "Create Angular AuthGuard reading permissionList from auth store",
+                "Build AppShellComponent: sidebar, header, breadcrumb, router-outlet",
+                "SidebarComponent filters nav items against permissionList at runtime",
+                "Implement NgRx auth state with session restoration via GET /auth/me on app init",
+                "Route config: lazy-load domain modules, guard each with required permission"
+              ],
+              "status": "pending"
             }
           ]
         }

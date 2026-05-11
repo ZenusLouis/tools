@@ -26,6 +26,11 @@ This repository supports Claude Code, Codex, ChatGPT/OpenAI dashboard agents, an
 5. For task work, emit artifacts: `brief.md`, `implementation.md`, `review.md`, or learning notes.
 6. When working from Codex IDE, queue meaningful chat/session context with `hooks/log-codex-ide-chat.ps1`; the long-running bridge daemon syncs the JSONL event.
 
+## Development Rules
+
+### Angular
+- **Template Separation**: Do NOT use inline templates (e.g., `template: '...'`). Always use separate HTML files with `templateUrl`.
+
 ## Useful Commands
 
 ```text
