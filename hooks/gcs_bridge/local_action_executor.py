@@ -452,6 +452,80 @@ def _extract_text_from_stream(text: str) -> str:
     return "\n".join(p for p in parts if p).strip()
 
 
+def _save_task_memory(
+    post_json_data: Any,
+    task_id: str,
+    project_name: str,
+    phase: str,
+    stdout_lines: list[str],
+    output_text: str,
+    returncode: int,
+    task_data: dict[str, Any],
+) -> None:
+    """Extract files read + implementation summary and save as MemoryNodes."""
+    try:
+        nodes: list[dict[str, Any]] = []
+
+        # 1. Files read during this run — so next task in same module can skip re-reading
+        read_files: list[str] = []
+        for line in stdout_lines:
+            m = re.search(r"\[Read:\s*(.+?)\]", line)
+            if m:
+                path = m.group(1).strip()
+                # Normalize to relative path within project
+                if "\\" in path or "/" in path:
+                    fname = re.split(r"[\\/]", path)[-1]
+                    rel = re.sub(r".*?(?:src[\\/]main[\\/]java|src[\\/]app|src[\\/])", "", path).replace("\\", "/")
+                    read_files.append(rel if rel != path else fname)
+
+        if read_files:
+            nodes.append({
+                "kind": "files_read",
+                "key": f"{project_name}:{task_id}:files_read",
+                "title": f"Files read during {task_id}",
+                "body": "\n".join(f"- `{f}`" for f in dict.fromkeys(read_files)),
+                "projectName": project_name,
+                "tags": [phase, "files_read", task_id],
+                "reqIds": list(task_data.get("reqIds") or []),
+                "metadata": {"taskId": task_id, "phase": phase, "exitCode": returncode},
+            })
+
+        # 2. Implementation summary — what was done / what files were written
+        written_files: list[str] = []
+        for line in stdout_lines:
+            m = re.search(r"\[Write:\s*(.+?)\]", line)
+            if m:
+                path = m.group(1).strip()
+                rel = re.sub(r".*?(?:src[\\/]main[\\/]java|src[\\/]app|src[\\/])", "", path).replace("\\", "/")
+                written_files.append(rel if rel != path else path.split("\\")[-1])
+
+        summary_parts = []
+        task_name = str(task_data.get("name") or task_id)
+        summary_parts.append(f"Task: {task_name}")
+        if written_files:
+            summary_parts.append("Written:\n" + "\n".join(f"- `{f}`" for f in dict.fromkeys(written_files)))
+        # Append first 800 chars of Claude output as context
+        if output_text and returncode == 0:
+            summary_parts.append("Summary:\n" + output_text[:800].strip())
+
+        if summary_parts:
+            nodes.append({
+                "kind": "task_result",
+                "key": f"{project_name}:{task_id}:{phase}:result",
+                "title": f"{task_id} — {task_name}",
+                "body": "\n\n".join(summary_parts),
+                "projectName": project_name,
+                "tags": [phase, "task_result", task_id] + list(task_data.get("reqIds") or []),
+                "reqIds": list(task_data.get("reqIds") or []),
+                "metadata": {"taskId": task_id, "phase": phase, "exitCode": returncode},
+            })
+
+        if nodes:
+            post_json_data("/api/bridge/memory", {"nodes": nodes}, timeout=8)
+    except Exception:
+        pass  # memory save is best-effort — never fail the task
+
+
 def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
     action_id = str(action.get("id") or "")
     claim_token = str(action.get("claimToken") or "") or None
@@ -801,6 +875,18 @@ def execute_task_action(action: dict[str, Any]) -> dict[str, Any]:
         },
         timeout=8,
     )
+    # Save memory nodes so future tasks in the same module skip re-reading these files
+    _save_task_memory(
+        post_json_data,
+        task_id=task_id,
+        project_name=project_name,
+        phase=phase,
+        stdout_lines=stdout_lines,
+        output_text=output_text,
+        returncode=returncode,
+        task_data=task_data,
+    )
+
     log_lines = [
         f"Finished local {provider} task run with exit code {returncode}.",
         f"Artifact: {rel_artifact}",

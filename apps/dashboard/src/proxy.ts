@@ -12,6 +12,7 @@ const PUBLIC_PATHS = [
   "/api/bridge/task-event",
   "/api/bridge/file-actions",
   "/api/bridge/prompt-context",
+  "/api/bridge/memory",
 ];
 
 function isPublicPath(pathname: string): boolean {
