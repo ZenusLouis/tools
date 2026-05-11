@@ -113,9 +113,19 @@ def main() -> int:
     next_file_action_poll = 0.0
     from_end = not args.from_start
 
-    # Auto-reload: track own script mtime
+    # Auto-reload: track own script + gcs_bridge package mtimes
     _self = Path(__file__).resolve()
-    _self_mtime = _self.stat().st_mtime
+    def _watched_mtimes() -> dict[str, float]:
+        mtimes: dict[str, float] = {str(_self): _self.stat().st_mtime}
+        pkg = _self.parent / "gcs_bridge"
+        if pkg.is_dir():
+            for f in pkg.rglob("*.py"):
+                try:
+                    mtimes[str(f)] = f.stat().st_mtime
+                except Exception:
+                    pass
+        return mtimes
+    _watch_mtimes = _watched_mtimes()
 
     print("GCS bridge daemon started. Press Ctrl+C to stop.", flush=True)
     print(f"Dashboard: {DASHBOARD_URL}", flush=True)
@@ -124,11 +134,12 @@ def main() -> int:
         while True:
             now = time.time()
 
-            # Self-reload check every 10s
+            # Auto-reload check: watch own script + gcs_bridge package
             try:
-                new_mtime = _self.stat().st_mtime
-                if new_mtime != _self_mtime:
-                    print("[auto-reload] Script changed — restarting daemon...", flush=True)
+                new_mtimes = _watched_mtimes()
+                if new_mtimes != _watch_mtimes:
+                    changed = [f for f in new_mtimes if new_mtimes.get(f) != _watch_mtimes.get(f)]
+                    print(f"[auto-reload] Changed: {', '.join(Path(f).name for f in changed)} — restarting...", flush=True)
                     save_state(state)
                     os.execv(sys.executable, [sys.executable] + sys.argv)
             except Exception:
