@@ -566,6 +566,27 @@
                 "Add confirm dialog for deactivation and role unassignment actions"
               ],
               "status": "pending"
+            },
+            {
+              "id": "omnibooking-M4-F1-T2",
+              "name": "Cinema and hotel domain UI screens",
+              "summary": "Build cinema screens: movie list, room seat builder, showtime calendar, seat selection map. Build hotel screens: property list, room type list, availability calendar, booking list.",
+              "details": "CIN-UI-001 Movie List: poster thumbnail, status chip, quick actions. CIN-UI-002 Room Seat Builder: grid with row/column labels, VIP/standard/blocked. CIN-UI-003 Showtime Calendar: grouped by date. CIN-UI-004 Seat Selection: interactive map during booking. CIN-UI-005 Booking detail. HOT-UI-001 to HOT-UI-004: property list, room type management, availability search results, booking/check-in screens. Screens reuse DataTableComponent, StatusChipComponent, AuditTimelineComponent from Global UI. Page 20.",
+              "acceptanceCriteria": [
+                "Movie list shows poster thumbnail, status chip, and quick-action buttons",
+                "Seat builder grid renders row/column labels with seat-type colors and blocked markers",
+                "Showtime calendar groups entries by date with status color",
+                "Hotel availability results show room types with quantity and estimated total"
+              ],
+              "steps": [
+                "Scaffold lazy-loaded CinemaModule and HotelModule with feature routes",
+                "Build MovieListComponent with poster, chip, inline actions",
+                "Build SeatBuilderComponent: SVG or CSS grid with seat-type color map",
+                "Build ShowtimeCalendarComponent grouping showtimes by date using Angular CDK",
+                "Build SeatSelectionMapComponent with hold integration",
+                "Build HotelAvailabilityComponent and HotelBookingDetailComponent"
+              ],
+              "status": "pending"
             }
           ]
         }

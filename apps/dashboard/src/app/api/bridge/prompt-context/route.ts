@@ -111,6 +111,8 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    if (!task) return NextResponse.json({ error: "Task not found" }, { status: 404 });
+
     // Load linked design tasks (done only)
     const designTasks = task.designRefs?.length
       ? await db.designTask.findMany({
@@ -118,7 +120,6 @@ export async function POST(req: NextRequest) {
           select: { id: true, screenName: true, provider: true, outputUrl: true, figmaNodeId: true, figmaFileKey: true },
         })
       : [];
-    if (!task) return NextResponse.json({ error: "Task not found" }, { status: 404 });
 
     const project = task.feature?.module?.project;
     const projectName = project?.name || "local";
