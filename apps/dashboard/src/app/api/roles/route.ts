@@ -10,7 +10,8 @@ const RoleSchema = z.object({
   name: z.string().min(1).max(120),
   slug: z.string().min(1).max(120).regex(/^[a-z0-9-]+$/),
   description: z.string().default(""),
-  provider: z.enum(["claude", "codex", "chatgpt"]),
+  provider: z.enum(["claude", "codex", "chatgpt", "gemini"]),
+
   defaultModel: z.string().optional(),
   phase: z.enum(["analysis", "implementation", "review", "research", "design", "custom"]),
   executionModeDefault: z.enum(["local", "dashboard"]).default("local"),
@@ -25,7 +26,7 @@ function normalizeRoleRuntime(role: z.infer<typeof RoleSchema>) {
   if (role.provider === "chatgpt") {
     return { ...role, executionModeDefault: "dashboard" as const, credentialService: "openai" };
   }
-  if (role.provider === "codex") {
+  if (role.provider === "codex" || role.provider === "claude" || role.provider === "gemini") {
     return { ...role, executionModeDefault: "local" as const, credentialService: "none" };
   }
   return role;

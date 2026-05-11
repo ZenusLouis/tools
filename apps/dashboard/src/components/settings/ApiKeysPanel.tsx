@@ -6,10 +6,11 @@ import type { ApiKeyRow } from "@/lib/api-keys";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 const SERVICE_OPTIONS = [
-  { value: "stitch", label: "Stitch Design" },
+  { value: "google", label: "Google / Gemini / Stitch" },
+  { value: "anthropic", label: "Anthropic" },
   { value: "figma", label: "Figma" },
   { value: "github", label: "GitHub" },
-  { value: "anthropic", label: "Anthropic" },
+  { value: "stitch", label: "Stitch Design (Legacy)" },
   { value: "custom", label: "Custom" },
 ];
 
@@ -21,6 +22,8 @@ function ServiceBadge({ service }: { service: string }) {
     openai: "bg-done/10 text-done",
     openai_admin: "bg-in-progress/10 text-in-progress",
     anthropic: "bg-accent/10 text-accent",
+    google: "bg-accent/10 text-accent",
+    gemini: "bg-accent/10 text-accent",
   };
   return <span className={`rounded px-2 py-0.5 font-mono text-[10px] font-bold uppercase ${colors[service] ?? "bg-border text-text-muted"}`}>{service}</span>;
 }
@@ -183,6 +186,75 @@ function AddKeyForm({ onAdded }: { onAdded: (key: ApiKeyRow) => void }) {
   );
 }
 
+function GoogleKeysForm({ keys, onAdded }: { keys: ApiKeyRow[]; onAdded: (key: ApiKeyRow) => void }) {
+  const googleKey = keys.find((key) => key.service === "google");
+  const [value, setValue] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!value.trim()) return;
+
+    setMessage(null);
+    setSaving(true);
+    try {
+      const res = await fetch("/api/keys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Google API Key", service: "google", value: value.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to save Google key");
+      onAdded(data);
+      setValue("");
+      setMessage({ type: "ok", text: "Google/Gemini API key saved encrypted." });
+    } catch (error) {
+      setMessage({ type: "error", text: error instanceof Error ? error.message : "Failed to save Google key" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3 rounded-xl border border-border bg-bg-base p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wider text-accent">Google / Gemini / Stitch</p>
+          <p className="mt-1 text-xs text-text-muted">
+            Used for Gemini model discovery and Stitch Design generation.
+          </p>
+        </div>
+        <span className={`rounded px-2 py-1 text-[10px] font-bold uppercase ${googleKey ? "bg-done/10 text-done" : "bg-card-hover text-text-muted"}`}>
+          {googleKey ? "Key saved" : "Key missing"}
+        </span>
+      </div>
+
+      <label className="space-y-1 block">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-text-muted">API Key</span>
+        <input
+          type="password"
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          placeholder={googleKey ? "Saved - paste a new key to rotate" : "Paste your Google/Gemini API key"}
+          className="w-full rounded-lg border border-border bg-card px-3 py-2 font-mono text-sm text-text outline-none focus:ring-1 focus:ring-accent"
+        />
+      </label>
+
+      {message && <p className={`text-xs ${message.type === "ok" ? "text-done" : "text-blocked"}`}>{message.text}</p>}
+
+      <button
+        type="submit"
+        disabled={saving || !value.trim()}
+        className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+      >
+        {saving ? <Loader2 size={13} className="animate-spin" /> : <Key size={13} />}
+        Save Google Key
+      </button>
+    </form>
+  );
+}
+
 function OpenAIKeysForm({ keys, onAdded }: { keys: ApiKeyRow[]; onAdded: (key: ApiKeyRow) => void }) {
   const runtimeKey = keys.find((key) => key.service === "openai");
   const adminKey = keys.find((key) => key.service === "openai_admin" || key.service === "openai_usage");
@@ -309,6 +381,8 @@ export function ApiKeysPanel({ initialKeys }: { initialKeys: ApiKeyRow[] }) {
       )}
 
       <OpenAIKeysForm keys={keys} onAdded={(key) => setKeys((prev) => [...prev, key])} />
+
+      <GoogleKeysForm keys={keys} onAdded={(key) => setKeys((prev) => [...prev, key])} />
 
       {nonOpenAIKeys.length > 0 && (
         <div className="space-y-2">

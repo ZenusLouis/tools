@@ -304,7 +304,6 @@ async function queueProgressSync(project: ProjectWithLatestPath, workspaceId: st
 function providerCredential(provider: string, credentialService: string) {
   if (credentialService !== "none") return credentialService;
   if (provider === "chatgpt") return "openai";
-  if (provider === "claude") return "anthropic";
   return "none";
 }
 

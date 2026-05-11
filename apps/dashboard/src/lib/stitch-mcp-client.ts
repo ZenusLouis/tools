@@ -9,6 +9,8 @@ async function resolveApiKey(workspaceId?: string): Promise<string> {
   if (workspaceId) {
     const key = await getApiKeyByService("google", workspaceId);
     if (key) return key;
+    const legacyKey = await getApiKeyByService("stitch", workspaceId);
+    if (legacyKey) return legacyKey;
   }
   return process.env.STITCH_API_KEY ?? "";
 }
@@ -89,7 +91,7 @@ export async function stitchGenerateScreen(params: {
   workspaceId?: string;
 }): Promise<{ screenId: string; outputUrl?: string; raw: unknown }> {
   const apiKey = await resolveApiKey(params.workspaceId);
-  if (!apiKey) throw new Error("Stitch/Google API key not configured. Add it in Settings → API Keys.");
+  if (!apiKey) throw new Error("Google/Gemini/Stitch API key not configured. Add it in Settings → API Keys.");
   const sessionId = await initSession(apiKey);
 
   const { data } = await mcpPost<ToolCallResult>(
