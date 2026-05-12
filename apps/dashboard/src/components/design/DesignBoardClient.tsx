@@ -24,9 +24,14 @@ export function DesignBoardClient({
     setMessage(null);
     startAnalyze(async () => {
       const res = await fetch(`/api/projects/${encodeURIComponent(projectName)}/design/analyze`, { method: "POST" });
-      const body = await res.json().catch(() => ({})) as { screensCreated?: number; linked?: number; error?: string };
+      const body = await res.json().catch(() => ({})) as { screensCreated?: number; linked?: number; error?: string; queued?: boolean; message?: string };
       if (!res.ok) {
         setMessage(body.error ?? "Analysis failed");
+        return;
+      }
+      if (body.queued) {
+        setMessage(body.message ?? "Analysis queued on local bridge. Refreshing in 30s...");
+        window.setTimeout(() => { refresh(); setMessage(null); }, 30_000);
         return;
       }
       setMessage(`Created ${body.screensCreated} screens, linked to ${body.linked} FE tasks.`);

@@ -68,9 +68,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ nam
     }
   }
 
-  const apiKey = await getApiKeyByService("anthropic", user.workspaceId);
-  if (!apiKey) return NextResponse.json({ error: "Anthropic API key not configured" }, { status: 400 });
-
   const analysisPrompt = `You are a UI/UX analyst. Given the following BRD (Business Requirements Document) for a ${project.frameworks.join(", ")} project called "${projectName}", extract all distinct UI screens that need to be designed.
 
 BRD Content:
@@ -86,6 +83,43 @@ Respond ONLY with valid JSON — no markdown, no explanation:
 {"screens":[{"screenName":"...","screenDesc":"...","userFlow":"...","reqIds":["..."]}]}
 
 Extract ALL screens needed for a complete app. Typical apps have 10-30 screens.`;
+
+  const apiKey = await getApiKeyByService("anthropic", user.workspaceId);
+
+  // Fallback to local bridge when no API key configured
+  if (!apiKey) {
+    const onlineBridge = await db.bridgeProjectPath.findFirst({
+      where: {
+        workspaceId: user.workspaceId,
+        projectName,
+        device: { lastSeenAt: { gte: new Date(Date.now() - 90_000) } },
+      },
+      include: { device: { select: { id: true } } },
+    });
+    if (!onlineBridge) {
+      return NextResponse.json({
+        error: "No Anthropic API key configured and no local bridge is online. Configure an API key in Settings or start the local bridge.",
+      }, { status: 400 });
+    }
+    const docs = project.docs as Record<string, string> | null;
+    await db.bridgeFileAction.create({
+      data: {
+        workspaceId: user.workspaceId,
+        deviceId: onlineBridge.device.id,
+        type: "run_analysis",
+        payload: {
+          projectName,
+          projectPath: onlineBridge.path,
+          frameworks: project.frameworks,
+          docs: docs ?? {},
+          callbackPath: `/api/projects/${encodeURIComponent(projectName)}/design/analyze/result`,
+          analysisKind: "design_screens",
+          prompt: analysisPrompt,
+        },
+      },
+    });
+    return NextResponse.json({ ok: true, queued: true, message: "Analysis queued on local bridge. Refresh in ~30s." });
+  }
 
   let screens: ScreenDraft[] = [];
   try {
