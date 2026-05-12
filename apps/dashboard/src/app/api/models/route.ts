@@ -99,7 +99,10 @@ export async function GET(req: NextRequest) {
       },
     });
     for (const d of devices) {
-      const models = (d.reportedModels as any)?.[provider] as string[];
+      const reportedModels = d.reportedModels && typeof d.reportedModels === "object" && !Array.isArray(d.reportedModels)
+        ? d.reportedModels as Record<string, unknown>
+        : {};
+      const models = reportedModels[provider];
       if (Array.isArray(models)) reported = [...reported, ...models];
     }
   } catch {

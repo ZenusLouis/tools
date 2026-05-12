@@ -48,7 +48,13 @@ class FileActionPoller:
                 action_status = "failed" if isinstance(result, dict) and int(result.get("exitCode") or 0) != 0 else "succeeded"
                 ok, detail = self.client.post_json_data(
                     "/api/bridge/file-actions/result",
-                    {"id": action_id, "status": action_status, "deviceKey": device_key, "result": sanitize_json(result)},
+                    {
+                        "id": action_id,
+                        "status": action_status,
+                        "deviceKey": device_key,
+                        "claimToken": action.get("claimToken"),
+                        "result": sanitize_json(result),
+                    },
                     timeout=8,
                 )
                 if ok:
@@ -60,7 +66,13 @@ class FileActionPoller:
             except Exception as exc:
                 self.client.post_json_data(
                     "/api/bridge/file-actions/result",
-                    {"id": action_id, "status": "failed", "deviceKey": device_key, "error": sanitize_text(str(exc))},
+                    {
+                        "id": action_id,
+                        "status": "failed",
+                        "deviceKey": device_key,
+                        "claimToken": action.get("claimToken"),
+                        "error": sanitize_text(str(exc)),
+                    },
                     timeout=8,
                 )
                 print(f"[file-actions] failed {action_id}: {exc}", flush=True)

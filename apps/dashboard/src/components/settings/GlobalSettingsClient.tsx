@@ -24,6 +24,12 @@ export function GlobalSettingsClient({ profiles }: { profiles: McpProfile[] }) {
     steps: Array<{ name: string; ok: boolean; status?: string | null; detail?: string | null }>;
     error?: string | null;
   }>({ running: false, ok: null, steps: [] });
+  const [coreCompare, setCoreCompare] = useState<{
+    running: boolean;
+    ok: boolean | null;
+    mismatches: string[];
+    error?: string | null;
+  }>({ running: false, ok: null, mismatches: [] });
   const [currentUsage] = useState(() => {
     if (typeof window === "undefined") return 0;
     const statsKey = `token-count-${new Date().toISOString().slice(0, 10)}`;
@@ -76,6 +82,27 @@ export function GlobalSettingsClient({ profiles }: { profiles: McpProfile[] }) {
         ok: false,
         steps: [],
         error: error instanceof Error ? error.message : "Failed to run Core API smoke test",
+      });
+    }
+  }
+
+  async function compareCoreContract() {
+    setCoreCompare({ running: true, ok: null, mismatches: [] });
+    try {
+      const response = await fetch("/api/core-runtime/compare", { cache: "no-store" });
+      const payload = await response.json();
+      setCoreCompare({
+        running: false,
+        ok: !!payload.ok,
+        mismatches: Array.isArray(payload.mismatches) ? payload.mismatches : [],
+        error: payload.error ?? null,
+      });
+    } catch (error) {
+      setCoreCompare({
+        running: false,
+        ok: false,
+        mismatches: ["Failed to compare Core API contract"],
+        error: error instanceof Error ? error.message : "Failed to compare Core API contract",
       });
     }
   }
@@ -218,6 +245,15 @@ export function GlobalSettingsClient({ profiles }: { profiles: McpProfile[] }) {
             {coreSmoke.running ? "Running Lifecycle Smoke..." : "Run Lifecycle Smoke"}
           </button>
 
+          <button
+            type="button"
+            onClick={compareCoreContract}
+            disabled={!coreRuntime?.reachable || coreCompare.running}
+            className="w-full rounded-lg border border-border bg-bg-base px-3 py-2 text-xs font-bold text-text transition-colors hover:border-accent/60 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {coreCompare.running ? "Comparing Contract..." : "Compare Contract"}
+          </button>
+
           {coreSmoke.ok !== null || coreSmoke.error ? (
             <div className={`rounded-lg border p-3 text-xs ${coreSmoke.ok ? "border-done/40 bg-done/10" : "border-blocked/40 bg-blocked/10"}`}>
               <p className={`font-bold ${coreSmoke.ok ? "text-done" : "text-blocked"}`}>
@@ -235,6 +271,24 @@ export function GlobalSettingsClient({ profiles }: { profiles: McpProfile[] }) {
                   ))}
                 </div>
               ) : null}
+            </div>
+          ) : null}
+
+          {coreCompare.ok !== null || coreCompare.error ? (
+            <div className={`rounded-lg border p-3 text-xs ${coreCompare.ok ? "border-done/40 bg-done/10" : "border-blocked/40 bg-blocked/10"}`}>
+              <p className={`font-bold ${coreCompare.ok ? "text-done" : "text-blocked"}`}>
+                {coreCompare.ok ? "Contract matches" : "Contract mismatch"}
+              </p>
+              {coreCompare.error ? <p className="mt-1 text-blocked">{coreCompare.error}</p> : null}
+              {coreCompare.mismatches.length > 0 ? (
+                <ul className="mt-2 space-y-1">
+                  {coreCompare.mismatches.map((item) => (
+                    <li key={item} className="font-mono text-text-muted">{item}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-1 text-text-muted">Next.js bridge contract and Spring Core API contract are aligned.</p>
+              )}
             </div>
           ) : null}
         </div>

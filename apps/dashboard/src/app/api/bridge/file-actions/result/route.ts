@@ -10,6 +10,7 @@ const ResultSchema = z.object({
   id: z.string().min(1),
   status: z.enum(["succeeded", "failed", "cancelled", "expired"]),
   deviceKey: z.string().min(1).max(120).optional(),
+  claimToken: z.string().min(1).optional(),
   result: z.record(z.string(), z.unknown()).optional(),
   error: z.string().max(4000).optional(),
 });
@@ -24,6 +25,8 @@ function objectValue(value: unknown) {
 }
 
 export async function POST(req: NextRequest) {
+  const body = await req.json().catch(() => null);
+  const parsed = ResultSchema.safeParse(body);
   let ctx = await verifyBridgeRequest(bridgeTokenFromHeaders(req.headers));
   if (!ctx && HOOK_SECRET) {
     if (req.headers.get("x-hook-secret") === HOOK_SECRET) {
@@ -31,9 +34,19 @@ export async function POST(req: NextRequest) {
       if (workspace) ctx = { workspaceId: workspace.id, deviceId: null, tokenId: null };
     }
   }
+  if (!ctx && parsed.success && parsed.data.claimToken) {
+    const action = await db.bridgeFileAction.findFirst({
+      where: {
+        id: parsed.data.id,
+        claimToken: parsed.data.claimToken,
+        status: { in: ["claimed", "running"] },
+      },
+      select: { workspaceId: true, deviceId: true },
+    });
+    if (action) ctx = { workspaceId: action.workspaceId, deviceId: action.deviceId, tokenId: null };
+  }
   if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const parsed = ResultSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues }, { status: 400 });
 
   let deviceId = ctx.deviceId;

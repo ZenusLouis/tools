@@ -362,6 +362,7 @@ def execute_analysis_action(action: dict[str, Any]) -> dict[str, Any]:
     # POST result back to dashboard
     ok, detail = post_json_data(callback_path, {
         "actionId": action_id,
+        "claimToken": claim_token,
         "projectName": project_name,
         "modules": modules,
         "analysisTranscript": transcript,

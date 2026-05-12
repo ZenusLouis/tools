@@ -42,6 +42,8 @@ pending -> claimed -> running -> succeeded | failed | cancelled | expired
 
 The dashboard Settings page can run a smoke test through `POST /api/core-runtime/smoke` when `GCS_CORE_API_ENABLED=true`. That smoke test creates a Spring action, claims it, refreshes a lease, posts a successful result, and reads final status.
 
+It can also run a contract comparison through `GET /api/core-runtime/compare`. This compares the dashboard bridge contract against Spring's `/api/core/contract` response so operators can confirm payload/result versions, action types, lifecycle states, lifecycle endpoints, and telemetry fields are aligned before any route is cut over.
+
 ## Migration Rules
 
 - Do not move Next.js routes to Spring until the contract response matches dashboard behavior.

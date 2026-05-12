@@ -64,6 +64,9 @@
 - Added an in-memory Spring Bridge Action Protocol v1 lifecycle slice for contract testing: enqueue, pending, claim, lease, status, result, and cancel endpoints under `/api/core/bridge/file-actions`.
 - Added Spring lifecycle tests covering pending claim, claim token lease transition, terminal result persistence, and pending cancellation.
 - Added a dashboard-authenticated Core Runtime smoke route and Settings button that exercises the Spring lifecycle end-to-end: enqueue, claim, lease, result, and status readback.
+- Added a dashboard-authenticated Core Runtime contract compare route and Settings button that checks the Next.js bridge contract against the Spring Core API contract before any runtime cutover.
+- Cleaned up existing lint blockers in bridge memory ingestion, local model reporting, and the design board empty-state copy so Phase 10 verification stays green.
+- Hardened local analysis result posting: the bridge now sends the claimed action token with analysis callbacks and generic action results, and dashboard result endpoints can accept `actionId + claimToken` when environment bridge credentials drift. This prevents completed local Claude analysis runs from being rejected with `401 Unauthorized` after long executions.
 
 ## Verification
 
@@ -90,6 +93,8 @@
 - `npm run lint`, `npx tsc --noEmit`, and `npm run build` passed after wiring the Core API feature flag/status endpoint and Settings status card into the dashboard.
 - `mvn test`, `npm run lint`, `npx tsc --noEmit`, and `npm run build` passed after adding the in-memory Spring bridge action lifecycle slice.
 - `mvn test`, `npm run lint`, `npx tsc --noEmit`, and `npm run build` passed after adding the dashboard Core Runtime lifecycle smoke test.
+- `mvn test`, `npm run lint`, `npx tsc --noEmit`, and `npm run build` passed after adding Core Runtime contract comparison.
+- `python -m py_compile hooks/gcs_bridge/action_runner.py hooks/gcs_bridge/local_action_executor.py hooks/gcs_bridge_daemon.py`, `npm run lint`, `npx tsc --noEmit`, and `npm run build` passed after claim-token hardening for analysis/result callbacks.
 
 ## Gaps
 

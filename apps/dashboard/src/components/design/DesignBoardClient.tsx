@@ -13,7 +13,7 @@ export function DesignBoardClient({
   initialTasks: DesignTaskItem[];
 }) {
   const router = useRouter();
-  const [tasks, setTasks] = useState(initialTasks);
+  const [tasks] = useState(initialTasks);
   const [analyzing, startAnalyze] = useTransition();
   const [runningAll, startRunAll] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
@@ -149,7 +149,7 @@ export function DesignBoardClient({
           <Sparkles size={32} className="text-text-muted/50" />
           <div>
             <p className="font-semibold text-text">No design screens yet</p>
-            <p className="mt-1 text-sm text-text-muted">Click "Analyze BRD" to extract screens from your requirements document.</p>
+            <p className="mt-1 text-sm text-text-muted">Click &quot;Analyze BRD&quot; to extract screens from your requirements document.</p>
           </div>
           <button
             type="button"

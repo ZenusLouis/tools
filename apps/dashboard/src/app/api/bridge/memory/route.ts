@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { bridgeTokenFromHeaders, verifyBridgeRequest } from "@/lib/bridge-auth";
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
         tags: node.tags,
         reqIds: node.reqIds,
         sourcePath: node.sourcePath ?? null,
-        metadata: node.metadata as any,
+        metadata: node.metadata as Prisma.InputJsonValue,
       },
       update: {
         title: node.title,
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
         tags: node.tags,
         reqIds: node.reqIds,
         sourcePath: node.sourcePath ?? null,
-        metadata: node.metadata as any,
+        metadata: node.metadata as Prisma.InputJsonValue,
       },
     });
     upserted++;
