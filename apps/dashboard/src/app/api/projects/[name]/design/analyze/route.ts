@@ -102,7 +102,7 @@ Extract ALL screens needed for a complete app. Typical apps have 10-30 screens.`
       }, { status: 400 });
     }
     const docs = project.docs as Record<string, string> | null;
-    await db.bridgeFileAction.create({
+    const action = await db.bridgeFileAction.create({
       data: {
         workspaceId: user.workspaceId,
         deviceId: onlineBridge.device.id,
@@ -118,7 +118,7 @@ Extract ALL screens needed for a complete app. Typical apps have 10-30 screens.`
         },
       },
     });
-    return NextResponse.json({ ok: true, queued: true, message: "Analysis queued on local bridge. Refresh in ~30s." });
+    return NextResponse.json({ ok: true, queued: true, actionId: action.id, message: "Analysis queued on local bridge." });
   }
 
   let screens: ScreenDraft[] = [];

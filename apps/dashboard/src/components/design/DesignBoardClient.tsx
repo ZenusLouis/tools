@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition, useCallback } from "react";
-import { Loader2, Sparkles, Play } from "lucide-react";
+import { useState, useTransition, useCallback, useEffect, useRef } from "react";
+import { Loader2, Sparkles, Play, TerminalSquare } from "lucide-react";
 import { DesignTaskCard, type DesignTaskItem } from "./DesignTaskCard";
 import { useRouter } from "next/navigation";
 
@@ -17,21 +17,53 @@ export function DesignBoardClient({
   const [analyzing, startAnalyze] = useTransition();
   const [runningAll, startRunAll] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
+  const [localActionId, setLocalActionId] = useState<string | null>(null);
+  const [localLog, setLocalLog] = useState<string[]>([]);
+  const [localStatus, setLocalStatus] = useState<string | null>(null);
+  const logRef = useRef<HTMLPreElement>(null);
 
   const refresh = useCallback(() => router.refresh(), [router]);
 
+  // Poll bridge action progress when running locally
+  useEffect(() => {
+    if (!localActionId) return;
+    if (localStatus && !["pending", "claimed", "running"].includes(localStatus)) return;
+    const timer = window.setInterval(async () => {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectName)}/design/analyze/status?actionId=${localActionId}`, { cache: "no-store" });
+      if (!res.ok) return;
+      const body = await res.json() as { status: string; log?: string[]; error?: string | null };
+      setLocalStatus(body.status);
+      if (body.log?.length) setLocalLog(body.log);
+      if (body.status === "succeeded") {
+        setLocalActionId(null);
+        refresh();
+      } else if (body.status === "failed") {
+        setLocalLog((prev) => [...prev, body.error ?? "Analysis failed."]);
+      }
+    }, 2500);
+    return () => window.clearInterval(timer);
+  }, [localActionId, localStatus, projectName, refresh]);
+
+  // Auto-scroll log
+  useEffect(() => {
+    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
+  }, [localLog]);
+
   function analyze() {
     setMessage(null);
+    setLocalLog([]);
+    setLocalStatus(null);
     startAnalyze(async () => {
       const res = await fetch(`/api/projects/${encodeURIComponent(projectName)}/design/analyze`, { method: "POST" });
-      const body = await res.json().catch(() => ({})) as { screensCreated?: number; linked?: number; error?: string; queued?: boolean; message?: string };
+      const body = await res.json().catch(() => ({})) as { screensCreated?: number; linked?: number; error?: string; queued?: boolean; actionId?: string; message?: string };
       if (!res.ok) {
         setMessage(body.error ?? "Analysis failed");
         return;
       }
-      if (body.queued) {
-        setMessage(body.message ?? "Analysis queued on local bridge. Refreshing in 30s...");
-        window.setTimeout(() => { refresh(); setMessage(null); }, 30_000);
+      if (body.queued && body.actionId) {
+        setLocalActionId(body.actionId);
+        setLocalStatus("pending");
+        setLocalLog(["Analysis queued on local bridge. Waiting for bridge to pick up..."]);
         return;
       }
       setMessage(`Created ${body.screensCreated} screens, linked to ${body.linked} FE tasks.`);
@@ -93,6 +125,23 @@ export function DesignBoardClient({
 
       {message && (
         <p className="rounded-xl border border-done/30 bg-done/10 px-4 py-2 text-sm text-done">{message}</p>
+      )}
+
+      {localLog.length > 0 && (
+        <div className="overflow-hidden rounded-xl border border-border bg-bg-base">
+          <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+            <TerminalSquare size={13} className="text-text-muted" />
+            <span className="font-mono text-[11px] text-text-muted">
+              {localStatus === "succeeded" ? "done" : localStatus === "failed" ? "failed" : "running..."}
+            </span>
+            {localStatus && !["succeeded", "failed", "cancelled"].includes(localStatus) && (
+              <Loader2 size={12} className="animate-spin text-accent" />
+            )}
+          </div>
+          <pre ref={logRef} className="max-h-48 overflow-auto whitespace-pre-wrap px-3 py-3 font-mono text-[11px] leading-5 text-text-muted">
+            {localLog.join("\n")}
+          </pre>
+        </div>
       )}
 
       {tasks.length === 0 ? (
